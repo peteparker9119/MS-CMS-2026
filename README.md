@@ -161,6 +161,143 @@ MS-CMS-2026/
 
 ---
 
+## Deployment (Ubuntu + Nginx + Gunicorn)
+
+### 1. Server Setup
+
+```bash
+sudo apt update && sudo apt install -y python3.11 python3.11-venv python3-pip \
+    mysql-server nginx git
+```
+
+### 2. Clone & Configure
+
+```bash
+git clone https://github.com/peteparker9119/MS-CMS-2026.git /var/www/cms
+cd /var/www/cms/backend
+
+python3.11 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+cp .env.example .env
+nano .env   # set SECRET_KEY, DB_*, ALLOWED_HOSTS, DEBUG=False
+```
+
+### 3. Database
+
+```bash
+sudo mysql -u root -p <<'SQL'
+CREATE DATABASE cms_convergence CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'cms_user'@'localhost' IDENTIFIED BY 'strong-password';
+GRANT ALL PRIVILEGES ON cms_convergence.* TO 'cms_user'@'localhost';
+FLUSH PRIVILEGES;
+SQL
+
+python manage.py migrate
+python manage.py seed_data
+python manage.py collectstatic --no-input
+```
+
+### 4. Gunicorn Systemd Service
+
+Create `/etc/systemd/system/cms.service`:
+
+```ini
+[Unit]
+Description=MS-CMS Gunicorn
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/cms/backend
+EnvironmentFile=/var/www/cms/backend/.env
+ExecStart=/var/www/cms/backend/venv/bin/gunicorn \
+    --workers 3 \
+    --bind unix:/run/cms.sock \
+    cms.wsgi:application
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now cms
+```
+
+### 5. Build Frontend
+
+```bash
+cd /var/www/cms/frontend
+npm ci
+
+# Point the API base to your domain
+echo "VITE_API_BASE=https://yourdomain.com" > .env.production
+
+npm run build   # outputs to dist/
+```
+
+### 6. Nginx Config
+
+Create `/etc/nginx/sites-available/cms`:
+
+```nginx
+server {
+    listen 80;
+    server_name yourdomain.com;
+
+    # React SPA
+    root /var/www/cms/frontend/dist;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Django API
+    location /api/ {
+        proxy_pass http://unix:/run/cms.sock;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Uploaded files
+    location /media/ {
+        alias /var/www/cms/backend/media/;
+    }
+
+    # Static files (Django admin etc.)
+    location /static/ {
+        alias /var/www/cms/backend/staticfiles/;
+    }
+}
+```
+
+```bash
+sudo ln -s /etc/nginx/sites-available/cms /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### 7. HTTPS with Let's Encrypt
+
+```bash
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d yourdomain.com
+```
+
+### 8. Health Check
+
+```bash
+curl https://yourdomain.com/api/health/
+# {"status": "ok"}
+```
+
+---
+
 ## License
 
 Internal use — TN EMIS Convergence Programme 2026.
