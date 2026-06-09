@@ -1,0 +1,662 @@
+import { useState, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getMeetings, submitMinutes, recordNotHeld, updateMeeting } from '../api/meetings';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { getErrorMessage } from '../api/client';
+
+const ERR = { fontSize: 11, color: '#dc2626', marginTop: 4 };
+import Badge from '../components/Badge';
+import { downloadPDF, downloadWord } from '../utils/momExport';
+import {
+  CCard, CCardBody, CButton,
+  CFormLabel, CFormInput, CFormTextarea,
+  CModal, CModalHeader, CModalTitle, CModalBody, CModalFooter,
+  CSpinner, CRow, CCol,
+} from '@coreui/react';
+
+const MONTHS   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MONTHS_S = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DOW_S    = ['S','M','T','W','T','F','S'];
+const STATUS_COLOR = { conducted:'#1D9E75', scheduled:'#378ADD', postponed:'#E0A21C', missed:'#D85A30' };
+const LBL = { fontSize: 11, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink3)', marginBottom: 6 };
+
+function toISO(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function shareWhatsApp(m) {
+  const A = m.pair.unit_a, B = m.pair.unit_b;
+  const mins = m.minutes;
+  const lines = [
+    '📋 MINUTES OF MEETING', '══════════════════════',
+    `Meeting : ${A.name} × ${B.name}`,
+    `Date    : ${m.date}${m.time ? ', ' + m.time : ''}`,
+  ];
+  if (mins?.attendees) lines.push(`Attended: ${mins.attendees}`);
+  if (m.agenda)        lines.push('', '📌 AGENDA', m.agenda);
+  if (mins?.summary)   lines.push('', '📝 SUMMARY', mins.summary);
+  if (mins?.action_points?.length) {
+    lines.push('', '✅ ACTION POINTS');
+    mins.action_points.forEach(ap => lines.push(`${ap.done ? '☑' : '☐'} ${ap.aid ?? ''}: ${ap.text ?? ap}`));
+  }
+  lines.push('', '──────────────────────', 'MS - CMS Convergence — TN EMIS');
+  window.open('https://wa.me/?text=' + encodeURIComponent(lines.join('\n')), '_blank');
+}
+
+/* ── Mini calendar ─────────────────────────────────────── */
+function MiniCalendar({ calMonth, setCalMonth, byDay, selDay, setSelDay, now }) {
+  const year = calMonth.getFullYear(), mo = calMonth.getMonth();
+  const first    = new Date(year, mo, 1);
+  const startDay = new Date(year, mo, 1 - first.getDay());
+  const cells    = Array.from({ length: 42 }, (_, i) => {
+    const d = new Date(startDay); d.setDate(startDay.getDate() + i); return d;
+  });
+
+  return (
+    <CCard>
+      <CCardBody style={{ padding: '14px 16px' }}>
+        {/* Month nav */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <button onClick={() => setCalMonth(new Date(year, mo - 1, 1))}
+            style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--ink2)', lineHeight: 1, padding: '2px 6px' }}>‹</button>
+          <div>
+            <span style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 18, color: 'var(--ink)' }}>{MONTHS_S[mo]}</span>
+            <span style={{ fontFamily: 'var(--fm)', fontSize: 13, color: 'var(--ink3)', marginLeft: 5 }}>{year}</span>
+          </div>
+          <button onClick={() => setCalMonth(new Date(year, mo + 1, 1))}
+            style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--ink2)', lineHeight: 1, padding: '2px 6px' }}>›</button>
+        </div>
+
+        {/* Day-of-week headers */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', marginBottom: 4 }}>
+          {DOW_S.map((d, i) => (
+            <div key={i} style={{ textAlign: 'center', fontFamily: 'var(--fm)', fontSize: 11, color: 'var(--ink3)', padding: '2px 0', letterSpacing: '.04em', fontWeight: 600 }}>{d}</div>
+          ))}
+        </div>
+
+        {/* Day cells */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2 }}>
+          {cells.map((d, i) => {
+            const key      = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+            const evs      = byDay[key] || [];
+            const isOther  = d.getMonth() !== mo;
+            const isToday  = d.toDateString() === now.toDateString();
+            const isSel    = selDay && d.toDateString() === selDay.toDateString();
+            const hasMeet  = evs.length > 0;
+            return (
+              <div key={i}
+                onClick={() => setSelDay(isSel ? null : new Date(d))}
+                style={{
+                  height: 38, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  justifyContent: 'center', borderRadius: 7, cursor: hasMeet ? 'pointer' : 'default',
+                  background: isSel ? 'var(--accent)' : isToday ? 'var(--accent-light)' : 'transparent',
+                  border: isToday && !isSel ? '1.5px solid var(--accent)' : '1.5px solid transparent',
+                  opacity: isOther ? 0.3 : 1, transition: '.1s',
+                }}
+                onMouseEnter={e => { if (hasMeet && !isSel) e.currentTarget.style.background = 'var(--paper)'; }}
+                onMouseLeave={e => { if (!isSel && !isToday) e.currentTarget.style.background = 'transparent'; else if (isToday && !isSel) e.currentTarget.style.background = 'var(--accent-light)'; }}
+              >
+                <span style={{ fontFamily: 'var(--fb)', fontSize: 13, fontWeight: isSel || isToday ? 700 : 400, color: isSel ? '#fff' : isToday ? 'var(--accent)' : 'var(--ink)', lineHeight: 1 }}>
+                  {d.getDate()}
+                </span>
+                {hasMeet && (
+                  <div style={{ display: 'flex', gap: 2, marginTop: 2 }}>
+                    {evs.slice(0, 3).map((m, j) => (
+                      <span key={j} style={{ width: 4, height: 4, borderRadius: '50%', background: isSel ? 'rgba(255,255,255,.7)' : (STATUS_COLOR[m.status] ?? '#ccc') }} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Today button */}
+        <div style={{ textAlign: 'center', marginTop: 10, borderTop: '1px solid var(--line)', paddingTop: 8 }}>
+          <button onClick={() => { setCalMonth(new Date(now.getFullYear(), now.getMonth(), 1)); setSelDay(null); }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--accent)', fontFamily: 'var(--fb)', padding: '4px 12px', borderRadius: 6 }}>
+            Today
+          </button>
+        </div>
+
+        {/* Legend */}
+        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 5 }}>
+          {[['conducted','Conducted'],['scheduled','Scheduled'],['postponed','Postponed'],['missed','Missed']].map(([s, l]) => (
+            <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_COLOR[s], flexShrink: 0 }} />
+              <span style={{ fontSize: 13, color: 'var(--ink3)', fontFamily: 'var(--fm)' }}>{l}</span>
+            </div>
+          ))}
+        </div>
+      </CCardBody>
+    </CCard>
+  );
+}
+
+/* ── Inline MoM content ────────────────────────────────── */
+function MomContent({ meeting }) {
+  const mins = meeting.minutes;
+  if (!mins) return <div style={{ fontSize: 13, color: 'var(--ink3)', fontStyle: 'italic' }}>No minutes filed yet.</div>;
+  return (
+    <div>
+      {mins.attendees && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={LBL}>Attendees</div>
+          <div style={{ fontSize: 15 }}>{mins.attendees}</div>
+        </div>
+      )}
+      {mins.summary && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={LBL}>Summary</div>
+          <div style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--ink2)' }}>{mins.summary}</div>
+        </div>
+      )}
+      {mins.action_points?.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={LBL}>Action Points</div>
+          {mins.action_points.map((ap, i) => (
+            <div key={ap.id ?? i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--line2)', fontSize: 15 }}>
+              <span style={{ color: ap.done ? 'var(--ok)' : 'var(--ink3)', fontSize: 15, lineHeight: 1.4 }}>{ap.done ? '✓' : '○'}</span>
+              <span style={{ textDecoration: ap.done ? 'line-through' : 'none', color: ap.done ? 'var(--ink3)' : 'var(--ink)' }}>{ap.text ?? ap}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {/* Export row */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+        <button onClick={() => downloadPDF(meeting)}
+          style={{ fontSize: 13, fontFamily: 'var(--fb)', fontWeight: 600, border: '1px solid var(--line)', borderRadius: 7, padding: '6px 14px', background: '#fff', cursor: 'pointer', color: 'var(--ink2)' }}>
+          ⬇ PDF
+        </button>
+        <button onClick={() => downloadWord(meeting)}
+          style={{ fontSize: 13, fontFamily: 'var(--fb)', fontWeight: 600, border: '1px solid var(--line)', borderRadius: 7, padding: '6px 14px', background: '#fff', cursor: 'pointer', color: 'var(--ink2)' }}>
+          ⬇ Word
+        </button>
+        {mins.uploaded_file && (
+          <a href={mins.uploaded_file} download={mins.filename || 'MoM'}
+            style={{ fontSize: 13, fontFamily: 'var(--fb)', fontWeight: 600, border: '1px solid var(--line)', borderRadius: 7, padding: '6px 14px', background: '#fff', cursor: 'pointer', color: 'var(--ink2)', textDecoration: 'none' }}>
+            📎 {mins.filename || 'Uploaded file'}
+          </a>
+        )}
+        <button onClick={() => shareWhatsApp(meeting)} title="Share on WhatsApp"
+          style={{ border: 'none', borderRadius: 7, padding: '6px 9px', background: '#25d366', cursor: 'pointer', color: '#fff', display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Main component ─────────────────────────────────────── */
+const TABS = [
+  { key: 'all',       label: 'All'        },
+  { key: 'upcoming',  label: 'Upcoming'   },
+  { key: 'conducted', label: 'Conducted'  },
+  { key: 'notheld',   label: 'Not Held'   },
+];
+
+export default function MeetingsPage() {
+  const toast    = useToast();
+  const qc       = useQueryClient();
+  const { user } = useAuth();
+  const now      = new Date();
+  const isAdmin  = user?.role === 'admin';
+
+  const [calMonth,  setCalMonth]  = useState(new Date(now.getFullYear(), now.getMonth(), 1));
+  const [selDay,    setSelDay]    = useState(null);
+  const [tab,       setTab]       = useState('all');
+  const [expanded,  setExpanded]  = useState(new Set());
+
+  /* Reschedule modal state */
+  const [rsOpen,    setRsOpen]    = useState(false);
+  const [rsMeeting, setRsMeeting] = useState(null);
+  const [rsDate,    setRsDate]    = useState('');
+  const [rsTime,    setRsTime]    = useState('');
+  const [rsAgenda,  setRsAgenda]  = useState('');
+  const [rsFe,      setRsFe]      = useState({});
+
+  /* MoM modal state */
+  const [momOpen,    setMomOpen]    = useState(false);
+  const [momMeeting, setMomMeeting] = useState(null);
+  const [momMode,    setMomMode]    = useState(null);
+  const [attendees,  setAttendees]  = useState('');
+  const [summary,    setSummary]    = useState('');
+  const [actions,    setActions]    = useState('');
+  const [nhStatus,   setNhStatus]   = useState('postponed');
+  const [reason,     setReason]     = useState('');
+  const [momFe,      setMomFe]      = useState({});
+
+  const { data: meetings = [], isLoading } = useQuery({
+    queryKey: ['meetings'],
+    queryFn: () => getMeetings({}),
+  });
+
+  /* Calendar dot map */
+  const byDay = useMemo(() => {
+    const map = {};
+    meetings.forEach(m => {
+      const d   = new Date(m.date + 'T00:00:00');
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      (map[key] = map[key] || []).push(m);
+    });
+    return map;
+  }, [meetings]);
+
+  /* Filtered list */
+  const todayISO = toISO(now);
+  const filtered = useMemo(() => {
+    let list = [...meetings];
+
+    // Day filter from calendar click
+    if (selDay) {
+      const key = toISO(selDay);
+      list = list.filter(m => m.date === key);
+    }
+
+    // Tab filter
+    if (tab === 'upcoming')  list = list.filter(m => m.status === 'scheduled' && m.date >= todayISO);
+    if (tab === 'conducted') list = list.filter(m => m.status === 'conducted');
+    if (tab === 'notheld')   list = list.filter(m => m.status === 'postponed' || m.status === 'missed');
+
+    return list.sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [meetings, tab, selDay, todayISO]);
+
+  const toggleExpand = (id) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  /* MoM mutation */
+  const momMutation = useMutation({
+    mutationFn: ({ meetingId, data, type }) =>
+      type === 'minutes' ? submitMinutes(meetingId, data) : recordNotHeld(meetingId, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['meetings'] });
+      setMomOpen(false); setMomMeeting(null); setMomMode(null);
+      setAttendees(''); setSummary(''); setActions(''); setReason('');
+      toast(momMode === 'conduct' ? 'Minutes filed' : 'Recorded');
+    },
+    onError: (err) => toast(getErrorMessage(err)),
+  });
+
+  /* Reschedule mutation (admin only) */
+  const rsMutation = useMutation({
+    mutationFn: ({ id, data }) => updateMeeting(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['meetings'] });
+      setRsOpen(false); setRsMeeting(null); setRsFe({});
+      toast('Meeting rescheduled');
+    },
+    onError: (err) => toast(getErrorMessage(err)),
+  });
+
+  const openReschedule = (m, e) => {
+    e.stopPropagation();
+    setRsMeeting(m);
+    setRsDate(m.date);
+    setRsTime(m.time ?? '');
+    setRsAgenda(m.agenda ?? '');
+    setRsFe({});
+    setRsOpen(true);
+  };
+
+  const handleReschedule = () => {
+    if (!rsDate) { setRsFe({ rsDate: 'Select a new date for the meeting' }); return; }
+    setRsFe({});
+    rsMutation.mutate({ id: rsMeeting.id, data: { date: rsDate, time: rsTime || null, agenda: rsAgenda } });
+  };
+
+  const handleMomSubmit = () => {
+    if (momMode === 'conduct') {
+      const apLines = actions.split('\n').map(s => s.replace(/^[-•*\d.)\s]+/, '').trim()).filter(Boolean);
+      if (!summary && !apLines.length) { setMomFe({ summary: 'Add a summary or at least one action point' }); return; }
+      setMomFe({});
+      momMutation.mutate({ meetingId: momMeeting.id, data: { attendees, summary, action_points: apLines, source: 'written' }, type: 'minutes' });
+    } else {
+      if (!reason) { setMomFe({ reason: 'Provide a reason for not holding the meeting' }); return; }
+      setMomFe({});
+      momMutation.mutate({ meetingId: momMeeting.id, data: { status: nhStatus, reason }, type: 'notheld' });
+    }
+  };
+
+  const openMom = (m, editExisting = false) => {
+    setMomMeeting(m);
+    if (editExisting && m.minutes) {
+      // Pre-fill existing MoM data for re-edit
+      setMomMode('conduct');
+      setAttendees(m.minutes.attendees ?? '');
+      setSummary(m.minutes.summary ?? '');
+      setActions((m.minutes.action_points ?? []).map(ap => ap.text).join('\n'));
+    } else {
+      setMomMode(null);
+      setAttendees(''); setSummary(''); setActions('');
+    }
+    setReason(''); setNhStatus('postponed');
+    setMomOpen(true);
+  };
+
+  /* Tab counts */
+  const counts = useMemo(() => ({
+    all:       meetings.length,
+    upcoming:  meetings.filter(m => m.status === 'scheduled' && m.date >= todayISO).length,
+    conducted: meetings.filter(m => m.status === 'conducted').length,
+    notheld:   meetings.filter(m => m.status === 'postponed' || m.status === 'missed').length,
+  }), [meetings, todayISO]);
+
+  const year = calMonth.getFullYear(), mo = calMonth.getMonth();
+
+  return (
+    <>
+      {/* Filter bar */}
+      <div className="filterbar">
+        <div className="period">
+          <div className="l">Meetings</div>
+          <div className="v">{selDay ? `${selDay.getDate()} ${MONTHS_S[selDay.getMonth()]} ${selDay.getFullYear()}` : `${MONTHS[mo]} ${year}`}</div>
+        </div>
+        {/* Tab pills */}
+        <div className="seg">
+          {TABS.map(t => (
+            <button key={t.key} className={tab === t.key ? 'on' : ''} onClick={() => { setTab(t.key); setSelDay(null); }}>
+              {t.label}
+              {counts[t.key] > 0 && (
+                <span style={{ marginLeft: 5, background: tab === t.key ? 'rgba(255,255,255,.25)' : 'var(--line)', color: tab === t.key ? '#fff' : 'var(--ink3)', borderRadius: 99, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}>
+                  {counts[t.key]}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <CRow className="g-3">
+        {/* ── Left: mini calendar ── */}
+        <CCol lg={3} md={4}>
+          <MiniCalendar
+            calMonth={calMonth} setCalMonth={setCalMonth}
+            byDay={byDay} selDay={selDay} setSelDay={setSelDay} now={now}
+          />
+        </CCol>
+
+        {/* ── Right: meeting list ── */}
+        <CCol lg={9} md={8}>
+          <CCard>
+            <CCardBody style={{ padding: 0 }}>
+              {/* List header */}
+              <div style={{ padding: '15px 20px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontFamily: 'var(--fd)', fontWeight: 600, fontSize: 18 }}>
+                  {selDay ? `${selDay.getDate()} ${MONTHS_S[selDay.getMonth()]} ${selDay.getFullYear()}` : TABS.find(t => t.key === tab)?.label}
+                </span>
+                <span style={{ fontSize: 13, color: 'var(--ink3)' }}>
+                  {isLoading ? <CSpinner size="sm" /> : `${filtered.length} meeting${filtered.length !== 1 ? 's' : ''}`}
+                </span>
+              </div>
+
+              {/* Empty state */}
+              {!isLoading && filtered.length === 0 && (
+                <div style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--ink3)', fontSize: 15 }}>
+                  No meetings in this view.
+                </div>
+              )}
+
+              {/* Meeting rows */}
+              {filtered.map(m => {
+                const A       = m.pair.unit_a, B = m.pair.unit_b;
+                const isOpen  = expanded.has(m.id);
+                const isUpcoming = m.status === 'scheduled' && m.date >= todayISO;
+                const isPast     = m.status === 'scheduled' && m.date < todayISO;
+
+                return (
+                  <div key={m.id} style={{ borderBottom: '1px solid var(--line)' }}>
+                    {/* ── Row ── */}
+                    <div
+                      onClick={() => toggleExpand(m.id)}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '100px auto 1fr auto 32px',
+                        alignItems: 'center',
+                        gap: 12,
+                        padding: '13px 18px',
+                        cursor: 'pointer',
+                        background: isOpen ? 'var(--accent-light)' : '#fff',
+                        transition: 'background .13s',
+                      }}
+                      onMouseEnter={e => { if (!isOpen) e.currentTarget.style.background = 'var(--paper)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = isOpen ? 'var(--accent-light)' : '#fff'; }}
+                    >
+                      {/* Date */}
+                      <div>
+                        <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>{m.date}</div>
+                        {m.time && <div style={{ fontFamily: 'var(--fm)', fontSize: 11, color: 'var(--ink3)', marginTop: 2 }}>{m.time}</div>}
+                      </div>
+
+                      {/* Units */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ width: 9, height: 9, borderRadius: '50%', background: A.color, flexShrink: 0 }} />
+                        <span style={{ fontFamily: 'var(--fb)', fontWeight: 600, fontSize: 15 }}>{A.abbr}</span>
+                        <span style={{ color: 'var(--ink3)', fontSize: 13, fontWeight: 400 }}>×</span>
+                        <span style={{ width: 9, height: 9, borderRadius: '50%', background: B.color, flexShrink: 0 }} />
+                        <span style={{ fontFamily: 'var(--fb)', fontWeight: 600, fontSize: 15 }}>{B.abbr}</span>
+                      </div>
+
+                      {/* Snippet */}
+                      <div style={{ fontSize: 13, color: 'var(--ink3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {m.minutes?.summary
+                          ? m.minutes.summary.slice(0, 90) + (m.minutes.summary.length > 90 ? '…' : '')
+                          : m.agenda
+                          ? m.agenda.slice(0, 90) + (m.agenda.length > 90 ? '…' : '')
+                          : m.mtype ? `${m.mtype === 'In-person' ? '📍' : '💻'} ${m.mtype}` : ''}
+                      </div>
+
+                      {/* Status badge */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Badge status={isUpcoming ? 'scheduled' : isPast ? 'scheduled' : m.status} />
+                      </div>
+
+                      {/* Chevron */}
+                      <div style={{ color: 'var(--ink3)', fontSize: 18, transition: 'transform .2s', transform: isOpen ? 'rotate(90deg)' : 'none', textAlign: 'center' }}>›</div>
+                    </div>
+
+                    {/* ── Expanded panel ── */}
+                    {isOpen && (
+                      <div style={{ padding: '16px 22px 20px', background: 'var(--paper)', borderTop: '1px solid var(--accent-light)' }}>
+
+                        {/* Meeting meta */}
+                        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 14 }}>
+                          <span style={{ fontSize: 15, color: 'var(--ink2)' }}>
+                            <span style={{ fontSize: 11, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink3)', marginRight: 5 }}>Pair</span>
+                            {A.name} × {B.name}
+                          </span>
+                          {m.mtype && (
+                            <span style={{ fontSize: 15, color: 'var(--ink2)' }}>
+                              {m.mtype === 'In-person' ? '📍' : '💻'} {m.mtype}
+                            </span>
+                          )}
+                          {m.time && (
+                            <span style={{ fontSize: 15, color: 'var(--ink2)' }}>🕘 {m.time}</span>
+                          )}
+                        </div>
+
+                        {m.agenda && (
+                          <div style={{ marginBottom: 14, padding: '10px 13px', background: '#fff', borderRadius: 8, border: '1px solid var(--line)' }}>
+                            <div style={LBL}>Agenda</div>
+                            <div style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--ink2)' }}>{m.agenda}</div>
+                          </div>
+                        )}
+
+                        {/* Conducted → show MOM inline + edit button */}
+                        {m.status === 'conducted' && (
+                          <div style={{ padding: '14px', background: '#fff', borderRadius: 10, border: '1px solid var(--line)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                              <div style={{ ...LBL, color: '#059669', marginBottom: 0 }}>Minutes of Meeting</div>
+                              <CButton size="sm" color="dark" variant="outline"
+                                onClick={(e) => { e.stopPropagation(); openMom(m, true); }}
+                                style={{ fontFamily: 'var(--fb)', fontSize: 11 }}>
+                                ✎ Edit MoM
+                              </CButton>
+                            </div>
+                            <MomContent meeting={m} />
+                          </div>
+                        )}
+
+                        {/* Postponed/Missed → show reason */}
+                        {(m.status === 'postponed' || m.status === 'missed') && (
+                          <div style={{ padding: '12px 14px', background: '#fff', borderRadius: 9, border: `1px solid ${m.status === 'missed' ? '#fca5a5' : '#fde68a'}` }}>
+                            <div style={LBL}>{m.status === 'missed' ? 'Missed — reason' : 'Postponed — reason'}</div>
+                            <div style={{ fontSize: 15, color: 'var(--ink2)' }}>{m.reason ?? m.not_held?.reason ?? '—'}</div>
+                          </div>
+                        )}
+
+                        {/* Scheduled → Enter MoM + admin Reschedule */}
+                        {m.status === 'scheduled' && (
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <CButton size="sm" color="dark"
+                              onClick={(e) => { e.stopPropagation(); openMom(m); }}
+                              style={{ fontFamily: 'var(--fb)', fontSize: 15 }}>
+                              ✅ Enter MoM
+                            </CButton>
+                            {isAdmin && (
+                              <CButton size="sm" color="secondary" variant="outline"
+                                onClick={(e) => openReschedule(m, e)}
+                                style={{ fontFamily: 'var(--fb)', fontSize: 13 }}>
+                                ✎ Reschedule
+                              </CButton>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </CCardBody>
+          </CCard>
+        </CCol>
+      </CRow>
+
+      {/* ── Reschedule modal (admin only) ── */}
+      {rsMeeting && (
+        <CModal visible={rsOpen} onClose={() => { setRsOpen(false); setRsMeeting(null); }} size="md" alignment="center">
+          <CModalHeader style={{ borderBottom: '1px solid var(--line)', paddingBottom: 14 }}>
+            <CModalTitle style={{ fontFamily: 'var(--fd)', fontWeight: 600, fontSize: 18 }}>
+              Reschedule — {rsMeeting.pair.unit_a.abbr} × {rsMeeting.pair.unit_b.abbr}
+            </CModalTitle>
+          </CModalHeader>
+          <CModalBody style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: 10 }}>
+              <div>
+                <CFormLabel style={LBL}>New date</CFormLabel>
+                <CFormInput type="date" value={rsDate}
+                  onChange={e => { setRsDate(e.target.value); setRsFe({}); }}
+                  style={rsFe.rsDate ? { borderColor: '#dc2626' } : {}} />
+                {rsFe.rsDate && <div style={ERR}>⚠ {rsFe.rsDate}</div>}
+              </div>
+              <div>
+                <CFormLabel style={LBL}>Time</CFormLabel>
+                <CFormInput type="time" value={rsTime} onChange={e => setRsTime(e.target.value)} />
+              </div>
+            </div>
+            <div>
+              <CFormLabel style={LBL}>Agenda <span style={{ textTransform: 'none', opacity: .6 }}>(optional)</span></CFormLabel>
+              <CFormTextarea value={rsAgenda} onChange={e => setRsAgenda(e.target.value)} placeholder="Updated agenda…" rows={2} style={{ resize: 'none' }} />
+            </div>
+          </CModalBody>
+          <CModalFooter style={{ borderTop: '1px solid var(--line)', paddingTop: 14 }}>
+            <CButton color="secondary" variant="outline" onClick={() => { setRsOpen(false); setRsMeeting(null); }} style={{ fontFamily: 'var(--fb)', fontSize: 13 }}>Cancel</CButton>
+            <CButton color="dark" onClick={handleReschedule} disabled={rsMutation.isPending} style={{ fontFamily: 'var(--fb)', fontSize: 13 }}>
+              {rsMutation.isPending ? 'Saving…' : 'Save changes'}
+            </CButton>
+          </CModalFooter>
+        </CModal>
+      )}
+
+      {/* ── MoM entry modal (for scheduled meetings only) ── */}
+      {momMeeting && (
+        <CModal visible={momOpen} onClose={() => { setMomOpen(false); setMomMeeting(null); setMomMode(null); }} size="lg" alignment="center">
+          <CModalHeader>
+            <CModalTitle style={{ fontFamily: 'var(--fd)', fontWeight: 600, fontSize: 18 }}>
+              {momMeeting.pair.unit_a.abbr} × {momMeeting.pair.unit_b.abbr} — {momMeeting.date}
+              {momMeeting.status === 'conducted' && momMeeting.minutes ? ' · Edit MoM' : ''}
+            </CModalTitle>
+          </CModalHeader>
+          <CModalBody>
+            {momMeeting.agenda && (
+              <div style={{ fontFamily: 'var(--fm)', fontSize: 13, color: 'var(--ink2)', marginBottom: 16, padding: '10px 12px', background: 'var(--paper)', borderRadius: 8, border: '1px solid var(--line)' }}>
+                <span style={{ ...LBL, display: 'block', marginBottom: 4 }}>Agenda</span>
+                {momMeeting.agenda}
+              </div>
+            )}
+
+            {!momMode && (
+              <div style={{ display: 'flex', gap: 10, flexDirection: 'column' }}>
+                <CButton color="dark" onClick={() => setMomMode('conduct')} style={{ fontFamily: 'var(--fb)' }}>
+                  ✅ Mark Conducted — Enter MoM
+                </CButton>
+                <CButton color="secondary" variant="outline" onClick={() => setMomMode('notheld')} style={{ fontFamily: 'var(--fb)' }}>
+                  ⚠ Record Not Held
+                </CButton>
+              </div>
+            )}
+
+            {momMode === 'conduct' && (
+              <>
+                <div className="mb-3">
+                  <CFormLabel style={LBL}>Attendees present</CFormLabel>
+                  <CFormInput value={attendees} onChange={e => setAttendees(e.target.value)} placeholder="e.g. 6 of 8" />
+                </div>
+                <div className="mb-3">
+                  <CFormLabel style={LBL}>Summary / discussion</CFormLabel>
+                  <CFormTextarea value={summary}
+                    onChange={e => { setSummary(e.target.value); setMomFe({}); }}
+                    placeholder="What was discussed and decided…" rows={3}
+                    style={momFe.summary ? { borderColor: '#dc2626' } : {}} />
+                  {momFe.summary && <div style={ERR}>⚠ {momFe.summary}</div>}
+                </div>
+                <div className="mb-3">
+                  <CFormLabel style={LBL}>Action points — one per line</CFormLabel>
+                  <CFormTextarea value={actions}
+                    onChange={e => { setActions(e.target.value); setMomFe({}); }}
+                    placeholder={'VP to share beneficiary list\nSMC to map overlapping schools'} rows={4} />
+                </div>
+              </>
+            )}
+
+            {momMode === 'notheld' && (
+              <>
+                <div className="mb-3">
+                  <CFormLabel style={LBL}>What happened</CFormLabel>
+                  <div className="d-flex gap-2">
+                    {[['postponed', '🕘 Postponed'], ['missed', '✕ Missed']].map(([v, l]) => (
+                      <label key={v} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, border: `1px solid ${nhStatus === v ? 'var(--warn)' : 'var(--line)'}`, borderRadius: 9, padding: '10px 8px', fontSize: 13, cursor: 'pointer', background: nhStatus === v ? '#fbf0d9' : '#fff', fontWeight: nhStatus === v ? 600 : 400, color: nhStatus === v ? '#8B5E08' : 'var(--ink)', height: 38 }}>
+                        <input type="radio" name="nhstatus" style={{ display: 'none' }} checked={nhStatus === v} onChange={() => setNhStatus(v)} />{l}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="mb-3">
+                  <CFormLabel style={LBL}>Reason</CFormLabel>
+                  <CFormTextarea value={reason}
+                    onChange={e => { setReason(e.target.value); setMomFe({}); }}
+                    placeholder="e.g. Key members on field duty…" rows={3}
+                    style={momFe.reason ? { borderColor: '#dc2626' } : {}} />
+                  {momFe.reason && <div style={ERR}>⚠ {momFe.reason}</div>}
+                </div>
+              </>
+            )}
+          </CModalBody>
+          {(momMode === 'conduct' || momMode === 'notheld') && (
+            <CModalFooter>
+              <CButton color="secondary" variant="outline" onClick={() => setMomMode(null)} style={{ fontFamily: 'var(--fb)' }}>Back</CButton>
+              <CButton color="dark" onClick={handleMomSubmit} disabled={momMutation.isPending} style={{ fontFamily: 'var(--fb)' }}>
+                {momMutation.isPending ? <CSpinner size="sm" /> : (momMode === 'conduct' ? 'Submit MoM' : 'Record')}
+              </CButton>
+            </CModalFooter>
+          )}
+        </CModal>
+      )}
+    </>
+  );
+}

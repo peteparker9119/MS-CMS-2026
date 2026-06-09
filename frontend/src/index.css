@@ -1,0 +1,3 @@
+/* Reset — all real styles are in src/styles/tokens.css and src/styles/components.css */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+#root { min-height: 100vh; }
