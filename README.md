@@ -20,6 +20,12 @@ A full-stack web application for managing inter-unit convergence across **7 unit
 
 ---
 
+## API Reference
+
+Full endpoint documentation: **[API.md](API.md)**
+
+---
+
 ## Features
 
 - **Meeting Planner** — Schedule meetings across all 21 unit-pairs with agenda and rescheduling

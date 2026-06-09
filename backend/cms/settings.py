@@ -28,7 +28,7 @@ INSTALLED_APPS = [
     'apps.worklog',
     'apps.kpi',
     'apps.gantt',
-    # 'apps.reviews',  # inactive — kept for DB table preservation
+    'apps.reviews',
     'apps.documents',
     'apps.notifications',
     'apps.menus',

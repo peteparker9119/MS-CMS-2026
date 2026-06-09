@@ -29,7 +29,7 @@ urlpatterns = [
     path('api/', include('apps.worklog.urls')),
     path('api/', include('apps.kpi.urls')),
     path('api/', include('apps.gantt.urls')),
-    # path('api/', include('apps.reviews.urls')),  # inactive — kept for DB table preservation
+    path('api/', include('apps.reviews.urls')),
     path('api/', include('apps.documents.urls')),
     path('api/', include('apps.notifications.urls')),
     path('api/', include('apps.menus.urls')),
