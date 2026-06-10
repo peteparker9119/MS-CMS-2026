@@ -108,12 +108,7 @@ export default function AppHeader() {
   return (
     <CHeader position="sticky" style={{ background: 'rgba(255,255,255,.97)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(15,23,42,.08)', boxShadow: '0 1px 0 rgba(15,23,42,.06)', zIndex: 1031, display: 'flex', alignItems: 'center', padding: '0 16px 0 0' }}>
 
-      {/* Brand — sits in the 62px rail zone on the left */}
-      <div style={{ width: 62, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-        <div style={{ width: 32, height: 32, borderRadius: 9, background: 'linear-gradient(135deg,#6366f1,#818cf8)', color: '#fff', fontFamily: 'var(--fd)', fontWeight: 800, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>M</div>
-      </div>
-
-      <CHeaderNav className="ms-auto" style={{ alignItems: 'center', gap: 6 }}>
+<CHeaderNav className="ms-auto" style={{ alignItems: 'center', gap: 6 }}>
 
         {/* ── Notification bell ── */}
         <div ref={notifRef} style={{ position: 'relative' }}>

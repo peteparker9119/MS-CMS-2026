@@ -124,29 +124,40 @@ export default function AppSidebar() {
           display: 'flex', flexDirection: 'column',
           transition: 'width .22s cubic-bezier(.4,0,.2,1)',
           userSelect: 'none',
-          paddingTop: 57,
         }}
       >
+        {/* ── Top zone (logo) — only visible when expanded ── */}
+        <div style={{
+          height: 57, flexShrink: 0,
+          display: 'flex', alignItems: 'center',
+          paddingLeft: 18,
+          borderBottom: '1px solid rgba(255,255,255,.08)',
+          overflow: 'hidden',
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            opacity: expanded ? 1 : 0,
+            transition: 'opacity .15s ease',
+            whiteSpace: 'nowrap',
+          }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+              background: 'linear-gradient(135deg,#6366f1,#818cf8)',
+              color: '#fff', fontFamily: 'var(--fd)', fontWeight: 800,
+              fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>M</div>
+            <div>
+              <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 15, color: '#fff', lineHeight: 1, marginBottom: 3 }}>MS - CMS</div>
+              <div style={{ fontFamily: 'var(--fm)', fontSize: 10, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.4)', lineHeight: 1 }}>Convergence</div>
+            </div>
+          </div>
+        </div>
 
         {/* ── Nav ── */}
         <nav style={{
           flex: 1, display: 'flex', flexDirection: 'column',
           padding: '8px 0', overflowY: 'auto', overflowX: 'hidden',
         }}>
-
-          {/* Brand name — visible below the header when sidebar opens */}
-          <div style={{
-            padding: '10px 0 6px 16px',
-            marginBottom: 4,
-            borderBottom: '1px solid rgba(255,255,255,.07)',
-            opacity: expanded ? 1 : 0,
-            transition: 'opacity .18s ease',
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
-          }}>
-            <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 15, color: '#fff', letterSpacing: '-.01em', lineHeight: 1, marginBottom: 4 }}>MS - CMS</div>
-            <div style={{ fontFamily: 'var(--fm)', fontSize: 10, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.4)', lineHeight: 1 }}>Convergence</div>
-          </div>
 
           {/* Static nav items */}
           {navItems.map(({ path, label, icon }) => (
