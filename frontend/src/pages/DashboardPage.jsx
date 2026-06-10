@@ -91,7 +91,7 @@ export default function DashboardPage() {
   return (
     <>
       {/* Single filter row */}
-      <div className="seg" style={{ display:'flex', alignItems:'center', marginBottom:18, flexWrap:'nowrap', borderRadius:12, padding:'4px 6px', overflowX:'auto' }}>
+      <div className="seg" style={{ display:'flex', alignItems:'center', marginBottom:18, flexWrap:'wrap', borderRadius:12, padding:'4px 6px' }}>
         {/* Unit pills (admin only) */}
         {user?.role === 'admin' && <>
           <button className={unitFocus==='all'?'on':''} onClick={() => setUnitFocus('all')}>All units</button>
