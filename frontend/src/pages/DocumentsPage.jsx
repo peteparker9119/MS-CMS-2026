@@ -140,8 +140,8 @@ export default function DocumentsPage() {
       </CRow>
 
       <CRow className="g-3">
-        {/* ── Left: Upload form — POC only ── */}
-        {isPOC && (
+        {/* ── Left: Upload form — admin + POC ── */}
+        {(isPOC || isAdmin) && (
           <CCol lg={5}>
             <CCard>
               <CCardBody style={{ padding: '20px 22px' }}>
@@ -200,7 +200,7 @@ export default function DocumentsPage() {
                       Circulate to all teams
                     </label>
                     <div style={{ fontSize: 11, color: 'var(--ink3)', marginTop: 2 }}>
-                      Admin and all unit POCs will see this letter
+                      All unit reps will see this letter
                     </div>
                   </div>
                 </div>
@@ -214,18 +214,13 @@ export default function DocumentsPage() {
         )}
 
         {/* ── Right: Letter list ── */}
-        <CCol lg={isPOC ? 7 : 12}>
+        <CCol lg={isPOC || isAdmin ? 7 : 12}>
           <CCard>
             <CCardBody style={{ padding: 0 }}>
               <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontFamily: 'var(--fd)', fontSize: 15, fontWeight: 600 }}>
                   Letters — {yearFilter} {isLoading ? <CSpinner size="sm" /> : `(${filtered.length})`}
                 </span>
-                {isAdmin && (
-                  <span style={{ fontSize: 11, color: 'var(--ink3)', background: 'var(--paper)', border: '1px solid var(--line)', padding: '3px 10px', borderRadius: 99 }}>
-                    View only
-                  </span>
-                )}
               </div>
 
               {!isLoading && filtered.length === 0 && (

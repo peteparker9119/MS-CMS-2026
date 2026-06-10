@@ -60,10 +60,10 @@ class IsPOCUploadAdminView(BasePermission):
     """
     D.O. Letters access model:
       - GET/HEAD/OPTIONS  → any authenticated user (admin + all POC)
-      - POST (upload)     → POC only
-      - DELETE            → admin or the POC who uploaded (object level)
+      - POST (upload)     → admin or POC
+      - DELETE            → admin or the uploader (object level)
     """
-    message = 'Only unit POCs can upload letters.'
+    message = 'Only unit reps or admins can upload letters.'
 
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
@@ -71,7 +71,7 @@ class IsPOCUploadAdminView(BasePermission):
         if request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
         if request.method == 'POST':
-            return request.user.role == 'poc'
+            return request.user.role in ('poc', 'admin')
         if request.method == 'DELETE':
             return True  # narrowed further in has_object_permission
         return False
