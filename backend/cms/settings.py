@@ -75,13 +75,14 @@ TEMPLATES = [
 WSGI_APPLICATION = 'cms.wsgi.application'
 
 if VERCEL:
-    # Serverless demo: use a pre-seeded SQLite file committed to the repo.
-    # Reads (login, dashboard) work fine; writes don't persist between invocations.
-    # Replace with a hosted Postgres/MySQL URL to get full read-write persistence.
+    # Vercel filesystem is read-only; api/index.py copies db.sqlite3 → /tmp/cms_db.sqlite3
+    # so Django can write (JWT token issuance, etc.) within each request.
+    # Writes reset on next cold-start — connect a hosted DB for full persistence.
+    _sqlite_path = os.environ.get('DJANGO_SQLITE_PATH', str(BASE_DIR / 'db.sqlite3'))
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
+            'NAME': _sqlite_path,
         }
     }
 else:
