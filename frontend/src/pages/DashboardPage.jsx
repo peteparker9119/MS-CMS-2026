@@ -90,33 +90,34 @@ export default function DashboardPage() {
 
   return (
     <>
-      {/* Single filter row */}
-      <div className="seg" style={{ display:'flex', alignItems:'center', marginBottom:18, flexWrap:'nowrap', borderRadius:12, padding:'4px 6px' }}>
-        {/* Unit pills (admin only) */}
-        {user?.role === 'admin' && <>
-          <button className={unitFocus==='all'?'on':''} onClick={() => setUnitFocus('all')}>All units</button>
-          {units.map(u => (
-            <button key={u.slug} className={unitFocus===u.slug?'on':''} onClick={() => setUnitFocus(unitFocus===u.slug?'all':u.slug)}>
-              <span className="sw" style={{ background:u.color }} />{u.abbr}
-            </button>
+      {/* Filter rows */}
+      <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:18 }}>
+        {/* Row 1: unit pills + period presets */}
+        <div className="seg" style={{ display:'flex', alignItems:'center', flexWrap:'wrap', gap:2, borderRadius:12, padding:'4px 6px' }}>
+          {/* Unit pills (admin only) */}
+          {user?.role === 'admin' && <>
+            <button className={unitFocus==='all'?'on':''} onClick={() => setUnitFocus('all')}>All units</button>
+            {units.map(u => (
+              <button key={u.slug} className={unitFocus===u.slug?'on':''} onClick={() => setUnitFocus(unitFocus===u.slug?'all':u.slug)}>
+                <span className="sw" style={{ background:u.color }} />{u.abbr}
+              </button>
+            ))}
+            {/* Divider */}
+            <span style={{ width:1, alignSelf:'stretch', background:'var(--line)', margin:'4px 8px', flexShrink:0 }} />
+          </>}
+
+          {/* Period presets */}
+          {PRESETS.map(([k,l]) => (
+            <button key={k} className={preset===k?'on':''} onClick={() => { setPreset(k); setRange({from:null,to:null}); }}>{l}</button>
           ))}
-          {/* Divider */}
-          <span style={{ width:1, alignSelf:'stretch', background:'var(--line)', margin:'4px 8px', flexShrink:0 }} />
-        </>}
+        </div>
 
-        {/* Period presets */}
-        {PRESETS.map(([k,l]) => (
-          <button key={k} className={preset===k?'on':''} onClick={() => { setPreset(k); setRange({from:null,to:null}); }}>{l}</button>
-        ))}
-
-        {/* Divider */}
-        <span style={{ width:1, alignSelf:'stretch', background:'var(--line)', margin:'4px 8px', flexShrink:0 }} />
-
-        {/* Custom date range — fixed-width inputs so they don't stretch */}
-        <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
-          <div style={{ width:116 }}><DateField value={range.from ?? ''} onChange={v => handleCustom('from', v)} placeholder="From" portal /></div>
+        {/* Row 2: custom date range */}
+        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+          <span style={{ fontFamily:'var(--fm)', fontSize:12, color:'var(--ink3)', flexShrink:0 }}>From</span>
+          <div style={{ width:130 }}><DateField value={range.from ?? ''} onChange={v => handleCustom('from', v)} placeholder="Start date" portal /></div>
           <span style={{ fontFamily:'var(--fm)', fontSize:12, color:'var(--ink3)', flexShrink:0 }}>–</span>
-          <div style={{ width:116 }}><DateField value={range.to ?? ''} onChange={v => handleCustom('to', v)} placeholder="To" portal /></div>
+          <div style={{ width:130 }}><DateField value={range.to ?? ''} onChange={v => handleCustom('to', v)} placeholder="End date" portal /></div>
         </div>
       </div>
 
