@@ -17,6 +17,10 @@ import {
 
 const MONTHS   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTHS_S = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTH_COLORS = [
+  '#6366f1','#ec4899','#f97316','#14b8a6','#22c55e','#3b82f6',
+  '#f59e0b','#ef4444','#8b5cf6','#06b6d4','#84cc16','#10b981',
+];
 const DOW_S    = ['S','M','T','W','T','F','S'];
 const STATUS_COLOR = { conducted:'#1D9E75', scheduled:'#378ADD', postponed:'#E0A21C', missed:'#D85A30' };
 const LBL = { fontSize: 11, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink3)', marginBottom: 6 };
@@ -203,10 +207,11 @@ export default function MeetingsPage() {
   const now      = new Date();
   const isAdmin  = user?.role === 'admin';
 
-  const [calMonth,  setCalMonth]  = useState(new Date(now.getFullYear(), now.getMonth(), 1));
-  const [selDay,    setSelDay]    = useState(null);
-  const [tab,       setTab]       = useState('all');
-  const [expanded,  setExpanded]  = useState(new Set());
+  const [calMonth,    setCalMonth]    = useState(new Date(now.getFullYear(), now.getMonth(), 1));
+  const [selDay,      setSelDay]      = useState(null);
+  const [tab,         setTab]         = useState('all');
+  const [expanded,    setExpanded]    = useState(new Set());
+  const [monthFilter, setMonthFilter] = useState([]);
 
   /* Reschedule modal state */
   const [rsOpen,    setRsOpen]    = useState(false);
@@ -243,10 +248,38 @@ export default function MeetingsPage() {
     return map;
   }, [meetings]);
 
+  /* Years available in data */
+  const years = useMemo(() => {
+    const set = new Set();
+    meetings.forEach(m => { if (m.date) set.add(String(new Date(m.date).getFullYear())); });
+    if (!set.size) set.add(String(now.getFullYear()));
+    return [...set].sort().reverse();
+  }, [meetings, now]);
+
+  const calYear = String(calMonth.getFullYear());
+
+  /* Per-month counts for the calendar year */
+  const monthCounts = useMemo(() => {
+    const counts = Array(12).fill(0);
+    meetings.forEach(m => {
+      if (!m.date) return;
+      const d = new Date(m.date);
+      if (String(d.getFullYear()) === calYear) counts[d.getMonth()]++;
+    });
+    return counts;
+  }, [meetings, calYear]);
+
   /* Filtered list */
   const todayISO = toISO(now);
   const filtered = useMemo(() => {
     let list = [...meetings];
+
+    // Year filter — matches calendar year
+    list = list.filter(m => m.date && String(new Date(m.date).getFullYear()) === calYear);
+
+    // Month filter
+    if (monthFilter.length > 0)
+      list = list.filter(m => m.date && monthFilter.includes(new Date(m.date).getMonth() + 1));
 
     // Day filter from calendar click
     if (selDay) {
@@ -260,7 +293,7 @@ export default function MeetingsPage() {
     if (tab === 'notheld')   list = list.filter(m => m.status === 'postponed' || m.status === 'missed');
 
     return list.sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [meetings, tab, selDay, todayISO]);
+  }, [meetings, tab, selDay, todayISO, monthFilter, calYear]);
 
   const toggleExpand = (id) => {
     setExpanded(prev => {
@@ -339,13 +372,20 @@ export default function MeetingsPage() {
     setMomOpen(true);
   };
 
-  /* Tab counts */
+  /* Tab counts — scoped to current year + month selection */
+  const scopedMeetings = useMemo(() => {
+    let list = meetings.filter(m => m.date && String(new Date(m.date).getFullYear()) === calYear);
+    if (monthFilter.length > 0)
+      list = list.filter(m => monthFilter.includes(new Date(m.date).getMonth() + 1));
+    return list;
+  }, [meetings, calYear, monthFilter]);
+
   const counts = useMemo(() => ({
-    all:       meetings.length,
-    upcoming:  meetings.filter(m => m.status === 'scheduled' && m.date >= todayISO).length,
-    conducted: meetings.filter(m => m.status === 'conducted').length,
-    notheld:   meetings.filter(m => m.status === 'postponed' || m.status === 'missed').length,
-  }), [meetings, todayISO]);
+    all:       scopedMeetings.length,
+    upcoming:  scopedMeetings.filter(m => m.status === 'scheduled' && m.date >= todayISO).length,
+    conducted: scopedMeetings.filter(m => m.status === 'conducted').length,
+    notheld:   scopedMeetings.filter(m => m.status === 'postponed' || m.status === 'missed').length,
+  }), [scopedMeetings, todayISO]);
 
   const year = calMonth.getFullYear(), mo = calMonth.getMonth();
 
@@ -357,20 +397,64 @@ export default function MeetingsPage() {
           <div className="l">Meetings</div>
           <div className="v">{selDay ? `${selDay.getDate()} ${MONTHS_S[selDay.getMonth()]} ${selDay.getFullYear()}` : `${MONTHS[mo]} ${year}`}</div>
         </div>
-        {/* Tab pills */}
-        <div className="seg">
-          {TABS.map(t => (
-            <button key={t.key} className={tab === t.key ? 'on' : ''} onClick={() => { setTab(t.key); setSelDay(null); }}>
-              {t.label}
-              {counts[t.key] > 0 && (
-                <span style={{ marginLeft: 5, background: tab === t.key ? 'rgba(255,255,255,.25)' : 'var(--line)', color: tab === t.key ? '#fff' : 'var(--ink3)', borderRadius: 99, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}>
-                  {counts[t.key]}
-                </span>
-              )}
-            </button>
-          ))}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* Year buttons */}
+          <div className="seg">
+            {years.map(y => (
+              <button key={y} className={calYear === y ? 'on' : ''} onClick={() => { setCalMonth(new Date(Number(y), now.getMonth(), 1)); setMonthFilter([]); setSelDay(null); }}>{y}</button>
+            ))}
+          </div>
+          {/* Tab pills */}
+          <div className="seg">
+            {TABS.map(t => (
+              <button key={t.key} className={tab === t.key ? 'on' : ''} onClick={() => { setTab(t.key); setSelDay(null); }}>
+                {t.label}
+                {counts[t.key] > 0 && (
+                  <span style={{ marginLeft: 5, background: tab === t.key ? 'rgba(255,255,255,.25)' : 'var(--line)', color: tab === t.key ? '#fff' : 'var(--ink3)', borderRadius: 99, padding: '1px 7px', fontSize: 11, fontWeight: 700 }}>
+                    {counts[t.key]}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
+
+      {/* Month filter cards */}
+      <CCard className="mb-3" style={{ border: '1px solid var(--line)' }}>
+        <CCardBody style={{ padding: '10px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ fontFamily: 'var(--fm)', fontSize: 10, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--ink3)' }}>
+              Month — {calYear}
+            </span>
+            {monthFilter.length > 0 && (
+              <button onClick={() => setMonthFilter([])} style={{ border: 'none', background: 'none', fontSize: 10, color: 'var(--accent)', fontWeight: 700, cursor: 'pointer', padding: '1px 6px' }}>
+                ✕ Clear
+              </button>
+            )}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 5 }}>
+            {MONTHS_S.map((m, i) => {
+              const mo     = i + 1;
+              const cnt    = monthCounts[i];
+              const active = monthFilter.includes(mo);
+              const color  = MONTH_COLORS[i];
+              return (
+                <div key={m} onClick={() => setMonthFilter(prev => prev.includes(mo) ? prev.filter(x => x !== mo) : [...prev, mo])}
+                  style={{
+                    padding: '5px 2px', borderRadius: 7, textAlign: 'center', cursor: 'pointer', transition: 'all .13s',
+                    border: `1.5px solid ${active ? color : 'var(--line)'}`,
+                    background: active ? color : '#fff',
+                    opacity: cnt === 0 && !active ? 0.45 : 1,
+                  }}>
+                  <div style={{ fontFamily: 'var(--fm)', fontSize: 9, fontWeight: 700, color: active ? '#fff' : 'var(--ink)', letterSpacing: '.03em' }}>{m}</div>
+                  <div style={{ fontFamily: 'var(--fd)', fontSize: 13, fontWeight: 700, color: active ? '#fff' : 'var(--ink)', lineHeight: 1.3 }}>{cnt}</div>
+                </div>
+              );
+            })}
+          </div>
+        </CCardBody>
+      </CCard>
 
       <CRow className="g-3">
         {/* ── Left: mini calendar ── */}
