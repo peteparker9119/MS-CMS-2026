@@ -1,12 +1,19 @@
 from pathlib import Path
 from decouple import config
 from datetime import timedelta
+import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Vercel injects env vars directly; decouple reads them from os.environ too.
+VERCEL = os.environ.get('VERCEL', False)
+
 SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=True, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS',
+    default='localhost,127.0.0.1'
+).split(',') + ['.vercel.app', '.now.sh']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -75,7 +82,7 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD', default=''),
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='3306'),
-        'CONN_MAX_AGE': 60,  # EC-07: reuse DB connections across requests
+        'CONN_MAX_AGE': 0 if VERCEL else 60,  # serverless: no persistent connections
         'OPTIONS': {
             'charset': 'utf8mb4',
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
@@ -106,7 +113,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ── Security (production) ─────────────────────────────────────────────────────
 if not DEBUG:
-    SECURE_SSL_REDIRECT          = True
+    # Vercel terminates SSL at the edge — enabling redirect here causes loops
+    SECURE_SSL_REDIRECT          = not VERCEL
     SECURE_HSTS_SECONDS          = 31536000   # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD          = True
@@ -159,10 +167,9 @@ DEFAULT_FROM_EMAIL = 'CMS Convergence <cms@tnschools.gov.in>'
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 # EC-04: structured logging; EC-05: DB errors; EC-06: role failures
-_LOG_DIR = BASE_DIR / 'logs'
-_LOG_DIR.mkdir(exist_ok=True)
-
-LOGGING = {
+# On Vercel the filesystem is read-only — log to console only.
+_handlers = ['console']
+_log_config: dict = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
@@ -176,28 +183,36 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
-        'file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': _LOG_DIR / 'cms.log',
-            'maxBytes': 5 * 1024 * 1024,  # 5 MB
-            'backupCount': 3,
-            'formatter': 'verbose',
-        },
     },
     'root': {
-        'handlers': ['console'],
+        'handlers': _handlers,
         'level': 'WARNING',
     },
     'loggers': {
         'cms': {
-            'handlers': ['console', 'file'],
+            'handlers': _handlers,
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
         'django.db.backends': {
-            'handlers': ['console', 'file'],
+            'handlers': _handlers,
             'level': 'ERROR',
             'propagate': False,
         },
     },
 }
+
+if not VERCEL:
+    _LOG_DIR = BASE_DIR / 'logs'
+    _LOG_DIR.mkdir(exist_ok=True)
+    _log_config['handlers']['file'] = {
+        'class': 'logging.handlers.RotatingFileHandler',
+        'filename': str(_LOG_DIR / 'cms.log'),
+        'maxBytes': 5 * 1024 * 1024,
+        'backupCount': 3,
+        'formatter': 'verbose',
+    }
+    _log_config['loggers']['cms']['handlers'] = ['console', 'file']
+    _log_config['loggers']['django.db.backends']['handlers'] = ['console', 'file']
+
+LOGGING = _log_config
