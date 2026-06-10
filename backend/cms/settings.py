@@ -74,22 +74,33 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'cms.wsgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': config('DB_NAME', default='cms_convergence'),
-        'USER': config('DB_USER', default='root'),
-        'PASSWORD': config('DB_PASSWORD', default=''),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='3306'),
-        'CONN_MAX_AGE': 0 if VERCEL else 60,  # serverless: no persistent connections
-        'OPTIONS': {
-            'charset': 'utf8mb4',
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-            'connect_timeout': 5,  # EC-05: fail fast on DB unreachable
-        },
+if VERCEL:
+    # Serverless demo: use a pre-seeded SQLite file committed to the repo.
+    # Reads (login, dashboard) work fine; writes don't persist between invocations.
+    # Replace with a hosted Postgres/MySQL URL to get full read-write persistence.
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': config('DB_NAME', default='cms_convergence'),
+            'USER': config('DB_USER', default='root'),
+            'PASSWORD': config('DB_PASSWORD', default=''),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='3306'),
+            'CONN_MAX_AGE': 60,
+            'OPTIONS': {
+                'charset': 'utf8mb4',
+                'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+                'connect_timeout': 5,
+            },
+        }
+    }
 
 AUTH_USER_MODEL = 'accounts.User'
 

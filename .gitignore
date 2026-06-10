@@ -6,7 +6,7 @@ backend/**/*.pyc
 backend/logs/
 backend/server.log
 backend/media/
-backend/*.sqlite3
+# backend/*.sqlite3  # db.sqlite3 committed for Vercel serverless demo
 backend/.env
 
 # Node / React
