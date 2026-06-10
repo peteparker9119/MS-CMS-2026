@@ -49,7 +49,7 @@ const NAV_POC = [
   { path: 'documents', label: 'D.O. Letters', icon: 'documents' },
 ];
 
-export default function AppSidebar({ mobileOpen, onClose }) {
+export default function AppSidebar() {
   const { user }   = useAuth();
   const navigate   = useNavigate();
   const location   = useLocation();
@@ -64,7 +64,7 @@ export default function AppSidebar({ mobileOpen, onClose }) {
 
   const navItems = user?.role === 'admin' ? NAV_ADMIN : NAV_POC;
   const cur      = location.pathname.replace(/^\//, '');
-  const expanded = mobileOpen || hovered;
+  const expanded = hovered;
 
   // Filter custom menus visible to this user
   const visibleCustomMenus = customMenus.filter(m => {
@@ -76,7 +76,6 @@ export default function AppSidebar({ mobileOpen, onClose }) {
 
   const handleNav = (path) => {
     navigate(`/${path}`);
-    if (mobileOpen && onClose) onClose();
   };
 
   const NavBtn = ({ path, label, icon }) => {
@@ -113,19 +112,11 @@ export default function AppSidebar({ mobileOpen, onClose }) {
 
   return (
     <>
-      {/* Mobile dim backdrop */}
-      {mobileOpen && (
-        <div onClick={onClose} style={{
-          position: 'fixed', inset: 0,
-          background: 'rgba(0,0,0,.45)', zIndex: 1029,
-        }} />
-      )}
-
       <div
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         style={{
-          position: 'fixed', top: 0, left: 0, bottom: 0,
+          position: 'fixed', top: 57, left: 0, bottom: 0,
           width: expanded ? W_OPEN : W_RAIL,
           overflow: 'hidden',
           background: '#1e2333',

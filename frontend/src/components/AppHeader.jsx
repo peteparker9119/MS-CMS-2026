@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { getNotifications, markRead, markAllRead, respondToNotification } from '../api/notifications';
-import { CHeader, CHeaderToggler, CHeaderNav } from '@coreui/react';
+import { CHeader, CHeaderNav } from '@coreui/react';
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -25,7 +25,7 @@ function NotifIcon({ type }) {
   return <span style={{ fontSize: 18 }}>{icons[type] ?? '🔔'}</span>;
 }
 
-export default function AppHeader({ onSidebarToggle }) {
+export default function AppHeader() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -108,10 +108,6 @@ export default function AppHeader({ onSidebarToggle }) {
   return (
     <CHeader position="sticky" style={{ background: 'rgba(255,255,255,.97)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(15,23,42,.08)', boxShadow: '0 1px 0 rgba(15,23,42,.06)', zIndex: 1030 }}>
 
-      {/* Hamburger */}
-      <CHeaderToggler onClick={onSidebarToggle} style={{ marginRight: 6, padding: '6px 10px', borderRadius: 9, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--ink2)', fontSize: 18, lineHeight: 1 }}>
-        ☰
-      </CHeaderToggler>
 
 <CHeaderNav className="ms-auto" style={{ alignItems: 'center', gap: 6 }}>
 
@@ -268,7 +264,17 @@ export default function AppHeader({ onSidebarToggle }) {
                           </div>
                         )}
 
-                        <div style={{ fontSize: 11, color: 'var(--ink3)', fontFamily: 'var(--fm)' }}>{timeAgo(n.created_at)}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                          <div style={{ fontSize: 11, color: 'var(--ink3)', fontFamily: 'var(--fm)' }}>{timeAgo(n.created_at)}</div>
+                          {(n.notif_type === 'item_created' || n.notif_type === 'deadline_changed') && n.object_id && (
+                            <button
+                              onClick={e => { e.stopPropagation(); setNotifOpen(false); if (!n.read) markReadMut.mutate(n.id); navigate(`/items?item=${n.object_id}`); }}
+                              style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: 'var(--accent)', fontFamily: 'var(--fb)', padding: '2px 0', whiteSpace: 'nowrap' }}
+                            >
+                              See more →
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))

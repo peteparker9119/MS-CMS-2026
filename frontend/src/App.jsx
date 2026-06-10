@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { CContainer, CSpinner } from '@coreui/react';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -59,14 +58,13 @@ function ProtectedRoute({ children }) {
 function AppLayout() {
   const { user } = useAuth();
   const location = useLocation();
-  const [mobileOpen, setMobileOpen] = useState(false);
   if (!user) return null;
 
   return (
     <div>
-      <AppSidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
+      <AppSidebar />
       <div className="app-wrapper d-flex flex-column min-vh-100">
-        <AppHeader onSidebarToggle={() => setMobileOpen(o => !o)} />
+        <AppHeader />
         <div className="body flex-grow-1">
           <CContainer
             fluid

@@ -556,11 +556,6 @@
   margin-left: 62px;
   transition: margin-left .22s cubic-bezier(.4,0,.2,1);
 }
-@media (max-width: 767px) {
-  .app-wrapper  { margin-left: 0 !important; }
-  .cms-sidebar  { width: 0; }
-  .cms-sidebar.cms-sidebar--open { width: 240px; }
-}
 
 /* ── Page enter animation ─────────────────────────────── */
 @keyframes pageIn {
