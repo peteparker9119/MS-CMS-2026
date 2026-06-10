@@ -12,6 +12,7 @@ import {
   CModal, CModalHeader, CModalTitle, CModalBody, CModalFooter,
   CRow, CCol,
 } from '@coreui/react';
+import SearchableSelect from '../components/SearchableSelect';
 
 /* ── constants ─────────────────────────────────────────── */
 const LBL = {
@@ -370,10 +371,12 @@ function UserModal({ visible, onClose, editUser, units }) {
           {fRole !== 'admin' && (
             <CCol xs={6}>
               <Field label="Convergence Unit">
-                <select style={INPUT} value={fUnit} onChange={e => setFUnit(e.target.value)}>
-                  <option value="">— None —</option>
-                  {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                </select>
+                <SearchableSelect
+                  value={fUnit}
+                  onChange={v => setFUnit(v)}
+                  placeholder="— None —"
+                  options={units.map(u => ({ value: String(u.id), label: u.name }))}
+                />
               </Field>
             </CCol>
           )}

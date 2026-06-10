@@ -1,3 +1,40 @@
+/* ── SearchableSelect ────────────────────────────────── */
+.ss-option {
+  padding: 9px 14px;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--ink);
+  background: #fff;
+  user-select: none;
+}
+.ss-option:hover { background: var(--paper, #f8f9fa); }
+.ss-option[aria-selected="true"] {
+  background: var(--accent-light, #eff3ff);
+  color: var(--accent, #3b5bdb);
+  font-weight: 600;
+}
+.ss-option--indented { padding-left: 22px; }
+.ss-placeholder {
+  padding: 9px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--ink3);
+  background: #fff;
+  border-bottom: 1px solid var(--line2, #f1f3f5);
+  user-select: none;
+}
+.ss-placeholder:hover { background: var(--paper, #f8f9fa); }
+.ss-group-header {
+  padding: 6px 14px 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink3);
+  background: var(--paper, #f8f9fa);
+  border-top: 1px solid var(--line2, #f1f3f5);
+}
+
 /* ── KPI card hover ──────────────────────────────────── */
 .kpi-hover:hover {
   transform: translateY(-3px);

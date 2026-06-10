@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../api/client';
 import DateField from '../components/DateField';
+import SearchableSelect from '../components/SearchableSelect';
 
 const ERR = { fontSize: 11, color: '#dc2626', marginTop: 4 };
 import { downloadPDF, downloadWord } from '../utils/momExport';
@@ -185,30 +186,35 @@ export default function MinutesPage() {
 
               <div className="mb-3">
                 <CFormLabel style={{ fontFamily:'var(--fm)', fontSize:11, fontWeight:600, letterSpacing:'.05em', textTransform:'uppercase', color:'var(--ink3)' }}>Convergence unit</CFormLabel>
-                <CFormSelect value={selPair} onChange={e => { setSelPair(e.target.value); clearFe('selPair'); }}
-                  style={fe.selPair ? { borderColor:'#dc2626' } : {}}>
-                  <option value="">— Select unit pair —</option>
-                  {pocUnit
-                    ? formPairs.map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.unit_a.slug === pocUnit.slug ? p.unit_b.name : p.unit_a.name}
-                        </option>
-                      ))
-                    : units.map(u => {
-                        const uPairs = formPairs.filter(p => p.unit_a.slug === u.slug || p.unit_b.slug === u.slug);
-                        if (!uPairs.length) return null;
-                        return (
-                          <optgroup key={u.slug} label={u.name}>
-                            {uPairs.map(p => (
-                              <option key={p.id} value={p.id}>
-                                {p.unit_a.slug === u.slug ? p.unit_b.name : p.unit_a.name}
-                              </option>
-                            ))}
-                          </optgroup>
-                        );
-                      })
-                  }
-                </CFormSelect>
+                {pocUnit ? (
+                  <SearchableSelect
+                    value={selPair}
+                    onChange={v => { setSelPair(v); clearFe('selPair'); }}
+                    placeholder="— Select unit pair —"
+                    hasError={!!fe.selPair}
+                    options={formPairs.map(p => ({
+                      value: String(p.id),
+                      label: p.unit_a.slug === pocUnit.slug ? p.unit_b.name : p.unit_a.name,
+                    }))}
+                  />
+                ) : (
+                  <SearchableSelect
+                    value={selPair}
+                    onChange={v => { setSelPair(v); clearFe('selPair'); }}
+                    placeholder="— Select unit pair —"
+                    hasError={!!fe.selPair}
+                    groups={units.map(u => {
+                      const uPairs = formPairs.filter(p => p.unit_a.slug === u.slug || p.unit_b.slug === u.slug);
+                      return {
+                        label: u.name,
+                        options: uPairs.map(p => ({
+                          value: String(p.id),
+                          label: p.unit_a.slug === u.slug ? p.unit_b.name : p.unit_a.name,
+                        })),
+                      };
+                    }).filter(g => g.options.length > 0)}
+                  />
+                )}
                 {fe.selPair && <div style={ERR}>⚠ {fe.selPair}</div>}
               </div>
 

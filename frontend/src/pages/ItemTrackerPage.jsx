@@ -13,6 +13,7 @@ import { getErrorMessage } from '../api/client';
 const ERR = { fontSize: 11, color: '#dc2626', marginTop: 4 };
 import Modal from '../components/Modal';
 import DateField from '../components/DateField';
+import SearchableSelect from '../components/SearchableSelect';
 import {
   CCard, CCardBody, CButton, CFormLabel, CFormInput,
   CFormSelect, CFormTextarea, CRow, CCol, CBadge,
@@ -381,12 +382,12 @@ export default function ItemTrackerPage() {
                       No users found in the selected unit(s).
                     </div>
                   ) : (
-                    <CFormSelect value={fAssignTo} onChange={e => setFAssignTo(e.target.value)}>
-                      <option value="">— Unassigned —</option>
-                      {assignableUsers.map(u => (
-                        <option key={u.id} value={u.id}>{u.name} (@{u.username})</option>
-                      ))}
-                    </CFormSelect>
+                    <SearchableSelect
+                      value={fAssignTo}
+                      onChange={v => setFAssignTo(v)}
+                      placeholder="— Unassigned —"
+                      options={assignableUsers.map(u => ({ value: String(u.id), label: `${u.name} (@${u.username})` }))}
+                    />
                   )}
                 </div>
               )}
@@ -650,16 +651,13 @@ function ItemModal({ item, isAdmin, onClose, onStatusChange, onAddAI, onToggleAI
           </div>
           {editAssign ? (
             <div>
-              <select
+              <SearchableSelect
                 value={assignDraft}
-                onChange={e => setAssignDraft(e.target.value)}
-                style={{ width:'100%', border:'1.5px solid var(--line)', borderRadius:9, padding:'9px 12px', fontFamily:'var(--fb)', fontSize:14, background:'#fff', color:'var(--ink)', boxSizing:'border-box', outline:'none', marginBottom:8 }}
-              >
-                <option value="">— Unassigned —</option>
-                {assignableUsers.map(u => (
-                  <option key={u.id} value={u.id}>{u.name} (@{u.username})</option>
-                ))}
-              </select>
+                onChange={v => setAssignDraft(v)}
+                placeholder="— Unassigned —"
+                options={assignableUsers.map(u => ({ value: String(u.id), label: `${u.name} (@${u.username})` }))}
+                style={{ marginBottom: 8 }}
+              />
               <div style={{ display:'flex', gap:8 }}>
                 <button onClick={saveAssign} style={{ flex:1, border:'none', background:'var(--accent)', color:'#fff', fontWeight:600, fontSize:13, padding:'8px 0', borderRadius:9, cursor:'pointer' }}>Save</button>
                 <button onClick={() => setEditAssign(false)} style={{ flex:1, border:'1px solid var(--line)', background:'transparent', color:'var(--ink2)', fontSize:13, padding:'8px 0', borderRadius:9, cursor:'pointer' }}>Cancel</button>
