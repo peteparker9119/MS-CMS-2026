@@ -357,17 +357,22 @@ export default function ItemTrackerPage() {
 
               <div className="mb-3">
                 <CFormLabel style={LBL}>Raise to unit(s)</CFormLabel>
-                <div className="d-flex flex-column gap-2">
-                  {fe.fTargets && <div style={{ ...ERR, marginBottom: 6 }}>⚠ {fe.fTargets}</div>}
-                  {targetableUnits.map(u => (
-                    <label key={u.id} style={{ display:'flex', alignItems:'center', gap:9, fontSize:13, cursor:'pointer', padding:'8px 11px', border:'1px solid var(--line)', borderRadius:9, background:'#fff' }}>
-                      <input type="checkbox" style={{ width:16, height:16, accentColor:'var(--ink)' }}
-                        checked={fTargets.includes(u.id)}
-                        onChange={e => { setFTargets(t => e.target.checked ? [...t,u.id] : t.filter(x => x!==u.id)); setFe(p => ({ ...p, fTargets: '' })); }} />
-                      <span style={{ width:10, height:10, borderRadius:'50%', background:u.color, display:'inline-block' }} />
-                      {u.name}
-                    </label>
-                  ))}
+                {fe.fTargets && <div style={{ ...ERR, marginBottom: 6 }}>⚠ {fe.fTargets}</div>}
+                <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                  {targetableUnits.map(u => {
+                    const on = fTargets.includes(u.id);
+                    return (
+                      <div key={u.id} onClick={() => { setFTargets(t => on ? t.filter(x => x!==u.id) : [...t,u.id]); setFe(p => ({ ...p, fTargets:'' })); }}
+                        style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 10px', borderRadius:99, cursor:'pointer', fontSize:12, fontWeight: on ? 700 : 500, transition:'all .12s',
+                          border:`1.5px solid ${on ? u.color : 'var(--line)'}`,
+                          background: on ? u.color + '18' : '#fff',
+                          color: on ? u.color : 'var(--ink2)',
+                        }}>
+                        <span style={{ width:7, height:7, borderRadius:'50%', background:u.color, flexShrink:0 }} />
+                        {u.name}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

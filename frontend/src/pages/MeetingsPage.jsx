@@ -211,7 +211,7 @@ export default function MeetingsPage() {
   const [selDay,      setSelDay]      = useState(null);
   const [tab,         setTab]         = useState('all');
   const [expanded,    setExpanded]    = useState(new Set());
-  const [monthFilter, setMonthFilter] = useState([]);
+  const [monthFilter, setMonthFilter] = useState(null); // single month (1-12) or null
 
   /* Reschedule modal state */
   const [rsOpen,    setRsOpen]    = useState(false);
@@ -278,8 +278,8 @@ export default function MeetingsPage() {
     list = list.filter(m => m.date && String(new Date(m.date).getFullYear()) === calYear);
 
     // Month filter
-    if (monthFilter.length > 0)
-      list = list.filter(m => m.date && monthFilter.includes(new Date(m.date).getMonth() + 1));
+    if (monthFilter)
+      list = list.filter(m => m.date && new Date(m.date).getMonth() + 1 === monthFilter);
 
     // Day filter from calendar click
     if (selDay) {
@@ -375,8 +375,8 @@ export default function MeetingsPage() {
   /* Tab counts — scoped to current year + month selection */
   const scopedMeetings = useMemo(() => {
     let list = meetings.filter(m => m.date && String(new Date(m.date).getFullYear()) === calYear);
-    if (monthFilter.length > 0)
-      list = list.filter(m => monthFilter.includes(new Date(m.date).getMonth() + 1));
+    if (monthFilter)
+      list = list.filter(m => new Date(m.date).getMonth() + 1 === monthFilter);
     return list;
   }, [meetings, calYear, monthFilter]);
 
@@ -401,7 +401,7 @@ export default function MeetingsPage() {
           {/* Year buttons */}
           <div className="seg">
             {years.map(y => (
-              <button key={y} className={calYear === y ? 'on' : ''} onClick={() => { setCalMonth(new Date(Number(y), now.getMonth(), 1)); setMonthFilter([]); setSelDay(null); }}>{y}</button>
+              <button key={y} className={calYear === y ? 'on' : ''} onClick={() => { setCalMonth(new Date(Number(y), now.getMonth(), 1)); setMonthFilter(null); setSelDay(null); }}>{y}</button>
             ))}
           </div>
           {/* Tab pills */}
@@ -423,24 +423,19 @@ export default function MeetingsPage() {
       {/* Month filter cards */}
       <CCard className="mb-3" style={{ border: '1px solid var(--line)' }}>
         <CCardBody style={{ padding: '10px 14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div style={{ marginBottom: 8 }}>
             <span style={{ fontFamily: 'var(--fm)', fontSize: 10, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--ink3)' }}>
               Month — {calYear}
             </span>
-            {monthFilter.length > 0 && (
-              <button onClick={() => setMonthFilter([])} style={{ border: 'none', background: 'none', fontSize: 10, color: 'var(--accent)', fontWeight: 700, cursor: 'pointer', padding: '1px 6px' }}>
-                ✕ Clear
-              </button>
-            )}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 5 }}>
             {MONTHS_S.map((m, i) => {
               const mo     = i + 1;
               const cnt    = monthCounts[i];
-              const active = monthFilter.includes(mo);
+              const active = monthFilter === mo;
               const color  = MONTH_COLORS[i];
               return (
-                <div key={m} onClick={() => setMonthFilter(prev => prev.includes(mo) ? prev.filter(x => x !== mo) : [...prev, mo])}
+                <div key={m} onClick={() => setMonthFilter(prev => prev === mo ? null : mo)}
                   style={{
                     padding: '5px 2px', borderRadius: 7, textAlign: 'center', cursor: 'pointer', transition: 'all .13s',
                     border: `1.5px solid ${active ? color : 'var(--line)'}`,
