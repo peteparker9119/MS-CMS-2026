@@ -26,7 +26,8 @@ class CustomMenuWriteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = CustomMenu
-        fields = ['name', 'slug', 'icon', 'description', 'access', 'is_active', 'order', 'fields_data']
+        fields = ['id', 'name', 'slug', 'icon', 'description', 'access', 'is_active', 'order', 'fields_data']
+        read_only_fields = ['id']
 
     def create(self, validated_data):
         fields_data = validated_data.pop('fields_data', [])

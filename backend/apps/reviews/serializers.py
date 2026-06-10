@@ -30,7 +30,7 @@ class ReviewTemplateSerializer(serializers.ModelSerializer):
             'id', 'title', 'unit', 'unit_name', 'description', 'frequency',
             'created_by', 'created_by_name', 'active', 'created_at', 'criteria',
         ]
-        read_only_fields = ['id', 'created_at']
+        read_only_fields = ['id', 'created_by', 'created_by_name', 'created_at']
 
 
 class ReviewEntrySerializer(serializers.ModelSerializer):

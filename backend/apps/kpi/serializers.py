@@ -26,7 +26,7 @@ class KPIDefinitionSerializer(serializers.ModelSerializer):
             'unit', 'unit_name',
             'active', 'created_at', 'latest_entry',
         ]
-        read_only_fields = ['id', 'created_at']
+        read_only_fields = ['id', 'assigned_by', 'assigned_by_name', 'created_at']
 
     def get_latest_entry(self, obj):
         entry = obj.entries.order_by('-date').first()
