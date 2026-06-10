@@ -116,30 +116,17 @@ export default function AppSidebar() {
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         style={{
-          position: 'fixed', top: 57, left: 0, bottom: 0,
+          position: 'fixed', top: 0, left: 0, bottom: 0,
           width: expanded ? W_OPEN : W_RAIL,
           overflow: 'hidden',
           background: '#1e2333',
-          zIndex: 1030,
+          zIndex: 1029,
           display: 'flex', flexDirection: 'column',
           transition: 'width .22s cubic-bezier(.4,0,.2,1)',
           userSelect: 'none',
+          paddingTop: 57,
         }}
       >
-        {/* ── Top zone ── */}
-        <div style={{
-          height: 64, flexShrink: 0,
-          display: 'flex', alignItems: 'center',
-          paddingLeft: 15,
-          borderBottom: '1px solid rgba(255,255,255,.08)',
-        }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: 9, flexShrink: 0,
-            background: 'linear-gradient(135deg,#6366f1,#818cf8)',
-            color: '#fff', fontFamily: 'var(--fd)', fontWeight: 800,
-            fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>M</div>
-        </div>
 
         {/* ── Nav ── */}
         <nav style={{
