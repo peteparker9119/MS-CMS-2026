@@ -13,15 +13,11 @@ import {
   CRow, CCol, CSpinner,
 } from '@coreui/react';
 
-const LBL = { fontFamily: 'var(--fm)', fontSize: 11, fontWeight: 600, color: 'var(--ink3)', marginBottom: 4 };
-const ROW = { padding: '14px 18px', borderBottom: '1px solid var(--line)', fontFamily: 'var(--fm)', fontSize: 15 };
+const LBL   = { fontFamily: 'var(--fm)', fontSize: 11, fontWeight: 600, color: 'var(--ink3)', marginBottom: 4 };
+const ROW   = { padding: '14px 18px', borderBottom: '1px solid var(--line)', fontFamily: 'var(--fm)', fontSize: 15 };
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const today    = new Date().toISOString().slice(0, 10);
 const thisYear = new Date().getFullYear();
-
-function letterYear(dateStr) {
-  if (!dateStr) return null;
-  return new Date(dateStr).getFullYear();
-}
 
 export default function DocumentsPage() {
   const { user } = useAuth();
@@ -31,39 +27,76 @@ export default function DocumentsPage() {
   const isAdmin  = user?.role === 'admin';
   const fileRef  = useRef(null);
 
-  const [yearFilter, setYearFilter] = useState(String(thisYear));
+  /* ── Filter state ── */
+  const [yearFilter,  setYearFilter]  = useState(String(thisYear));
+  const [monthFilter, setMonthFilter] = useState(null);   // 1-12 or null
+  const [dateFrom,    setDateFrom]    = useState('');
+  const [dateTo,      setDateTo]      = useState('');
+
+  const usingRange = dateFrom || dateTo;
 
   const { data: letters = [], isLoading } = useQuery({ queryKey: ['letters'], queryFn: getLetters });
 
+  /* Available years from data */
   const years = useMemo(() => {
     const set = new Set();
-    letters.forEach(l => { if (l.date) set.add(String(letterYear(l.date))); });
+    letters.forEach(l => { if (l.date) set.add(String(new Date(l.date).getFullYear())); });
     if (!set.size) set.add(String(thisYear));
     return [...set].sort().reverse();
   }, [letters]);
 
-  const filtered = useMemo(() =>
-    letters.filter(l => !yearFilter || String(letterYear(l.date)) === yearFilter),
-    [letters, yearFilter]
-  );
+  /* Per-month counts for the selected year (used by month cards) */
+  const monthCounts = useMemo(() => {
+    const counts = Array(12).fill(0);
+    letters.forEach(l => {
+      if (!l.date) return;
+      const d = new Date(l.date);
+      if (String(d.getFullYear()) === yearFilter) counts[d.getMonth()]++;
+    });
+    return counts;
+  }, [letters, yearFilter]);
 
-  const thisYearCount = useMemo(() => letters.filter(l => String(letterYear(l.date)) === String(thisYear)).length, [letters]);
-  const myUploads     = useMemo(() => letters.filter(l => l.uploaded_by === user?.id).length, [letters, user]);
+  /* Final filtered list */
+  const filtered = useMemo(() => {
+    if (usingRange) {
+      return letters.filter(l => {
+        if (!l.date) return false;
+        if (dateFrom && l.date < dateFrom) return false;
+        if (dateTo   && l.date > dateTo)   return false;
+        return true;
+      });
+    }
+    return letters.filter(l => {
+      if (!l.date) return false;
+      const d = new Date(l.date);
+      if (yearFilter  && String(d.getFullYear()) !== yearFilter) return false;
+      if (monthFilter && d.getMonth() + 1 !== monthFilter)       return false;
+      return true;
+    });
+  }, [letters, yearFilter, monthFilter, dateFrom, dateTo, usingRange]);
+
+  /* Stat cards */
+  const thisYearCount   = useMemo(() => letters.filter(l => l.date && String(new Date(l.date).getFullYear()) === String(thisYear)).length, [letters]);
+  const myUploads       = useMemo(() => letters.filter(l => l.uploaded_by === user?.id).length, [letters, user]);
   const circulatedCount = useMemo(() => letters.filter(l => l.visible_to_all).length, [letters]);
 
+  const filterLabel = usingRange
+    ? `${dateFrom || '…'} → ${dateTo || '…'}`
+    : monthFilter ? `${MONTHS[monthFilter - 1]} ${yearFilter}` : yearFilter;
+
   const statCards = isPOC ? [
-    { hero: true, l: 'Total Letters', v: letters.length,   sub: 'visible to you'  },
-    { l: 'This Year',                 v: thisYearCount,    sub: String(thisYear)   },
-    { l: 'My Uploads',                v: myUploads,        sub: 'uploaded by you'  },
-    { l: 'Showing',                   v: filtered.length,  sub: `in ${yearFilter}` },
+    { hero: true, l: 'Total Letters', v: letters.length,  sub: 'visible to you'   },
+    { l: 'This Year',                 v: thisYearCount,   sub: String(thisYear)    },
+    { l: 'My Uploads',                v: myUploads,       sub: 'uploaded by you'   },
+    { l: 'Showing',                   v: filtered.length, sub: filterLabel         },
   ] : [
-    { hero: true, l: 'Total Letters', v: letters.length,   sub: 'all time'         },
-    { l: 'This Year',                 v: thisYearCount,    sub: String(thisYear)    },
-    { l: 'Circulated',                v: circulatedCount,  sub: 'shared with teams' },
-    { l: 'Showing',                   v: filtered.length,  sub: `in ${yearFilter}`  },
+    { hero: true, l: 'Total Letters', v: letters.length,  sub: 'all time'          },
+    { l: 'This Year',                 v: thisYearCount,   sub: String(thisYear)    },
+    { l: 'Circulated',                v: circulatedCount, sub: 'shared with teams' },
+    { l: 'Showing',                   v: filtered.length, sub: filterLabel         },
   ];
 
-  /* Upload form state — POC only */
+  /* Upload form state */
   const [title,  setTitle]  = useState('');
   const [refNo,  setRefNo]  = useState('');
   const [date,   setDate]   = useState(today);
@@ -105,11 +138,29 @@ export default function DocumentsPage() {
     onError: (err) => toast(getErrorMessage(err)),
   });
 
-  /* A POC can delete only their own uploads; admin can delete any */
   const canDelete = (l) => isAdmin || l.uploaded_by === user?.id;
+
+  /* Handlers */
+  const selectMonth = (m) => {
+    setMonthFilter(prev => prev === m ? null : m);
+    setDateFrom(''); setDateTo('');
+  };
+  const selectYear = (y) => {
+    setYearFilter(y); setMonthFilter(null); setDateFrom(''); setDateTo('');
+  };
+  const applyRange = () => {
+    setMonthFilter(null);
+  };
+  const clearAll = () => {
+    setMonthFilter(null); setDateFrom(''); setDateTo('');
+    setYearFilter(String(thisYear));
+  };
+
+  const anyFilter = monthFilter || dateFrom || dateTo;
 
   return (
     <>
+      {/* ── Header bar ── */}
       <div className="filterbar">
         <div className="period">
           <div className="l">D.O. Letters</div>
@@ -119,12 +170,12 @@ export default function DocumentsPage() {
         </div>
         <div className="seg">
           {years.map(y => (
-            <button key={y} className={yearFilter === y ? 'on' : ''} onClick={() => setYearFilter(y)}>{y}</button>
+            <button key={y} className={yearFilter === y && !usingRange ? 'on' : ''} onClick={() => selectYear(y)}>{y}</button>
           ))}
         </div>
       </div>
 
-      {/* Stats */}
+      {/* ── Stat cards ── */}
       <CRow className="g-3 mb-3">
         {statCards.map((c, i) => (
           <CCol key={i} xs={6} md={3}>
@@ -139,8 +190,72 @@ export default function DocumentsPage() {
         ))}
       </CRow>
 
+      {/* ── Month filter cards ── */}
+      <CCard className="mb-3" style={{ border: '1px solid var(--line)' }}>
+        <CCardBody style={{ padding: '14px 18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span style={{ fontFamily: 'var(--fm)', fontSize: 11, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--ink3)' }}>
+              Filter by month — {usingRange ? 'date range active' : yearFilter}
+            </span>
+            {anyFilter && (
+              <button onClick={clearAll} style={{ border: 'none', background: 'none', fontSize: 11, color: 'var(--accent)', fontWeight: 700, cursor: 'pointer', padding: '2px 8px' }}>
+                ✕ Clear filters
+              </button>
+            )}
+          </div>
+
+          {/* Month cards row */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8, marginBottom: 14 }}>
+            {MONTHS.map((m, i) => {
+              const mo   = i + 1;
+              const cnt  = monthCounts[i];
+              const active = !usingRange && monthFilter === mo;
+              return (
+                <div
+                  key={m}
+                  onClick={() => selectMonth(mo)}
+                  style={{
+                    padding: '10px 6px',
+                    borderRadius: 10,
+                    border: `1.5px solid ${active ? 'var(--accent)' : cnt > 0 ? 'var(--line)' : 'var(--line2)'}`,
+                    background: active ? 'var(--accent)' : cnt > 0 ? '#fff' : 'var(--paper)',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    transition: 'all .13s',
+                    opacity: cnt === 0 && !active ? 0.5 : 1,
+                  }}
+                >
+                  <div style={{ fontFamily: 'var(--fm)', fontSize: 11, fontWeight: 700, color: active ? '#fff' : 'var(--ink3)', letterSpacing: '.04em' }}>{m}</div>
+                  <div style={{ fontFamily: 'var(--fd)', fontSize: 18, fontWeight: 700, color: active ? '#fff' : cnt > 0 ? 'var(--ink)' : 'var(--ink3)', lineHeight: 1.2, marginTop: 4 }}>{cnt}</div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Date range row */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 140 }}>
+              <div style={{ fontFamily: 'var(--fm)', fontSize: 11, fontWeight: 600, color: 'var(--ink3)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.05em' }}>From</div>
+              <DateField value={dateFrom} onChange={v => { setDateFrom(v); applyRange(); }} style={usingRange ? { borderColor: 'var(--accent)' } : {}} />
+            </div>
+            <div style={{ flex: 1, minWidth: 140 }}>
+              <div style={{ fontFamily: 'var(--fm)', fontSize: 11, fontWeight: 600, color: 'var(--ink3)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.05em' }}>To</div>
+              <DateField value={dateTo} onChange={v => { setDateTo(v); applyRange(); }} style={usingRange ? { borderColor: 'var(--accent)' } : {}} />
+            </div>
+            {usingRange && (
+              <button
+                onClick={() => { setDateFrom(''); setDateTo(''); }}
+                style={{ padding: '7px 14px', border: '1px solid var(--line)', borderRadius: 9, background: '#fff', fontSize: 13, color: 'var(--ink2)', cursor: 'pointer', fontFamily: 'var(--fb)', fontWeight: 600, marginBottom: 0 }}
+              >
+                Clear range
+              </button>
+            )}
+          </div>
+        </CCardBody>
+      </CCard>
+
       <CRow className="g-3">
-        {/* ── Left: Upload form — admin + POC ── */}
+        {/* ── Left: Upload form ── */}
         {(isPOC || isAdmin) && (
           <CCol lg={5}>
             <CCard>
@@ -184,7 +299,6 @@ export default function DocumentsPage() {
                   <CFormTextarea rows={3} value={desc} onChange={e => setDesc(e.target.value)} placeholder="Brief summary of letter contents…" />
                 </div>
 
-                {/* Circulate toggle */}
                 <div
                   className="mb-3"
                   onClick={() => setVisAll(v => !v)}
@@ -217,14 +331,16 @@ export default function DocumentsPage() {
         <CCol lg={isPOC || isAdmin ? 7 : 12}>
           <CCard>
             <CCardBody style={{ padding: 0 }}>
-              <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--line)' }}>
                 <span style={{ fontFamily: 'var(--fd)', fontSize: 15, fontWeight: 600 }}>
-                  Letters — {yearFilter} {isLoading ? <CSpinner size="sm" /> : `(${filtered.length})`}
+                  Letters — {filterLabel} {isLoading ? <CSpinner size="sm" /> : `(${filtered.length})`}
                 </span>
               </div>
 
               {!isLoading && filtered.length === 0 && (
-                <div style={{ padding: 32, textAlign: 'center', fontSize: 13, color: 'var(--ink3)' }}>No letters for {yearFilter}.</div>
+                <div style={{ padding: 32, textAlign: 'center', fontSize: 13, color: 'var(--ink3)' }}>
+                  No letters for {filterLabel}.
+                </div>
               )}
 
               {filtered.map(l => (
@@ -233,7 +349,6 @@ export default function DocumentsPage() {
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, marginBottom: 4 }}>{l.title}</div>
 
-                      {/* Badges row */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
                         {l.tracking_number && (
                           <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', background: 'var(--accent)', color: '#fff', padding: '2px 8px', borderRadius: 4 }}>
