@@ -37,7 +37,7 @@ const MENU_SLUGS = MENUS.map(m => m.slug);
 
 const ROLE_META = {
   admin: { label: 'Admin',    bg: '#1e2333', color: '#fff'    },
-  poc:   { label: 'Unit POC', bg: '#dbeafe', color: '#1d4ed8' },
+  poc:   { label: 'Unit Rep', bg: '#dbeafe', color: '#1d4ed8' },
   user:  { label: 'User',     bg: '#f1f5f9', color: '#475569' },
 };
 
@@ -54,7 +54,7 @@ const FIELD_TYPES = [
 ];
 
 const ICONS = ['grid','list','document','chart','folder','star','settings','users','calendar','tag'];
-const ACCESS_OPTS = [['all','All Users'],['admin','Admin Only'],['poc','POC Only']];
+const ACCESS_OPTS = [['all','All Users'],['admin','Admin Only'],['poc','Unit Only']];
 
 const TYPE_ICON = {
   text:'T', number:'#', date:'📅', email:'@', phone:'☎',
@@ -364,7 +364,7 @@ function UserModal({ visible, onClose, editUser, units }) {
             <Field label="Role">
               <select style={INPUT} value={fRole} onChange={e => setFRole(e.target.value)}>
                 <option value="admin">Admin</option>
-                <option value="poc">Unit POC</option>
+                <option value="poc">Unit Rep</option>
               </select>
             </Field>
           </CCol>
@@ -500,7 +500,7 @@ function UnitModal({ visible, onClose, editUnit }) {
             </Field>
           </CCol>
         </CRow>
-        <Field label="POC Member Name">
+        <Field label="Member Name">
           <input style={INPUT} value={fMemberName} onChange={e => setFMemberName(e.target.value)} placeholder="Name of the point-of-contact member" />
         </Field>
       </CModalBody>
@@ -562,7 +562,7 @@ function UsersTab({ units }) {
     { label: 'Total Users', value: users.length, color: '#4f46e5' },
     { label: 'Active',      value: totalActive,  color: '#16a34a' },
     { label: 'Admin',       value: totalAdmin,   color: '#0f172a' },
-    { label: 'Unit POC',    value: totalPoc,     color: '#2563eb' },
+    { label: 'Unit Rep',    value: totalPoc,     color: '#2563eb' },
   ];
 
   return (
@@ -691,7 +691,7 @@ function UnitsTab() {
             </div>
             {u.member_name && (
               <div style={{ fontFamily: 'var(--fm)', fontSize: 12, color: 'var(--ink2)', marginBottom: 12 }}>
-                <span style={{ color: 'var(--ink3)' }}>POC: </span>{u.member_name}
+                {u.member_name}
               </div>
             )}
             <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>

@@ -221,7 +221,7 @@ export default function AppSidebar({ mobileOpen, onClose }) {
               transition: 'opacity .15s ease',
             }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{user.unit_name}</div>
-              <div style={{ fontFamily: 'var(--fm)', fontSize: 11, color: 'rgba(255,255,255,.45)' }}>POC workspace</div>
+              <div style={{ fontFamily: 'var(--fm)', fontSize: 11, color: 'rgba(255,255,255,.45)' }}>workspace</div>
             </div>
           </div>
         )}
