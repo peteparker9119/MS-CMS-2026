@@ -16,6 +16,20 @@ import {
 const LBL   = { fontFamily: 'var(--fm)', fontSize: 11, fontWeight: 600, color: 'var(--ink3)', marginBottom: 4 };
 const ROW   = { padding: '14px 18px', borderBottom: '1px solid var(--line)', fontFamily: 'var(--fm)', fontSize: 15 };
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTH_COLORS = [
+  '#6366f1', // Jan — indigo
+  '#ec4899', // Feb — pink
+  '#f97316', // Mar — orange
+  '#14b8a6', // Apr — teal
+  '#22c55e', // May — green
+  '#3b82f6', // Jun — blue
+  '#f59e0b', // Jul — amber
+  '#ef4444', // Aug — red
+  '#8b5cf6', // Sep — violet
+  '#06b6d4', // Oct — cyan
+  '#84cc16', // Nov — lime
+  '#10b981', // Dec — emerald
+];
 const today    = new Date().toISOString().slice(0, 10);
 const thisYear = new Date().getFullYear();
 
@@ -29,11 +43,9 @@ export default function DocumentsPage() {
 
   /* ── Filter state ── */
   const [yearFilter,  setYearFilter]  = useState(String(thisYear));
-  const [monthFilter, setMonthFilter] = useState(null);   // 1-12 or null
-  const [dateFrom,    setDateFrom]    = useState('');
-  const [dateTo,      setDateTo]      = useState('');
+  const [monthFilter, setMonthFilter] = useState([]);     // array of selected months (1-12)
 
-  const usingRange = dateFrom || dateTo;
+  const usingRange = false;
 
   const { data: letters = [], isLoading } = useQuery({ queryKey: ['letters'], queryFn: getLetters });
 
@@ -57,32 +69,22 @@ export default function DocumentsPage() {
   }, [letters, yearFilter]);
 
   /* Final filtered list */
-  const filtered = useMemo(() => {
-    if (usingRange) {
-      return letters.filter(l => {
-        if (!l.date) return false;
-        if (dateFrom && l.date < dateFrom) return false;
-        if (dateTo   && l.date > dateTo)   return false;
-        return true;
-      });
-    }
-    return letters.filter(l => {
-      if (!l.date) return false;
-      const d = new Date(l.date);
-      if (yearFilter  && String(d.getFullYear()) !== yearFilter) return false;
-      if (monthFilter && d.getMonth() + 1 !== monthFilter)       return false;
-      return true;
-    });
-  }, [letters, yearFilter, monthFilter, dateFrom, dateTo, usingRange]);
+  const filtered = useMemo(() => letters.filter(l => {
+    if (!l.date) return false;
+    const d = new Date(l.date);
+    if (yearFilter               && String(d.getFullYear()) !== yearFilter)    return false;
+    if (monthFilter.length > 0   && !monthFilter.includes(d.getMonth() + 1))  return false;
+    return true;
+  }), [letters, yearFilter, monthFilter]);
 
   /* Stat cards */
   const thisYearCount   = useMemo(() => letters.filter(l => l.date && String(new Date(l.date).getFullYear()) === String(thisYear)).length, [letters]);
   const myUploads       = useMemo(() => letters.filter(l => l.uploaded_by === user?.id).length, [letters, user]);
   const circulatedCount = useMemo(() => letters.filter(l => l.visible_to_all).length, [letters]);
 
-  const filterLabel = usingRange
-    ? `${dateFrom || '…'} → ${dateTo || '…'}`
-    : monthFilter ? `${MONTHS[monthFilter - 1]} ${yearFilter}` : yearFilter;
+  const filterLabel = monthFilter.length > 0
+    ? monthFilter.map(m => MONTHS[m - 1]).join(', ') + ` ${yearFilter}`
+    : yearFilter;
 
   const statCards = isPOC ? [
     { hero: true, l: 'Total Letters', v: letters.length,  sub: 'visible to you'   },
@@ -141,22 +143,13 @@ export default function DocumentsPage() {
   const canDelete = (l) => isAdmin || l.uploaded_by === user?.id;
 
   /* Handlers */
-  const selectMonth = (m) => {
-    setMonthFilter(prev => prev === m ? null : m);
-    setDateFrom(''); setDateTo('');
-  };
-  const selectYear = (y) => {
-    setYearFilter(y); setMonthFilter(null); setDateFrom(''); setDateTo('');
-  };
-  const applyRange = () => {
-    setMonthFilter(null);
-  };
-  const clearAll = () => {
-    setMonthFilter(null); setDateFrom(''); setDateTo('');
-    setYearFilter(String(thisYear));
-  };
+  const selectMonth = (m) => setMonthFilter(prev =>
+    prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]
+  );
+  const selectYear = (y) => { setYearFilter(y); setMonthFilter([]); };
+  const clearAll   = ()  => { setMonthFilter([]); setYearFilter(String(thisYear)); };
 
-  const anyFilter = monthFilter || dateFrom || dateTo;
+  const anyFilter = monthFilter.length > 0;
 
   return (
     <>
@@ -192,65 +185,47 @@ export default function DocumentsPage() {
 
       {/* ── Month filter cards ── */}
       <CCard className="mb-3" style={{ border: '1px solid var(--line)' }}>
-        <CCardBody style={{ padding: '14px 18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <span style={{ fontFamily: 'var(--fm)', fontSize: 11, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--ink3)' }}>
-              Filter by month — {usingRange ? 'date range active' : yearFilter}
+        <CCardBody style={{ padding: '10px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ fontFamily: 'var(--fm)', fontSize: 10, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--ink3)' }}>
+              Month — {yearFilter}
             </span>
             {anyFilter && (
-              <button onClick={clearAll} style={{ border: 'none', background: 'none', fontSize: 11, color: 'var(--accent)', fontWeight: 700, cursor: 'pointer', padding: '2px 8px' }}>
-                ✕ Clear filters
+              <button onClick={clearAll} style={{ border: 'none', background: 'none', fontSize: 10, color: 'var(--accent)', fontWeight: 700, cursor: 'pointer', padding: '1px 6px' }}>
+                ✕ Clear
               </button>
             )}
           </div>
 
-          {/* Month cards row */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8, marginBottom: 14 }}>
+          {/* Month cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 5, marginBottom: 10 }}>
             {MONTHS.map((m, i) => {
-              const mo   = i + 1;
-              const cnt  = monthCounts[i];
-              const active = !usingRange && monthFilter === mo;
+              const mo     = i + 1;
+              const cnt    = monthCounts[i];
+              const active = monthFilter.includes(mo);
+              const color  = MONTH_COLORS[i];
               return (
                 <div
                   key={m}
                   onClick={() => selectMonth(mo)}
                   style={{
-                    padding: '10px 6px',
-                    borderRadius: 10,
-                    border: `1.5px solid ${active ? 'var(--accent)' : cnt > 0 ? 'var(--line)' : 'var(--line2)'}`,
-                    background: active ? 'var(--accent)' : cnt > 0 ? '#fff' : 'var(--paper)',
+                    padding: '5px 2px',
+                    borderRadius: 7,
+                    border: `1.5px solid ${active ? color : 'var(--line)'}`,
+                    background: active ? color : '#fff',
                     cursor: 'pointer',
                     textAlign: 'center',
                     transition: 'all .13s',
-                    opacity: cnt === 0 && !active ? 0.5 : 1,
+                    opacity: cnt === 0 && !active ? 0.45 : 1,
                   }}
                 >
-                  <div style={{ fontFamily: 'var(--fm)', fontSize: 11, fontWeight: 700, color: active ? '#fff' : 'var(--ink3)', letterSpacing: '.04em' }}>{m}</div>
-                  <div style={{ fontFamily: 'var(--fd)', fontSize: 18, fontWeight: 700, color: active ? '#fff' : cnt > 0 ? 'var(--ink)' : 'var(--ink3)', lineHeight: 1.2, marginTop: 4 }}>{cnt}</div>
+                  <div style={{ fontFamily: 'var(--fm)', fontSize: 9, fontWeight: 700, color: active ? '#fff' : 'var(--ink)', letterSpacing: '.03em' }}>{m}</div>
+                  <div style={{ fontFamily: 'var(--fd)', fontSize: 13, fontWeight: 700, color: active ? '#fff' : 'var(--ink)', lineHeight: 1.3 }}>{cnt}</div>
                 </div>
               );
             })}
           </div>
 
-          {/* Date range row */}
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: 140 }}>
-              <div style={{ fontFamily: 'var(--fm)', fontSize: 11, fontWeight: 600, color: 'var(--ink3)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.05em' }}>From</div>
-              <DateField value={dateFrom} onChange={v => { setDateFrom(v); applyRange(); }} style={usingRange ? { borderColor: 'var(--accent)' } : {}} />
-            </div>
-            <div style={{ flex: 1, minWidth: 140 }}>
-              <div style={{ fontFamily: 'var(--fm)', fontSize: 11, fontWeight: 600, color: 'var(--ink3)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.05em' }}>To</div>
-              <DateField value={dateTo} onChange={v => { setDateTo(v); applyRange(); }} style={usingRange ? { borderColor: 'var(--accent)' } : {}} />
-            </div>
-            {usingRange && (
-              <button
-                onClick={() => { setDateFrom(''); setDateTo(''); }}
-                style={{ padding: '7px 14px', border: '1px solid var(--line)', borderRadius: 9, background: '#fff', fontSize: 13, color: 'var(--ink2)', cursor: 'pointer', fontFamily: 'var(--fb)', fontWeight: 600, marginBottom: 0 }}
-              >
-                Clear range
-              </button>
-            )}
-          </div>
         </CCardBody>
       </CCard>
 
