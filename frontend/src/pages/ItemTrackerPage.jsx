@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getItems, createItem, updateItem, setItemStatus,
@@ -176,9 +177,11 @@ export default function ItemTrackerPage() {
   const { user } = useAuth();
   const toast    = useToast();
   const qc       = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [filter, setFilter] = useState('all');
   const [modal,  setModal]  = useState(null);
+  const deepLinked = useRef(false);
 
   // Create form state
   const [fType,     setFType]     = useState('support');
@@ -197,6 +200,18 @@ export default function ItemTrackerPage() {
     queryKey: ['items', filter],
     queryFn:  () => getItems(filter !== 'all' ? { status: filter } : {}),
   });
+
+  // Deep-link: open item modal when ?item=<id> is in the URL
+  useEffect(() => {
+    const itemId = Number(searchParams.get('item'));
+    if (!itemId || deepLinked.current || items.length === 0) return;
+    const found = items.find(i => i.id === itemId);
+    if (found) {
+      setModal(found);
+      deepLinked.current = true;
+      setSearchParams({}, { replace: true }); // clean up the URL
+    }
+  }, [items, searchParams, setSearchParams]);
 
   // Fetch assignable users whenever target units change
   const { data: assignableUsers = [] } = useQuery({
