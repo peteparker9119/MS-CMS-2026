@@ -228,3 +228,8 @@ if not VERCEL:
     _log_config['loggers']['django.db.backends']['handlers'] = ['console', 'file']
 
 LOGGING = _log_config
+
+# ── Third-party integrations ──────────────────────────────────────────────────
+WHATSAPP_TOKEN    = config('WHATSAPP_TOKEN', default='')
+WHATSAPP_PHONE_ID = config('WHATSAPP_PHONE_ID', default='')
+GOOGLE_CALENDAR_CREDENTIALS_JSON = config('GOOGLE_CALENDAR_CREDENTIALS_JSON', default='')

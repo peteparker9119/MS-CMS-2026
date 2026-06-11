@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getLetters, uploadLetter, deleteLetter, updateLetter } from '../api/documents';
+import { getLetters, uploadLetter, deleteLetter, updateLetter, getCompliance } from '../api/documents';
 import { getUnits } from '../api/units';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -50,6 +50,11 @@ export default function DocumentsPage() {
 
   const { data: letters = [], isLoading } = useQuery({ queryKey: ['letters'], queryFn: getLetters });
   const { data: units = [] } = useQuery({ queryKey: ['units'], queryFn: getUnits });
+  const { data: compliance = [] } = useQuery({
+    queryKey: ['compliance', yearFilter],
+    queryFn: () => getCompliance(yearFilter),
+    enabled: isAdmin,
+  });
   const [circulateId, setCirculateId] = useState(null);
 
   /* Available years from data */
@@ -237,6 +242,53 @@ export default function DocumentsPage() {
 
         </CCardBody>
       </CCard>
+
+      {isAdmin && (
+        <CCard className="mb-3">
+          <CCardBody style={{ padding:'14px 16px' }}>
+            <div style={{ fontFamily:'var(--fd)', fontWeight:600, fontSize:15, marginBottom:12 }}>
+              DO Letter Compliance — {yearFilter}
+            </div>
+            <div style={{ overflowX:'auto' }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign:'left', padding:'5px 8px', fontFamily:'var(--fm)', color:'var(--ink3)', fontWeight:600, borderBottom:'1px solid var(--line)', minWidth:100 }}>Unit</th>
+                    {MONTHS.map(m => (
+                      <th key={m} style={{ padding:'5px 6px', fontFamily:'var(--fm)', color:'var(--ink3)', fontWeight:600, borderBottom:'1px solid var(--line)', textAlign:'center', minWidth:38 }}>{m}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {compliance.map(row => (
+                    <tr key={row.unit_id}>
+                      <td style={{ padding:'6px 8px', fontWeight:600, color:row.unit_color, fontSize:12 }}>
+                        <span style={{ display:'inline-flex', alignItems:'center', gap:5 }}>
+                          <span style={{ width:7, height:7, borderRadius:'50%', background:row.unit_color, display:'inline-block' }} />
+                          {row.unit_abbr}
+                        </span>
+                      </td>
+                      {MONTHS.map((_, mi) => {
+                        const val = row.months[String(mi + 1)];
+                        return (
+                          <td key={mi} style={{ padding:'5px 6px', textAlign:'center' }}>
+                            {val === true  && <span style={{ color:'#059669', fontSize:14, fontWeight:700 }}>✓</span>}
+                            {val === false && <span style={{ color:'#dc2626', fontSize:13, fontWeight:700 }}>✗</span>}
+                            {val === null  && <span style={{ color:'var(--line2)', fontSize:12 }}>—</span>}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ fontFamily:'var(--fm)', fontSize:11, color:'var(--ink3)', marginTop:8 }}>
+              Compliance is checked on the 13th of each month. ✓ uploaded · ✗ missed · — not yet checked
+            </div>
+          </CCardBody>
+        </CCard>
+      )}
 
       <CRow className="g-3">
         {/* ── Left: Upload form ── */}

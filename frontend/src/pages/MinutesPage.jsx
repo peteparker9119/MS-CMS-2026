@@ -322,6 +322,42 @@ export default function MinutesPage() {
                               </div>
                           </div>
                         </div>
+                        {/* Action points list */}
+                        {m.minutes?.action_points?.length > 0 && (
+                          <div style={{ marginTop:10, paddingTop:10, borderTop:'1px solid var(--line2)' }}>
+                            {m.minutes.action_points.map((ap, ai) => (
+                              <div key={ap.id ?? ai}>
+                                <div style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 0', fontSize:13 }}>
+                                  <span style={{ width:14, height:14, borderRadius:4, border:`1.5px solid ${ap.done?'var(--ok)':'var(--ink3)'}`, background:ap.done?'var(--ok)':'transparent', flexShrink:0, display:'inline-block' }} />
+                                  <span style={{ color:ap.done?'var(--ink3)':'var(--ink)', textDecoration:ap.done?'line-through':'none', flex:1 }}>{ap.text}</span>
+                                  {ap.deadline && (() => {
+                                    const d = new Date(ap.deadline);
+                                    const now = new Date();
+                                    const diff = (d - now) / (1000 * 60 * 60 * 24);
+                                    const color = diff < 0 ? '#dc2626' : diff <= 3 ? '#f59e0b' : '#059669';
+                                    return (
+                                      <span style={{ fontSize:10, fontWeight:700, color:'#fff', background:color, borderRadius:4, padding:'1px 6px', marginLeft:6 }}>
+                                        {ap.deadline}
+                                      </span>
+                                    );
+                                  })()}
+                                  {ap.assigned_to_name && (
+                                    <span style={{ fontSize:11, color:'var(--ink3)', marginLeft:6 }}>→ {ap.assigned_to_name}</span>
+                                  )}
+                                </div>
+                                {ap.deadline_history?.length > 0 && (
+                                  <div style={{ marginLeft:27, marginTop:4, borderLeft:'2px solid var(--line)', paddingLeft:8 }}>
+                                    {ap.deadline_history.map((h, hi) => (
+                                      <div key={hi} style={{ fontSize:10, color:'var(--ink3)', marginBottom:2 }}>
+                                        {h.changed_at?.slice(0,10)} — deadline changed from {h.old_deadline ?? 'none'} → {h.new_deadline ?? 'none'} by {h.changed_by_name}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         {/* Action count + share row */}
                         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:10, paddingTop:10, borderTop:'1px solid var(--line2)' }}>
                           <span style={{ fontFamily:'var(--fm)', fontSize:13, color:'var(--ink2)' }}>

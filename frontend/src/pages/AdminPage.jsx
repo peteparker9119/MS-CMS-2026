@@ -300,13 +300,14 @@ function UserModal({ visible, onClose, editUser, units }) {
   const toast = useToast();
   const qc    = useQueryClient();
 
-  const [fFirst,  setFFirst]  = useState(editUser?.first_name ?? '');
-  const [fLast,   setFLast]   = useState(editUser?.last_name ?? '');
-  const [fEmail,  setFEmail]  = useState(editUser?.email ?? '');
-  const [fRole,   setFRole]   = useState(editUser?.role ?? 'poc');
-  const [fUnit,   setFUnit]   = useState(editUser?.unit ?? '');
-  const [fActive, setFActive] = useState(editUser?.is_active ?? true);
-  const [fMenus,  setFMenus]  = useState(
+  const [fFirst,    setFFirst]    = useState(editUser?.first_name ?? '');
+  const [fLast,     setFLast]     = useState(editUser?.last_name ?? '');
+  const [fEmail,    setFEmail]    = useState(editUser?.email ?? '');
+  const [fRole,     setFRole]     = useState(editUser?.role ?? 'poc');
+  const [fUnit,     setFUnit]     = useState(editUser?.unit ?? '');
+  const [fActive,   setFActive]   = useState(editUser?.is_active ?? true);
+  const [fWA,       setFWA]       = useState(editUser?.whatsapp_number ?? '');
+  const [fMenus,    setFMenus]    = useState(
     editUser?.menu_permissions?.length > 0 ? editUser.menu_permissions : [...MENU_SLUGS]
   );
 
@@ -328,6 +329,7 @@ function UserModal({ visible, onClose, editUser, units }) {
     const data = {
       first_name: fFirst, last_name: fLast, email: fEmail,
       role: fRole, is_active: fActive,
+      whatsapp_number: fWA || null,
       menu_permissions: allOn ? [] : fMenus,
     };
     if (fRole !== 'admin') data.unit = fUnit || null;
@@ -357,6 +359,11 @@ function UserModal({ visible, onClose, editUser, units }) {
 
         <Field label="Email (optional)">
           <input style={INPUT} type="email" value={fEmail} onChange={e => setFEmail(e.target.value)} placeholder="user@example.com" />
+        </Field>
+
+        <Field label="WhatsApp Number">
+          <input style={INPUT} value={fWA} onChange={e => setFWA(e.target.value)} placeholder="e.g. 919876543210 (no + prefix)" />
+          <div style={{ fontSize:11, color:'var(--ink3)', marginTop:3 }}>Country code + number, no + sign</div>
         </Field>
 
         <CRow className="g-3">

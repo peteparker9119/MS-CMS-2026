@@ -188,6 +188,21 @@ class ActionPointViewSet(viewsets.ModelViewSet):
 
         return qs
 
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if 'deadline' in request.data:
+            new_dl = request.data.get('deadline') or None
+            old_dl = str(instance.deadline) if instance.deadline else None
+            if str(new_dl or '') != str(old_dl or ''):
+                from .models import ActionPointDeadlineHistory
+                ActionPointDeadlineHistory.objects.create(
+                    action_point=instance,
+                    changed_by=request.user,
+                    old_deadline=old_dl,
+                    new_deadline=new_dl,
+                )
+        return super().partial_update(request, *args, **kwargs)
+
     @action(detail=True, methods=['post'], url_path='comments')
     def add_comment(self, request, pk=None):
         ap = self.get_object()
@@ -228,6 +243,30 @@ class ActionPointViewSet(viewsets.ModelViewSet):
             created += 1
 
         return Response({'sent': created})
+
+
+class MeetingMembersView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk=None):
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        try:
+            meeting = Meeting.objects.select_related('pair__unit_a', 'pair__unit_b').get(pk=pk)
+        except Meeting.DoesNotExist:
+            return Response({'detail': 'Not found'}, status=404)
+        unit_a = meeting.pair.unit_a
+        unit_b = meeting.pair.unit_b
+        users = User.objects.filter(unit__in=[unit_a, unit_b], is_active=True).select_related('unit')
+        data = [
+            {
+                'id': u.id,
+                'name': u.get_full_name() or u.username,
+                'unit_abbr': u.unit.abbr if u.unit else '',
+            }
+            for u in users
+        ]
+        return Response(data)
 
 
 class DashboardStatsView(APIView):

@@ -49,3 +49,19 @@ class DOLetter(models.Model):
                 seq = 1
             self.tracking_number = f'{unit_abbr}-DOL-{seq:03d}'
         super().save(*args, **kwargs)
+
+
+class DOLetterCompliance(models.Model):
+    unit = models.ForeignKey(
+        'units.ConvergenceUnit', on_delete=models.CASCADE, related_name='do_compliance'
+    )
+    year = models.PositiveSmallIntegerField()
+    month = models.PositiveSmallIntegerField()
+    is_compliant = models.BooleanField(default=False)
+    checked_at = models.DateTimeField(auto_now=True)
+    notified_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'documents_dolettercompliance'
+        unique_together = [('unit', 'year', 'month')]
+        ordering = ['-year', '-month', 'unit__order']

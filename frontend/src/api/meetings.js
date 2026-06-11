@@ -17,3 +17,6 @@ export const addComment     = (id, text) => client.post(`/action-points/${id}/co
 
 export const getDashboardStats  = (params) => client.get('/dashboard/stats/', p(params)).then((r) => r.data);
 export const getDashboardMatrix = (params) => client.get('/dashboard/matrix/', p(params)).then((r) => r.data);
+
+export const getMeetingMembers = (meetingId) =>
+  client.get(`/meetings/${meetingId}/members/`).then(r => r.data);

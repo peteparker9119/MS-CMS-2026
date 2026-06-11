@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import DateField from '../components/DateField';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getDashboardStats, getDashboardMatrix, getMeetings, updateActionPoint, addComment } from '../api/meetings';
+import { getDashboardStats, getDashboardMatrix, getMeetings, updateActionPoint, addComment, getMeetingMembers } from '../api/meetings';
 import { askItemStatus } from '../api/items';
 import { getUnits } from '../api/units';
 import { useAuth } from '../context/AuthContext';
@@ -157,7 +157,12 @@ export default function DashboardPage() {
                     onClick={() => setModal({ type:'action-point', ap, meeting })}>
                     <span style={{ width:9, height:9, borderRadius:'50%', background:'var(--bad)', display:'inline-block' }} />
                     <div>
-                      <div style={{ fontSize:15 }}>{ap.text}</div>
+                      <div style={{ fontSize:15 }}>{ap.text}{ap.deadline && (() => {
+                          const d = new Date(ap.deadline);
+                          const diff = (d - new Date()) / 864e5;
+                          const bg = diff < 0 ? '#dc2626' : diff <= 3 ? '#f59e0b' : '#059669';
+                          return <span style={{ fontSize:10, background:bg, color:'#fff', borderRadius:4, padding:'1px 6px', marginLeft:4, fontWeight:700 }}>{ap.deadline}</span>;
+                        })()}</div>
                       <div style={{ fontFamily:'var(--fm)', fontSize:13, color:'var(--ink3)', marginTop:3, display:'flex', gap:7 }}>
                         <UnitDotLabel unit={A} /> × <UnitDotLabel unit={B} /> · {meeting.date}
                       </div>
@@ -364,9 +369,33 @@ function MeetingCard({ meeting: m, defaultOpen, onAPClick }) {
 }
 
 function ActionPointModal({ ap, meeting, onClose, onToggle, toast, qc }) {
-  const [comment, setComment] = useState('');
-  const [posting, setPosting] = useState(false);
+  const [comment,  setComment]  = useState('');
+  const [posting,  setPosting]  = useState(false);
+  const [assignee, setAssignee] = useState(ap.assigned_to ?? null);
+  const [deadline, setDeadline] = useState(ap.deadline ?? '');
+  const [saving,   setSaving]   = useState(false);
   const A = meeting.pair.unit_a, B = meeting.pair.unit_b;
+
+  const { data: members = [] } = useQuery({
+    queryKey: ['meeting-members', meeting.id],
+    queryFn: () => getMeetingMembers(meeting.id),
+  });
+
+  const handleSaveAP = async () => {
+    setSaving(true);
+    try {
+      await updateActionPoint(ap.id, {
+        assigned_to: assignee || null,
+        deadline: deadline || null,
+      });
+      qc.invalidateQueries(['meetings']);
+      toast('Saved');
+    } catch {
+      toast('Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleComment = async () => {
     if (!comment.trim()) return;
@@ -421,11 +450,54 @@ function ActionPointModal({ ap, meeting, onClose, onToggle, toast, qc }) {
           <div style={{ fontSize:15, lineHeight:1.45, fontWeight:500 }}>{ap.text}</div>
         </div>
 
+        {/* Assign + Deadline */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:18 }}>
+          <div>
+            <div style={{ fontFamily:'var(--fm)', fontSize:11, fontWeight:600, color:'var(--ink3)', marginBottom:4, textTransform:'uppercase', letterSpacing:'.05em' }}>Assign to</div>
+            <select
+              value={assignee ?? ''}
+              onChange={e => setAssignee(e.target.value ? Number(e.target.value) : null)}
+              style={{ width:'100%', border:'1px solid var(--line)', borderRadius:7, padding:'7px 10px', fontSize:13, background:'#fff' }}
+            >
+              <option value="">— Unassigned —</option>
+              {members.map(m => (
+                <option key={m.id} value={m.id}>{m.name} ({m.unit_abbr})</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <div style={{ fontFamily:'var(--fm)', fontSize:11, fontWeight:600, color:'var(--ink3)', marginBottom:4, textTransform:'uppercase', letterSpacing:'.05em' }}>Deadline</div>
+            <input
+              type="date"
+              value={deadline}
+              onChange={e => setDeadline(e.target.value)}
+              style={{ width:'100%', border:'1px solid var(--line)', borderRadius:7, padding:'7px 10px', fontSize:13 }}
+            />
+          </div>
+        </div>
+
         {/* From the minutes */}
         {meeting.minutes?.summary && (
           <>
             <div className="seclab">From the minutes</div>
             <div style={{ fontSize:15, lineHeight:1.6, color:'var(--ink2)', marginBottom:4 }}>{meeting.minutes.summary}</div>
+          </>
+        )}
+
+        {/* Deadline history */}
+        {ap.deadline_history?.length > 0 && (
+          <>
+            <div className="seclab">Deadline history</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:16 }}>
+              {ap.deadline_history.map((h, i) => (
+                <div key={i} style={{ fontSize:12, color:'var(--ink3)', display:'flex', gap:6, alignItems:'center' }}>
+                  <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--line2)', flexShrink:0 }} />
+                  <span>{h.changed_at?.slice(0,10)}</span>
+                  <span style={{ color:'var(--ink2)' }}>{h.old_deadline ?? 'none'} → {h.new_deadline ?? 'none'}</span>
+                  <span style={{ marginLeft:'auto', fontSize:11 }}>by {h.changed_by_name}</span>
+                </div>
+              ))}
+            </div>
           </>
         )}
 
@@ -462,6 +534,9 @@ function ActionPointModal({ ap, meeting, onClose, onToggle, toast, qc }) {
           {!ap.done && (
             <CButton color="dark" style={{ flex:1, justifyContent:'center' }} onClick={() => { onToggle(ap.id); onClose(); }}>Mark closed</CButton>
           )}
+          <CButton color="primary" onClick={handleSaveAP} disabled={saving} style={{ fontFamily:'var(--fb)', fontSize:13 }}>
+            {saving ? 'Saving…' : 'Save changes'}
+          </CButton>
           <CButton color="dark" variant="outline" onClick={onClose}>Close</CButton>
         </div>
       </div>

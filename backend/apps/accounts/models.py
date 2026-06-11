@@ -20,6 +20,10 @@ class User(AbstractUser):
     )
     is_team_lead = models.BooleanField(default=False)
     menu_permissions = models.JSONField(default=list, blank=True)  # e.g. ['dashboard','planner']
+    whatsapp_number = models.CharField(
+        max_length=20, blank=True, default='',
+        help_text='E.164 without +, e.g. 919876543210'
+    )
 
     class Meta:
         db_table = 'accounts_user'

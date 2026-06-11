@@ -1,6 +1,9 @@
 from rest_framework import serializers
+from django.contrib.auth import get_user_model
 from apps.units.serializers import UnitPairSerializer, ConvergenceUnitSerializer
-from .models import Meeting, MeetingMinutes, ActionPoint, ActionPointComment, MeetingNotHeld
+from .models import Meeting, MeetingMinutes, ActionPoint, ActionPointComment, MeetingNotHeld, ActionPointDeadlineHistory
+
+User = get_user_model()
 
 
 class ActionPointCommentSerializer(serializers.ModelSerializer):
@@ -12,14 +15,39 @@ class ActionPointCommentSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'created_by_name']
 
 
+class ActionPointDeadlineHistorySerializer(serializers.ModelSerializer):
+    changed_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ActionPointDeadlineHistory
+        fields = ['id', 'changed_by_name', 'old_deadline', 'new_deadline', 'changed_at']
+
+    def get_changed_by_name(self, obj):
+        if obj.changed_by:
+            return obj.changed_by.get_full_name() or obj.changed_by.username
+        return 'System'
+
+
 class ActionPointSerializer(serializers.ModelSerializer):
     comments = ActionPointCommentSerializer(many=True, read_only=True)
-    comment_count = serializers.IntegerField(source='comments.count', read_only=True)
+    assigned_to_name = serializers.SerializerMethodField()
+    deadline_history = ActionPointDeadlineHistorySerializer(many=True, read_only=True)
+    assigned_to = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), allow_null=True, required=False,
+    )
 
     class Meta:
         model = ActionPoint
-        fields = ['id', 'aid', 'text', 'done', 'order', 'comments', 'comment_count']
-        read_only_fields = ['id', 'aid']
+        fields = [
+            'id', 'aid', 'text', 'done', 'order',
+            'assigned_to', 'assigned_to_name', 'deadline',
+            'deadline_history', 'comments',
+        ]
+
+    def get_assigned_to_name(self, obj):
+        if obj.assigned_to:
+            return obj.assigned_to.get_full_name() or obj.assigned_to.username
+        return None
 
 
 class MeetingNotHeldSerializer(serializers.ModelSerializer):

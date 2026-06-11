@@ -6,3 +6,6 @@ export const uploadLetter  = (formData) =>
   client.post('/do-letters/', formData).then(r => r.data);
 export const deleteLetter  = (id) => client.delete(`/do-letters/${id}/`).then(r => r.data);
 export const updateLetter  = (id, data) => client.patch(`/do-letters/${id}/`, data).then(r => r.data);
+
+export const getCompliance = (year) =>
+  client.get('/do-compliance/', { params: { year } }).then(r => r.data);

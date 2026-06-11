@@ -44,3 +44,37 @@ class DOLetterViewSet(viewsets.ModelViewSet):
         ser.is_valid(raise_exception=True)
         ser.save()
         return Response(ser.data)
+
+
+import datetime as _dt
+from rest_framework.views import APIView as _APIView
+from rest_framework.response import Response as _Response
+from rest_framework.permissions import IsAuthenticated as _IsAuthenticated
+from .models import DOLetterCompliance
+from apps.units.models import ConvergenceUnit
+
+
+class DOComplianceView(_APIView):
+    permission_classes = [_IsAuthenticated]
+
+    def get(self, request):
+        try:
+            year = int(request.query_params.get('year', _dt.date.today().year))
+        except (ValueError, TypeError):
+            year = _dt.date.today().year
+
+        units        = ConvergenceUnit.objects.order_by('order')
+        comp_qs      = DOLetterCompliance.objects.filter(year=year).select_related('unit')
+        comp_map     = {(c.unit_id, c.month): c.is_compliant for c in comp_qs}
+
+        result = []
+        for unit in units:
+            months = {str(m): comp_map.get((unit.id, m)) for m in range(1, 13)}
+            result.append({
+                'unit_id':    unit.id,
+                'unit_abbr':  unit.abbr,
+                'unit_name':  unit.name,
+                'unit_color': unit.color,
+                'months':     months,
+            })
+        return _Response(result)

@@ -26,6 +26,7 @@ class Meeting(models.Model):
     time = models.TimeField(null=True, blank=True)
     status = models.CharField(max_length=15, choices=STATUS_CHOICES, default=STATUS_SCHEDULED)
     mtype = models.CharField(max_length=15, choices=TYPE_CHOICES, default=TYPE_INPERSON)
+    google_event_id = models.CharField(max_length=200, blank=True, default='')
     agenda = models.TextField(blank=True)
     notify_units = models.ManyToManyField('units.ConvergenceUnit', blank=True, related_name='notified_meetings')
     created_by = models.ForeignKey(
@@ -76,6 +77,13 @@ class ActionPoint(models.Model):
     text = models.TextField()
     done = models.BooleanField(default=False)
     order = models.PositiveSmallIntegerField(default=0)
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='assigned_action_points',
+    )
+    deadline = models.DateField(null=True, blank=True)
 
     class Meta:
         db_table = 'meetings_actionpoint'
@@ -100,6 +108,22 @@ class ActionPointComment(models.Model):
 
     def __str__(self):
         return f'Comment on {self.action_point.aid}'
+
+
+class ActionPointDeadlineHistory(models.Model):
+    action_point = models.ForeignKey(
+        ActionPoint, on_delete=models.CASCADE, related_name='deadline_history'
+    )
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL
+    )
+    old_deadline = models.DateField(null=True, blank=True)
+    new_deadline = models.DateField(null=True, blank=True)
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'meetings_actionpointdeadlinehistory'
+        ordering = ['-changed_at']
 
 
 class MeetingNotHeld(models.Model):
