@@ -78,8 +78,6 @@ export default function DashboardPage() {
 
   const askStatusMut = useMutation({
     mutationFn: ({ id, note = '' }) => askItemStatus(id, note),
-    onSuccess: (data) => toast(data?.sent > 0 ? `Status request sent to ${data.sent} POC user(s)` : 'No POC users assigned to this pair'),
-    onError: (err) => toast(err?.response?.data?.detail || 'Failed to send notification'),
   });
 
   const selPairMeetings = useMemo(() => {
@@ -166,14 +164,24 @@ export default function DashboardPage() {
                     </div>
                     <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                       <span style={{ color:'var(--ink3)', fontSize:18 }}>›</span>
-                      {user?.role === 'admin' && (
-                        <button
-                          onClick={e => { e.stopPropagation(); askStatusMut.mutate({ id: ap.id }); }}
-                          style={{ border:'1px solid var(--accent)', background:'var(--accent-light)', color:'var(--accent)', borderRadius:6, padding:'3px 9px', fontSize:11, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', fontFamily:'var(--fb)' }}
-                        >
-                          Ask status
-                        </button>
-                      )}
+                      {user?.role === 'admin' && (() => {
+                        const sending = askStatusMut.isPending && askStatusMut.variables?.id === ap.id;
+                        return (
+                          <button
+                            disabled={sending}
+                            onClick={e => {
+                              e.stopPropagation();
+                              askStatusMut.mutate({ id: ap.id }, {
+                                onSuccess: (data) => toast(data?.sent > 0 ? `Notified ${data.sent} POC user(s)` : 'No POC users found for this pair'),
+                                onError:   ()     => toast('Failed to send — check backend'),
+                              });
+                            }}
+                            style={{ border:'1px solid var(--accent)', background: sending ? 'var(--line)' : 'var(--accent-light)', color: sending ? 'var(--ink3)' : 'var(--accent)', borderRadius:6, padding:'3px 9px', fontSize:11, fontWeight:700, cursor: sending ? 'not-allowed' : 'pointer', whiteSpace:'nowrap', fontFamily:'var(--fb)', opacity: sending ? 0.6 : 1 }}
+                          >
+                            {sending ? 'Sending…' : 'Ask status'}
+                          </button>
+                        );
+                      })()}
                     </div>
                   </div>
                 );
