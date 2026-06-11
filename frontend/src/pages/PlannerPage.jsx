@@ -373,7 +373,7 @@ export default function PlannerPage() {
         </CModalBody>
         <CModalFooter style={{ borderTop:'1px solid var(--line)', paddingTop:14 }}>
           <CButton color="secondary" variant="outline" onClick={() => setSchedModalOpen(false)} style={{ fontFamily:'var(--fb)', fontSize:13 }}>Cancel</CButton>
-          <CButton color="dark" onClick={handleSchedule} disabled={scheduleMutation.isPending} style={{ fontFamily:'var(--fb)', fontSize:13, background:'#3b5bdb', borderColor:'#3b5bdb' }}>
+          <CButton color="dark" onClick={handleSchedule} disabled={scheduleMutation.isPending || !fDate} style={{ fontFamily:'var(--fb)', fontSize:13, background:'#3b5bdb', borderColor:'#3b5bdb' }}>
             {scheduleMutation.isPending ? 'Scheduling…' : 'Schedule meeting'}
           </CButton>
         </CModalFooter>

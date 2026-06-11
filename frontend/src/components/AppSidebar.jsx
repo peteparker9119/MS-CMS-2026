@@ -126,35 +126,21 @@ export default function AppSidebar() {
           userSelect: 'none',
         }}
       >
-        {/* ── Top zone (logo) — fills full sidebar width when expanded ── */}
+        {/* ── Top zone — only visible when expanded ── */}
         <div style={{
           height: 57, flexShrink: 0,
           display: 'flex', alignItems: 'center',
-          padding: '0 18px',
+          paddingLeft: 18,
           borderBottom: '1px solid rgba(255,255,255,.08)',
           overflow: 'hidden',
-          background: expanded ? 'linear-gradient(135deg, rgba(99,102,241,.25), rgba(129,140,248,.12))' : 'transparent',
-          transition: 'background .22s cubic-bezier(.4,0,.2,1)',
-          width: '100%',
         }}>
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 12,
             opacity: expanded ? 1 : 0,
             transition: 'opacity .15s ease',
             whiteSpace: 'nowrap',
-            width: '100%',
           }}>
-            <div style={{
-              width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-              background: 'linear-gradient(135deg,#6366f1,#818cf8)',
-              color: '#fff', fontFamily: 'var(--fd)', fontWeight: 800,
-              fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 2px 8px rgba(99,102,241,.4)',
-            }}>M</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: 'var(--fd)', fontWeight: 800, fontSize: 16, color: '#fff', lineHeight: 1, marginBottom: 4, letterSpacing: '-.01em' }}>MS - CMS</div>
-              <div style={{ fontFamily: 'var(--fm)', fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', lineHeight: 1 }}>Convergence Management</div>
-            </div>
+            <div style={{ fontFamily: 'var(--fd)', fontWeight: 800, fontSize: 15, color: '#fff', lineHeight: 1, marginBottom: 3, letterSpacing: '-.01em' }}>Convergence</div>
+            <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 12, color: 'rgba(255,255,255,.6)', lineHeight: 1, letterSpacing: '.02em' }}>Management System</div>
           </div>
         </div>
 

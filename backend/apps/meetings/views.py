@@ -196,6 +196,39 @@ class ActionPointViewSet(viewsets.ModelViewSet):
         comment = ser.save(action_point=ap, created_by=request.user)
         return Response(ActionPointCommentSerializer(comment).data, status=201)
 
+    @action(detail=True, methods=['post'], url_path='ask-status', permission_classes=[IsAuthenticated])
+    def ask_status(self, request, pk=None):
+        """Admin sends in-app notification to POC users asking why item is still pending."""
+        from apps.notifications.models import Notification
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
+        ap = self.get_object()
+        if request.user.role != 'admin':
+            return Response({'detail': 'Admin only'}, status=403)
+
+        meeting = ap.minutes.meeting
+        unit_a  = meeting.pair.unit_a
+        unit_b  = meeting.pair.unit_b
+
+        poc_users = User.objects.filter(role='poc', unit__in=[unit_a, unit_b])
+        note = request.data.get('note', '')
+        msg = f'Action item "{ap.text}" is still pending. {note}'.strip()
+
+        created = 0
+        for user in poc_users:
+            Notification.objects.create(
+                user=user,
+                title='Status update requested',
+                message=msg,
+                notif_type='item_created',
+                object_id=ap.id,
+                action_type='acknowledge',
+            )
+            created += 1
+
+        return Response({'sent': created})
+
 
 class DashboardStatsView(APIView):
     permission_classes = [IsAuthenticated]

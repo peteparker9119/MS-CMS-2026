@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import DateField from '../components/DateField';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getDashboardStats, getDashboardMatrix, getMeetings, updateActionPoint, addComment } from '../api/meetings';
+import { askItemStatus } from '../api/items';
 import { getUnits } from '../api/units';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -73,6 +74,11 @@ export default function DashboardPage() {
   const toggleAP = useMutation({
     mutationFn: ({ id }) => updateActionPoint(id, { done: true }),
     onSuccess: () => { qc.invalidateQueries(['meetings']); toast('Action point closed'); },
+  });
+
+  const askStatusMut = useMutation({
+    mutationFn: ({ id, note = '' }) => askItemStatus(id, note),
+    onSuccess: () => toast('Notification sent'),
   });
 
   const selPairMeetings = useMemo(() => {
@@ -157,7 +163,17 @@ export default function DashboardPage() {
                         <UnitDotLabel unit={A} /> × <UnitDotLabel unit={B} /> · {meeting.date}
                       </div>
                     </div>
-                    <span style={{ color:'var(--ink3)', fontSize:18 }}>›</span>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <span style={{ color:'var(--ink3)', fontSize:18 }}>›</span>
+                      {user?.role === 'admin' && (
+                        <button
+                          onClick={e => { e.stopPropagation(); askStatusMut.mutate({ id: ap.id }); }}
+                          style={{ border:'1px solid var(--accent)', background:'var(--accent-light)', color:'var(--accent)', borderRadius:6, padding:'3px 9px', fontSize:11, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', fontFamily:'var(--fb)' }}
+                        >
+                          Ask status
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}

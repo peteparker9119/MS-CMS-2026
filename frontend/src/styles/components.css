@@ -648,7 +648,7 @@
 .kpi-amber .kpi-label { color: #9a7012; }
 
 .kpi-value { font-family: var(--fd); font-weight: 800; font-size: 36px; line-height: 1; margin-top: 10px; letter-spacing: -.03em; }
-.kpi-amber .kpi-value { color: #7a5408; }
+.kpi-amber .kpi-value { color: #ef4444; }
 
 .kpi-unit  { font-family: var(--fb); font-size: 15px; font-weight: 600; color: var(--ink3); margin-left: 3px; }
 .kpi-hero  .kpi-unit  { color: rgba(255,255,255,.6); }

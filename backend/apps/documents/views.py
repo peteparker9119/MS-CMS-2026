@@ -10,7 +10,7 @@ class DOLetterViewSet(viewsets.ModelViewSet):
     permission_classes = [IsPOCUploadAdminView]
     serializer_class = DOLetterSerializer
     parser_classes = [MultiPartParser, FormParser]
-    http_method_names = ['get', 'post', 'delete', 'head', 'options']
+    http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
 
     def get_queryset(self):
         qs = DOLetter.objects.select_related('uploaded_by').prefetch_related('units')
@@ -32,3 +32,15 @@ class DOLetterViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(uploaded_by=self.request.user)
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if request.user.role != 'admin' and instance.uploaded_by != request.user:
+            from rest_framework.response import Response
+            return Response({'detail': 'Not allowed'}, status=403)
+        # Only allow updating visible_to_all and unit_ids
+        allowed = {k: v for k, v in request.data.items() if k in ('visible_to_all', 'unit_ids')}
+        ser = self.get_serializer(instance, data=allowed, partial=True)
+        ser.is_valid(raise_exception=True)
+        ser.save()
+        return Response(ser.data)

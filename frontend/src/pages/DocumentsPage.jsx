@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getLetters, uploadLetter, deleteLetter } from '../api/documents';
+import { getLetters, uploadLetter, deleteLetter, updateLetter } from '../api/documents';
+import { getUnits } from '../api/units';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../api/client';
@@ -48,6 +49,8 @@ export default function DocumentsPage() {
   const usingRange = false;
 
   const { data: letters = [], isLoading } = useQuery({ queryKey: ['letters'], queryFn: getLetters });
+  const { data: units = [] } = useQuery({ queryKey: ['units'], queryFn: getUnits });
+  const [circulateId, setCirculateId] = useState(null);
 
   /* Available years from data */
   const years = useMemo(() => {
@@ -138,6 +141,12 @@ export default function DocumentsPage() {
     mutationFn: deleteLetter,
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['letters'] }); toast('Deleted'); },
     onError: (err) => toast(getErrorMessage(err)),
+  });
+
+  const updateLetterMut = useMutation({
+    mutationFn: ({ id, data }) => updateLetter(id, data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['letters'] }); toast('Letter updated'); setCirculateId(null); },
+    onError: () => toast('Failed to update'),
   });
 
   const canDelete = (l) => isAdmin || l.uploaded_by === user?.id;
@@ -360,6 +369,13 @@ export default function DocumentsPage() {
                           Delete
                         </button>
                       )}
+                      {isAdmin && !l.visible_to_all && (
+                        <button
+                          onClick={() => setCirculateId(l.id)}
+                          style={{ background: 'none', border: '1px solid #059669', borderRadius: 5, padding: '4px 10px', cursor: 'pointer', color: '#059669', fontSize: 13, fontFamily: 'var(--fb)' }}>
+                          Circulate
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -371,6 +387,30 @@ export default function DocumentsPage() {
                     {l.uploaded_by_name && <span>By: {l.uploaded_by_name}</span>}
                     {l.uploaded_at && <span>{new Date(l.uploaded_at).toLocaleDateString()}</span>}
                   </div>
+                  {isAdmin && circulateId === l.id && (
+                    <div style={{ padding: '12px 18px', background: '#f0fdf4', borderTop: '1px solid #bbf7d0', margin: '10px -18px -14px', borderRadius: '0 0 0 0' }}>
+                      <div style={{ fontFamily: 'var(--fm)', fontSize: 12, fontWeight: 700, color: '#065f46', marginBottom: 8 }}>Select teams to circulate to:</div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                        {units.map(u => (
+                          <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', padding: '5px 10px', border: '1px solid var(--line)', borderRadius: 7, background: '#fff' }}>
+                            <input type="checkbox" defaultChecked style={{ accentColor: u.color }} />
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: u.color, display: 'inline-block' }} />
+                            {u.abbr}
+                          </label>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={() => updateLetterMut.mutate({ id: l.id, data: { visible_to_all: true } })}
+                          style={{ border: 'none', background: '#059669', color: '#fff', borderRadius: 7, padding: '6px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--fb)' }}>
+                          ✦ Circulate to all teams
+                        </button>
+                        <button onClick={() => setCirculateId(null)}
+                          style={{ border: '1px solid var(--line)', background: '#fff', color: 'var(--ink2)', borderRadius: 7, padding: '6px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--fb)' }}>
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </CCardBody>

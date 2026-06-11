@@ -36,3 +36,12 @@ class DOLetterSerializer(serializers.ModelSerializer):
         letter = DOLetter.objects.create(**validated_data)
         letter.units.set(units)
         return letter
+
+    def update(self, instance, validated_data):
+        units = validated_data.pop('units', None)
+        for attr, val in validated_data.items():
+            setattr(instance, attr, val)
+        instance.save()
+        if units is not None:
+            instance.units.set(units)
+        return instance
