@@ -103,13 +103,16 @@ export default function DashboardPage() {
           <span style={{ width:1, alignSelf:'stretch', background:'var(--line)', margin:'4px 8px', flexShrink:0 }} />
         </>}
 
-        {/* Period presets */}
-        {PRESETS.map(([k,l]) => (
-          <button key={k} className={preset===k?'on':''} onClick={() => { setPreset(k); setRange({from:null,to:null}); }}>{l}</button>
-        ))}
+        {/* Period presets + date range — pushed to right */}
+        <div style={{ display:'flex', alignItems:'center', gap:2, marginLeft:'auto', flexShrink:0 }}>
+          {PRESETS.map(([k,l]) => (
+            <button key={k} className={preset===k?'on':''} onClick={() => { setPreset(k); setRange({from:null,to:null}); }}>{l}</button>
+          ))}
+          <span style={{ width:1, alignSelf:'stretch', background:'var(--line)', margin:'4px 8px', flexShrink:0 }} />
+        </div>
 
-        {/* Custom date range — pushed to right */}
-        <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0, marginLeft:'auto' }}>
+        {/* Custom date range */}
+        <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
           <div style={{ width:106 }}><DateField value={range.from ?? ''} onChange={v => handleCustom('from', v)} placeholder="From" portal /></div>
           <span style={{ fontFamily:'var(--fm)', fontSize:12, color:'var(--ink3)', flexShrink:0 }}>–</span>
           <div style={{ width:106 }}><DateField value={range.to ?? ''} onChange={v => handleCustom('to', v)} placeholder="To" portal /></div>
