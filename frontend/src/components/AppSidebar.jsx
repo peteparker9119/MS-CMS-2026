@@ -126,30 +126,14 @@ export default function AppSidebar() {
           userSelect: 'none',
         }}
       >
-        {/* ── Top zone — always visible ── */}
+        {/* ── Top zone — always rendered, width reveals text ── */}
         <div style={{
           height: 57, flexShrink: 0,
           display: 'flex', alignItems: 'center',
-          paddingLeft: 18,
+          paddingLeft: 14,
           borderBottom: '1px solid rgba(255,255,255,.08)',
-          overflow: 'hidden',
-          position: 'relative',
         }}>
-          {/* Collapsed: show short label */}
-          <div style={{
-            position: 'absolute',
-            opacity: expanded ? 0 : 1,
-            transition: 'opacity .15s ease',
-            whiteSpace: 'nowrap',
-          }}>
-            <div style={{ fontFamily: 'var(--fd)', fontWeight: 800, fontSize: 13, color: '#fff', lineHeight: 1, letterSpacing: '.02em' }}>CMS</div>
-          </div>
-          {/* Expanded: show full text */}
-          <div style={{
-            opacity: expanded ? 1 : 0,
-            transition: 'opacity .15s ease',
-            whiteSpace: 'nowrap',
-          }}>
+          <div style={{ whiteSpace: 'nowrap' }}>
             <div style={{ fontFamily: 'var(--fd)', fontWeight: 800, fontSize: 15, color: '#fff', lineHeight: 1, marginBottom: 3, letterSpacing: '-.01em' }}>Convergence</div>
             <div style={{ fontFamily: 'var(--fd)', fontWeight: 600, fontSize: 11, color: 'rgba(255,255,255,.5)', lineHeight: 1, letterSpacing: '.04em', textTransform: 'uppercase' }}>Management System</div>
           </div>
