@@ -111,7 +111,7 @@ export default function DashboardPage() {
         <span style={{ width:1, alignSelf:'stretch', background:'var(--line)', margin:'4px 8px', flexShrink:0 }} />
 
         {/* Custom date range — same row */}
-        <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0, marginLeft:'auto' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
           <div style={{ width:106 }}><DateField value={range.from ?? ''} onChange={v => handleCustom('from', v)} placeholder="From" portal /></div>
           <span style={{ fontFamily:'var(--fm)', fontSize:12, color:'var(--ink3)', flexShrink:0 }}>–</span>
           <div style={{ width:106 }}><DateField value={range.to ?? ''} onChange={v => handleCustom('to', v)} placeholder="To" portal /></div>
