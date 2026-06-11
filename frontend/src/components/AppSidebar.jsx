@@ -126,27 +126,28 @@ export default function AppSidebar() {
           userSelect: 'none',
         }}
       >
-        {/* ── Brand zone — fixed at top, above header z-index ── */}
+        {/* ── Top zone — only visible when expanded ── */}
         <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0,
-          height: 57, zIndex: 1032,
+          height: 57, flexShrink: 0,
           display: 'flex', alignItems: 'center',
           paddingLeft: 18,
-          background: '#1e2333',
           borderBottom: '1px solid rgba(255,255,255,.08)',
-          whiteSpace: 'nowrap',
           overflow: 'hidden',
         }}>
-          <div>
+          <div style={{
+            opacity: expanded ? 1 : 0,
+            transition: 'opacity .15s ease',
+            whiteSpace: 'nowrap',
+          }}>
             <div style={{ fontFamily: 'var(--fd)', fontWeight: 800, fontSize: 15, color: '#fff', lineHeight: 1, marginBottom: 3, letterSpacing: '-.01em' }}>Convergence</div>
-            <div style={{ fontFamily: 'var(--fd)', fontWeight: 600, fontSize: 11, color: 'rgba(255,255,255,.5)', lineHeight: 1, letterSpacing: '.04em', textTransform: 'uppercase' }}>Management System</div>
+            <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 12, color: 'rgba(255,255,255,.6)', lineHeight: 1, letterSpacing: '.02em' }}>Management System</div>
           </div>
         </div>
 
-        {/* ── Nav ── starts below brand zone ── */}
+        {/* ── Nav ── */}
         <nav style={{
           flex: 1, display: 'flex', flexDirection: 'column',
-          paddingTop: 57, overflowY: 'auto', overflowX: 'hidden',
+          padding: '8px 0', overflowY: 'auto', overflowX: 'hidden',
         }}>
 
           {/* Static nav items */}
