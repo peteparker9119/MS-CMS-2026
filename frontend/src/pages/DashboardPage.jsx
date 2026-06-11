@@ -78,7 +78,8 @@ export default function DashboardPage() {
 
   const askStatusMut = useMutation({
     mutationFn: ({ id, note = '' }) => askItemStatus(id, note),
-    onSuccess: () => toast('Notification sent'),
+    onSuccess: (data) => toast(data?.sent > 0 ? `Status request sent to ${data.sent} POC user(s)` : 'No POC users assigned to this pair'),
+    onError: (err) => toast(err?.response?.data?.detail || 'Failed to send notification'),
   });
 
   const selPairMeetings = useMemo(() => {

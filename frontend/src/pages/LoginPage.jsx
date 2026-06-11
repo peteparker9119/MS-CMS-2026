@@ -4,13 +4,13 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
 const UNITS = [
-  { label: 'VETRI Palligal',  username: 'poc_vp'    },
-  { label: 'SMC',             username: 'poc_smc'   },
-  { label: 'Career Guidance', username: 'poc_cg'    },
-  { label: 'ACIS',            username: 'poc_acis'  },
-  { label: 'NSNOP',           username: 'poc_nsnop' },
-  { label: 'Alumni',          username: 'poc_alum'  },
-  { label: 'Manarkeni',       username: 'poc_man'   },
+  { label: 'VETRI Palligal',  username: 'vp'    },
+  { label: 'SMC',             username: 'smc'   },
+  { label: 'Career Guidance', username: 'cg'    },
+  { label: 'ACIS',            username: 'acis'  },
+  { label: 'NSNOP',           username: 'nsnop' },
+  { label: 'Alumni',          username: 'alum'  },
+  { label: 'Manarkeni',       username: 'man'   },
 ];
 
 const BULLETS = [

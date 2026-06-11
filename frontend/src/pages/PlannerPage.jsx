@@ -186,7 +186,7 @@ export default function PlannerPage() {
                   const isSelected = d.toDateString() === selDay.toDateString();
                   return (
                     <div key={i}
-                      onClick={() => { setSelDay(new Date(d)); setFDate(iso); }}
+                      onClick={() => { setSelDay(new Date(d)); openScheduleModal(iso); }}
                       style={{ minHeight:72, border:`1px solid ${isSelected?'var(--accent)':isToday?'var(--info)':'var(--line)'}`, borderRadius:9, padding:'7px 9px', cursor:'pointer', background:isSelected?'var(--accent-light)':isToday?'#f5f7ff':'#fff', display:'flex', flexDirection:'column', gap:4, opacity:isOther?.35:1, transition:'.13s', boxShadow:isSelected?'0 0 0 2px var(--accent)':isToday?'0 0 0 2px var(--info)':'none' }}>
                       <div style={{ fontFamily:'var(--fd)', fontSize:15, fontWeight:700, color: isToday?'var(--accent)':isSelected?'var(--accent-dark)':'var(--ink)', lineHeight:1 }}>{d.getDate()}</div>
                       <div style={{ display:'flex', flexDirection:'column', gap:2, marginTop:3, overflow:'hidden' }}>
