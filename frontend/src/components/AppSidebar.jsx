@@ -126,23 +126,8 @@ export default function AppSidebar() {
           userSelect: 'none',
         }}
       >
-        {/* ── Top zone — only visible when expanded ── */}
-        <div style={{
-          height: 57, flexShrink: 0,
-          display: 'flex', alignItems: 'center',
-          paddingLeft: 18,
-          borderBottom: '1px solid rgba(255,255,255,.08)',
-          overflow: 'hidden',
-        }}>
-          <div style={{
-            opacity: expanded ? 1 : 0,
-            transition: 'opacity .15s ease',
-            whiteSpace: 'nowrap',
-          }}>
-            <div style={{ fontFamily: 'var(--fd)', fontWeight: 800, fontSize: 15, color: '#fff', lineHeight: 1, marginBottom: 3, letterSpacing: '-.01em' }}>Convergence</div>
-            <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 12, color: 'rgba(255,255,255,.6)', lineHeight: 1, letterSpacing: '.02em' }}>Management System</div>
-          </div>
-        </div>
+        {/* ── Top zone — empty spacer aligned with header height ── */}
+        <div style={{ height: 57, flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,.08)' }} />
 
         {/* ── Nav ── */}
         <nav style={{
