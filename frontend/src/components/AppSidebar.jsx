@@ -126,8 +126,6 @@ export default function AppSidebar() {
           userSelect: 'none',
         }}
       >
-        {/* ── Top zone — empty spacer aligned with header height ── */}
-        <div style={{ height: 57, flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,.08)' }} />
 
         {/* ── Nav ── */}
         <nav style={{
