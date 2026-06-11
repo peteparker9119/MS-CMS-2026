@@ -62,9 +62,9 @@ function AppLayout() {
 
   return (
     <div>
+      <AppHeader />
       <AppSidebar />
       <div className="app-wrapper d-flex flex-column min-vh-100">
-        <AppHeader />
         <div className="body flex-grow-1">
           <CContainer
             fluid

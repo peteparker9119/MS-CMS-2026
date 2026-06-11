@@ -106,7 +106,7 @@ export default function AppHeader() {
   const handleLogout = () => { logout(); navigate('/login'); };
 
   return (
-    <CHeader position="sticky" style={{ background: 'rgba(255,255,255,.97)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(15,23,42,.08)', boxShadow: '0 1px 0 rgba(15,23,42,.06)', zIndex: 1031, display: 'flex', alignItems: 'center', padding: '0 16px 0 0' }}>
+    <CHeader style={{ position: 'fixed', top: 0, left: 0, right: 0, background: 'rgba(255,255,255,.97)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(15,23,42,.08)', boxShadow: '0 1px 0 rgba(15,23,42,.06)', zIndex: 1031, display: 'flex', alignItems: 'center', padding: '0 16px 0 16px' }}>
 
 <CHeaderNav className="ms-auto" style={{ alignItems: 'center', gap: 6 }}>
 

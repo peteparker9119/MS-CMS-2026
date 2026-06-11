@@ -127,10 +127,10 @@ export default function AppSidebar() {
         }}
       >
 
-        {/* ── Nav ── */}
+        {/* ── Nav ── starts below header ── */}
         <nav style={{
           flex: 1, display: 'flex', flexDirection: 'column',
-          padding: '8px 0', overflowY: 'auto', overflowX: 'hidden',
+          padding: '8px 0', paddingTop: 57, overflowY: 'auto', overflowX: 'hidden',
         }}>
 
           {/* Static nav items */}
