@@ -1,9 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { getNotifications, markRead, markAllRead, respondToNotification } from '../api/notifications';
 import { CHeader, CHeaderNav } from '@coreui/react';
+
+const PAGE_TITLES = {
+  'dashboard':   { title: 'Dashboard',    sub: 'Overview & stats' },
+  'meetings':    { title: 'Meetings',     sub: 'Schedule & records' },
+  'planner':     { title: 'Planner',      sub: 'Calendar view' },
+  'minutes':     { title: 'Minutes',      sub: 'Meeting minutes & action points' },
+  'items':       { title: 'Item Tracker', sub: 'Track & manage action items' },
+  'documents':   { title: 'D.O. Letters', sub: 'Official correspondence archive' },
+  'admin-panel': { title: 'Admin Panel',  sub: 'System configuration' },
+};
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -28,7 +38,10 @@ function NotifIcon({ type }) {
 export default function AppHeader() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const qc = useQueryClient();
+  const pageKey = location.pathname.replace(/^\//, '').split('/')[0];
+  const page = PAGE_TITLES[pageKey] ?? { title: 'CMS', sub: '' };
 
   const [notifOpen, setNotifOpen] = useState(false);
   const [userOpen,  setUserOpen]  = useState(false);
@@ -106,9 +119,15 @@ export default function AppHeader() {
   const handleLogout = () => { logout(); navigate('/login'); };
 
   return (
-    <CHeader style={{ position: 'fixed', top: 0, left: 0, right: 0, background: 'rgba(255,255,255,.97)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(15,23,42,.08)', boxShadow: '0 1px 0 rgba(15,23,42,.06)', zIndex: 1031, display: 'flex', alignItems: 'center', padding: '0 16px 0 16px' }}>
+    <CHeader style={{ position: 'fixed', top: 0, left: 240, right: 0, background: '#fff', borderBottom: '1px solid rgba(15,23,42,.08)', boxShadow: '0 1px 3px rgba(15,23,42,.06)', zIndex: 1031, display: 'flex', alignItems: 'center', padding: '0 20px', gap: 12 }}>
 
-<CHeaderNav className="ms-auto" style={{ alignItems: 'center', gap: 6 }}>
+      {/* Page title */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 17, color: 'var(--ink)', lineHeight: 1, letterSpacing: '-.01em' }}>{page.title}</div>
+        {page.sub && <div style={{ fontFamily: 'var(--fm)', fontSize: 12, color: 'var(--ink3)', marginTop: 3, lineHeight: 1 }}>{page.sub}</div>}
+      </div>
+
+      <CHeaderNav style={{ alignItems: 'center', gap: 6 }}>
 
         {/* ── Notification bell ── */}
         <div ref={notifRef} style={{ position: 'relative' }}>

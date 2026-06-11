@@ -553,9 +553,8 @@
 
 /* ── App wrapper always offset by collapsed rail ─────── */
 .app-wrapper {
-  margin-left: 62px;
+  margin-left: 240px;
   padding-top: 57px;
-  transition: margin-left .22s cubic-bezier(.4,0,.2,1);
 }
 
 /* ── Page enter animation ─────────────────────────────── */
