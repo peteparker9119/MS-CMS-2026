@@ -108,10 +108,8 @@ export default function DashboardPage() {
           <button key={k} className={preset===k?'on':''} onClick={() => { setPreset(k); setRange({from:null,to:null}); }}>{l}</button>
         ))}
 
-        <span style={{ width:1, alignSelf:'stretch', background:'var(--line)', margin:'4px 8px', flexShrink:0 }} />
-
-        {/* Custom date range — same row */}
-        <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
+        {/* Custom date range — pushed to right */}
+        <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0, marginLeft:'auto' }}>
           <div style={{ width:106 }}><DateField value={range.from ?? ''} onChange={v => handleCustom('from', v)} placeholder="From" portal /></div>
           <span style={{ fontFamily:'var(--fm)', fontSize:12, color:'var(--ink3)', flexShrink:0 }}>–</span>
           <div style={{ width:106 }}><DateField value={range.to ?? ''} onChange={v => handleCustom('to', v)} placeholder="To" portal /></div>
