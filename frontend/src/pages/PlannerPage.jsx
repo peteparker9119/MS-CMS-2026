@@ -97,6 +97,103 @@ function ReasonModal({ meeting, action, onConfirm, onClose, saving }) {
   );
 }
 
+// ── Mini calendar sidebar (GCal-style) ───────────────────────────────────────
+function MiniCalendar({ meetings, onDateClick, weekStart }) {
+  const now = new Date();
+  const [month, setMonth] = useState(new Date(now.getFullYear(), now.getMonth(), 1));
+
+  // Keep mini calendar in sync when week changes
+  const mo   = month.getMonth();
+  const year = month.getFullYear();
+  const first    = new Date(year, mo, 1);
+  const startDay = new Date(year, mo, 1 - first.getDay());
+  const days     = Array.from({ length: 42 }, (_, i) => {
+    const d = new Date(startDay);
+    d.setDate(startDay.getDate() + i);
+    return d;
+  });
+
+  // Build set of ISO dates that have meetings
+  const eventDays = useMemo(() => {
+    const s = new Set();
+    meetings.forEach(m => { if (m.date) s.add(m.date); });
+    return s;
+  }, [meetings]);
+
+  // Which dates are in the current week view
+  const weekDates = useMemo(() => {
+    const s = new Set();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + i);
+      s.add(toIso(d));
+    }
+    return s;
+  }, [weekStart]);
+
+  const todayIso = toIso(now);
+
+  return (
+    <div style={{ width: 200, flexShrink: 0, background: '#fff', borderRadius: 12, border: '1px solid var(--line)', padding: '10px 8px', userSelect: 'none' }}>
+      {/* Month header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, paddingLeft: 4 }}>
+        <span style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 13, color: '#3c4043' }}>
+          {MONTHS_S[mo]} {year}
+        </span>
+        <div style={{ display: 'flex', gap: 0 }}>
+          <button type="button" onClick={() => setMonth(new Date(year, mo - 1, 1))}
+            style={{ border: 0, background: 'none', cursor: 'pointer', fontSize: 16, color: '#70757a', padding: '2px 4px', lineHeight: 1 }}>‹</button>
+          <button type="button" onClick={() => setMonth(new Date(year, mo + 1, 1))}
+            style={{ border: 0, background: 'none', cursor: 'pointer', fontSize: 16, color: '#70757a', padding: '2px 4px', lineHeight: 1 }}>›</button>
+        </div>
+      </div>
+
+      {/* DOW headers */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', marginBottom: 2 }}>
+        {['S','M','T','W','T','F','S'].map((d, i) => (
+          <div key={i} style={{ fontFamily: 'var(--fm)', fontSize: 10, color: '#70757a', textAlign: 'center', padding: '2px 0', fontWeight: 500 }}>{d}</div>
+        ))}
+      </div>
+
+      {/* Day cells */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 1 }}>
+        {days.map((d, i) => {
+          const iso      = toIso(d);
+          const isOther  = d.getMonth() !== mo;
+          const isToday  = iso === todayIso;
+          const inWeek   = weekDates.has(iso);
+          const hasEvent = eventDays.has(iso);
+
+          return (
+            <div key={i}
+              onClick={() => onDateClick(new Date(d))}
+              style={{
+                width: 24, height: 24, margin: '0 auto',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexDirection: 'column',
+                borderRadius: '50%',
+                cursor: 'pointer',
+                position: 'relative',
+                background: isToday ? '#1a73e8' : inWeek ? '#e8f0fe' : 'transparent',
+                color: isToday ? '#fff' : isOther ? '#b0b4b8' : '#3c4043',
+              }}
+              onMouseEnter={e => { if (!isToday) e.currentTarget.style.background = inWeek ? '#d2e3fc' : '#f1f3f4'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = isToday ? '#1a73e8' : inWeek ? '#e8f0fe' : 'transparent'; }}
+            >
+              <span style={{ fontFamily: 'var(--fm)', fontSize: 11, fontWeight: isToday ? 700 : 400, lineHeight: 1 }}>
+                {d.getDate()}
+              </span>
+              {hasEvent && !isToday && (
+                <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#1a73e8', position: 'absolute', bottom: 2, left: '50%', transform: 'translateX(-50%)' }} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── D.O. Letters tab ──────────────────────────────────────────────────────────
 function DOLettersTab({ user }) {
   const toast = useToast();
@@ -245,6 +342,18 @@ export default function PlannerPage() {
     onError: () => toast('Failed to update'),
   });
 
+  const moveMutation = useMutation({
+    mutationFn: ({ id, data }) => updateMeeting(id, data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['meetings'] }); toast('Meeting moved'); },
+    onError:   () => toast('Failed to move'),
+  });
+
+  const resizeMutation = useMutation({
+    mutationFn: ({ id, end_time }) => updateMeeting(id, { end_time }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['meetings'] }); },
+    onError:   () => toast('Failed to update'),
+  });
+
   const cancelMutation = useMutation({
     mutationFn: ({ id, reason }) => cancelMeeting(id, reason),
     onSuccess: () => {
@@ -372,27 +481,42 @@ export default function PlannerPage() {
 
       {/* ── Week view ── */}
       {view === 'week' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* Week navigation */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ display: 'inline-flex', background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 99, padding: 3, gap: 0 }}>
-              <button type="button" onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d); }}
-                style={{ border: 0, background: 'none', fontSize: 20, lineHeight: 1, padding: '1px 12px', borderRadius: 99, cursor: 'pointer', color: 'var(--ink2)', fontWeight: 600 }}>‹</button>
-              <button type="button" onClick={() => setWeekStart(getMonday(new Date()))}
-                style={{ border: 0, background: 'none', fontFamily: 'var(--fm)', fontSize: 12, lineHeight: 1, padding: '5px 12px', borderRadius: 99, cursor: 'pointer', color: 'var(--ink2)' }}>Today</button>
-              <button type="button" onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d); }}
-                style={{ border: 0, background: 'none', fontSize: 20, lineHeight: 1, padding: '1px 12px', borderRadius: 99, cursor: 'pointer', color: 'var(--ink2)', fontWeight: 600 }}>›</button>
-            </div>
-            <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 20, color: 'var(--ink)' }}>{weekLabel}</div>
-          </div>
-
-          <WeekCalendar
-            weekStart={weekStart}
+        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+          {/* Mini calendar sidebar */}
+          <MiniCalendar
             meetings={meetings}
-            onSlotClick={(date, startMin, endMin) => openNewMeeting(date, startMin, endMin)}
-            onDragCreate={(date, startMin, endMin) => openNewMeeting(date, startMin, endMin)}
-            onEventClick={openEditMeeting}
+            onDateClick={(d) => {
+              setWeekStart(getMonday(d));
+            }}
+            weekStart={weekStart}
           />
+
+          {/* Week grid + nav */}
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* Week navigation */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ display: 'inline-flex', background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 99, padding: 3, gap: 0 }}>
+                <button type="button" onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d); }}
+                  style={{ border: 0, background: 'none', fontSize: 20, lineHeight: 1, padding: '1px 12px', borderRadius: 99, cursor: 'pointer', color: 'var(--ink2)', fontWeight: 600 }}>‹</button>
+                <button type="button" onClick={() => setWeekStart(getMonday(new Date()))}
+                  style={{ border: 0, background: 'none', fontFamily: 'var(--fm)', fontSize: 12, lineHeight: 1, padding: '5px 12px', borderRadius: 99, cursor: 'pointer', color: 'var(--ink2)' }}>Today</button>
+                <button type="button" onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d); }}
+                  style={{ border: 0, background: 'none', fontSize: 20, lineHeight: 1, padding: '1px 12px', borderRadius: 99, cursor: 'pointer', color: 'var(--ink2)', fontWeight: 600 }}>›</button>
+              </div>
+              <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 20, color: 'var(--ink)' }}>{weekLabel}</div>
+            </div>
+
+            <WeekCalendar
+              weekStart={weekStart}
+              meetings={meetings}
+              onSlotClick={(date, startMin, endMin) => openNewMeeting(date, startMin, endMin)}
+              onDragCreate={(date, startMin, endMin) => openNewMeeting(date, startMin, endMin)}
+              onEventEdit={openEditMeeting}
+              onEventCancel={openCancel}
+              onEventMove={(m, dateIso, time, end_time) => moveMutation.mutate({ id: m.id, data: { date: dateIso, time, end_time } })}
+              onEventResize={(m, end_time) => resizeMutation.mutate({ id: m.id, end_time })}
+            />
+          </div>
         </div>
       )}
 

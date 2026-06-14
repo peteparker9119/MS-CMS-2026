@@ -1,214 +1,249 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import WysiwygEditor from './WysiwygEditor';
 import DateField from './DateField';
 import TimeField from './TimeField';
 
-const LBL = {
-  fontFamily: 'var(--fm)',
-  fontSize: 11,
-  letterSpacing: '.05em',
-  textTransform: 'uppercase',
-  color: 'var(--ink3)',
-  marginBottom: 4,
-  display: 'block',
-};
-
-const INPUT_STYLE = {
-  width: '100%',
-  border: '1px solid var(--line)',
-  borderRadius: 7,
-  padding: '7px 10px',
-  fontSize: 13,
-  fontFamily: 'var(--fm)',
-  color: 'var(--ink)',
-  background: '#fff',
-  outline: 'none',
-  boxSizing: 'border-box',
-};
-
-const SELECT_STYLE = {
-  ...INPUT_STYLE,
-  cursor: 'pointer',
-};
-
-const RECURRENCE_OPTIONS = [
-  { value: 'none',    label: 'Does not repeat' },
-  { value: 'daily',   label: 'Every day' },
-  { value: 'weekly',  label: 'Every week' },
-  { value: 'monthly', label: 'Every month on the day' },
-  { value: 'custom',  label: 'Custom...' },
-];
-
+// ── Helpers ──────────────────────────────────────────────────────────────────
 function timeToMin(t) {
   if (!t) return 0;
   const [h, m] = t.split(':').map(Number);
   return h * 60 + m;
 }
-
 function minToTime(min) {
-  const clamped = Math.max(0, Math.min(min, 23 * 60 + 59));
-  return `${String(Math.floor(clamped / 60)).padStart(2, '0')}:${String(clamped % 60).padStart(2, '0')}`;
+  const c = Math.max(0, Math.min(min, 23*60+59));
+  return `${String(Math.floor(c/60)).padStart(2,'0')}:${String(c%60).padStart(2,'0')}`;
 }
-
-function randPart(len) {
-  const chars = 'abcdefghijklmnopqrstuvwxyz';
-  return Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+function fmtDisp(t) {
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  const ap = h >= 12 ? 'PM' : 'AM';
+  const hr = h > 12 ? h-12 : h === 0 ? 12 : h;
+  return m === 0 ? `${hr} ${ap}` : `${hr}:${String(m).padStart(2,'0')} ${ap}`;
 }
-
-function generateMeetLink() {
+function randPart(n) {
+  return Array.from({ length:n }, () => 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random()*26)]).join('');
+}
+function generateMeet() {
   return `https://meet.google.com/${randPart(3)}-${randPart(4)}-${randPart(3)}`;
 }
 
+// ── Shared styles ─────────────────────────────────────────────────────────────
+const GS = 'Google Sans,Roboto,sans-serif';
+const RI = 'Roboto,sans-serif';
+
+const INPUT = {
+  width:'100%', border:'1px solid #dadce0', borderRadius:4,
+  padding:'8px 12px', fontSize:14, fontFamily:RI, color:'#3c4043',
+  background:'#fff', outline:'none', boxSizing:'border-box',
+  transition:'border-color .15s',
+};
+const LABEL = {
+  fontFamily:RI, fontSize:11, letterSpacing:'.6px', textTransform:'uppercase',
+  color:'#5f6368', marginBottom:5, display:'block', fontWeight:500,
+};
+
+const RECURRENCE = [
+  { v:'none',    l:'Does not repeat' },
+  { v:'daily',   l:'Every day' },
+  { v:'weekly',  l:'Every week' },
+  { v:'monthly', l:'Every month' },
+  { v:'custom',  l:'Custom...' },
+];
+
+// ── TimePicker (12h display, 15-min steps) ────────────────────────────────────
+function TimePicker({ value, onChange, label }) {
+  const opts = useMemo(() => {
+    const list = [];
+    for (let h = 0; h < 24; h++) {
+      for (let m = 0; m < 60; m += 15) {
+        const t24 = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+        const ap  = h >= 12 ? 'PM' : 'AM';
+        const hr  = h > 12 ? h-12 : h === 0 ? 12 : h;
+        const lbl = `${hr}:${String(m).padStart(2,'0')} ${ap}`;
+        list.push({ v:t24, l:lbl });
+      }
+    }
+    return list;
+  }, []);
+
+  return (
+    <div>
+      <label style={LABEL}>{label}</label>
+      <select value={value} onChange={e => onChange(e.target.value)}
+        style={{ ...INPUT, cursor:'pointer' }}
+        onFocus={e => e.target.style.borderColor='#1a73e8'}
+        onBlur={e  => e.target.style.borderColor='#dadce0'}
+      >
+        {opts.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+      </select>
+    </div>
+  );
+}
+
+// ── Main EventModal ───────────────────────────────────────────────────────────
 export default function EventModal({ initial, pairs, meetings, onSave, onClose, saving = false }) {
   const editing = initial?.meeting ?? null;
+  const titleRef = useRef(null);
 
-  const initDate     = initial?.date     ? (initial.date instanceof Date ? `${initial.date.getFullYear()}-${String(initial.date.getMonth()+1).padStart(2,'0')}-${String(initial.date.getDate()).padStart(2,'0')}` : initial.date) : '';
-  const initStartMin = initial?.startMin ?? (editing?.time ? timeToMin(editing.time) : 9 * 60);
-  const initEndMin   = initial?.endMin   ?? (editing?.end_time ? timeToMin(editing.end_time) : initStartMin + 60);
+  const toIso = (d) => d instanceof Date
+    ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    : (d || '');
 
-  const [title,      setTitle]      = useState(editing?.title || '');
-  const [date,       setDate]       = useState(editing?.date  || initDate);
-  const [startTime,  setStartTime]  = useState(editing?.time      || minToTime(initStartMin));
-  const [endTime,    setEndTime]    = useState(editing?.end_time  || minToTime(initEndMin));
-  const [recurrence, setRecurrence] = useState(editing?.recurrence || 'none');
-  const [mtype,      setMtype]      = useState(editing?.mtype || 'In-person');
-  const [meetLink,   setMeetLink]   = useState(editing?.meet_link || '');
-  const [pairId,     setPairId]     = useState(editing?.pair?.id ? String(editing.pair.id) : '');
-  const [notify,     setNotify]     = useState(() => editing?.notify_units?.map(u => u.id) || []);
-  const [description,setDescription]= useState(editing?.description || '');
+  const initDate  = editing?.date  || toIso(initial?.date) || '';
+  const initStart = minToTime(initial?.startMin ?? (editing ? timeToMin(editing.time) : 9*60));
+  const initEnd   = minToTime(initial?.endMin   ?? (editing?.end_time ? timeToMin(editing.end_time) : timeToMin(initStart)+60));
 
-  // When pair changes, default notify both units
-  const selectedPair = useMemo(() => pairs.find(p => p.id === parseInt(pairId)), [pairs, pairId]);
-  const pairUnits    = useMemo(() => selectedPair ? [selectedPair.unit_a, selectedPair.unit_b] : [], [selectedPair]);
+  const [title,       setTitle]       = useState(editing?.title || '');
+  const [date,        setDate]        = useState(initDate);
+  const [startTime,   setStartTime]   = useState(editing?.time     || initStart);
+  const [endTime,     setEndTime]     = useState(editing?.end_time || initEnd);
+  const [recurrence,  setRecurrence]  = useState(editing?.recurrence || 'none');
+  const [mtype,       setMtype]       = useState(editing?.mtype || 'In-person');
+  const [meetLink,    setMeetLink]    = useState(editing?.meet_link || '');
+  const [pairId,      setPairId]      = useState(editing?.pair?.id ? String(editing.pair.id) : '');
+  const [notify,      setNotify]      = useState(() => editing?.notify_units?.map(u=>u.id) || []);
+  const [description, setDescription] = useState(editing?.description || '');
+  const [location,    setLocation]    = useState('');
 
+  // Auto-focus title
+  useEffect(() => { titleRef.current?.focus(); }, []);
+
+  // Auto-set notify when pair selected first time
+  const selPair  = useMemo(() => pairs.find(p => p.id === parseInt(pairId)), [pairs, pairId]);
+  const pairUnits= useMemo(() => selPair ? [selPair.unit_a, selPair.unit_b] : [], [selPair]);
   useEffect(() => {
-    if (selectedPair && notify.length === 0 && !editing) {
-      setNotify([selectedPair.unit_a.id, selectedPair.unit_b.id]);
+    if (selPair && !editing && notify.length === 0) {
+      setNotify([selPair.unit_a.id, selPair.unit_b.id]);
     }
-  }, [selectedPair]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selPair]); // eslint-disable-line
+
+  // Auto-extend end time when start changes
+  const prevStart = useRef(startTime);
+  useEffect(() => {
+    const prevM = timeToMin(prevStart.current);
+    const curM  = timeToMin(startTime);
+    const endM  = timeToMin(endTime);
+    const dur   = endM - prevM;
+    if (dur > 0 && dur <= 4*60) setEndTime(minToTime(curM + dur));
+    prevStart.current = startTime;
+  }, [startTime]); // eslint-disable-line
 
   // Conflict detection
-  const startMin = timeToMin(startTime);
-  const endMin   = timeToMin(endTime) || startMin + 60;
-
+  const sMin = timeToMin(startTime), eMin = timeToMin(endTime) || sMin+60;
   const hasConflict = useMemo(() => {
     if (!pairId || !date || !startTime) return false;
-    const sameDayMeetings = meetings.filter(m => m.date === date && m.id !== editing?.id && m.status !== 'cancelled');
-    return sameDayMeetings.some(m => {
-      const mStart = timeToMin(m.time);
-      const mEnd   = m.end_time ? timeToMin(m.end_time) : mStart + 60;
-      return startMin < mEnd && endMin > mStart;
-    });
-  }, [meetings, pairId, date, startMin, endMin, editing]);
+    return meetings
+      .filter(m => m.date === date && m.id !== editing?.id && m.status !== 'cancelled')
+      .some(m => { const ms = timeToMin(m.time), me = m.end_time ? timeToMin(m.end_time) : ms+60; return sMin < me && eMin > ms; });
+  }, [meetings, pairId, date, sMin, eMin, editing]);
 
   const handleSave = () => {
-    if (!pairId) return;
-    if (!date)   return;
-    const data = {
-      pair_id:          parseInt(pairId),
-      date,
-      time:             startTime || null,
-      end_time:         endTime   || null,
-      title:            title.trim(),
-      description,
-      meet_link:        meetLink.trim(),
-      recurrence,
-      mtype,
-      notify_unit_ids:  notify.map(Number),
-    };
-    onSave(data, editing?.id);
+    if (!pairId || !date) return;
+    onSave({
+      pair_id:         parseInt(pairId),
+      date, title:     title.trim(),
+      time:            startTime || null,
+      end_time:        endTime   || null,
+      description, meet_link: meetLink.trim(),
+      recurrence, mtype,
+      notify_unit_ids: notify.map(Number),
+    }, editing?.id);
   };
 
-  const toggleNotify = (uid) => {
-    setNotify(n => n.includes(uid) ? n.filter(x => x !== uid) : [...n, uid]);
-  };
+  const canSave = !!pairId && !!date && !saving;
+
+  // Keyboard save
+  useEffect(() => {
+    const h = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && canSave) handleSave(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [canSave, handleSave]); // eslint-disable-line
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.35)', zIndex: 1040, backdropFilter: 'blur(2px)' }}
-      />
+      {/* Scrim */}
+      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.5)', zIndex:1049 }} />
 
-      {/* Modal card */}
+      {/* Dialog */}
       <div style={{
-        position: 'fixed',
-        top: '50%', left: '50%',
-        transform: 'translate(-50%,-50%)',
-        zIndex: 1050,
-        width: 'min(720px, 96vw)',
-        background: '#fff',
-        borderRadius: 14,
-        boxShadow: '0 20px 60px rgba(0,0,0,.22)',
-        display: 'flex',
-        flexDirection: 'column',
-        maxHeight: '90vh',
-        overflow: 'hidden',
+        position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
+        zIndex:1050, width:'min(780px, 97vw)', background:'#fff', borderRadius:8,
+        boxShadow:'0 24px 38px 3px rgba(0,0,0,.14),0 9px 46px 8px rgba(0,0,0,.12),0 11px 15px -7px rgba(0,0,0,.2)',
+        display:'flex', flexDirection:'column', maxHeight:'95vh', overflow:'hidden',
+        fontFamily:GS,
       }}>
-        {/* Modal header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 22px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
-          <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 17, color: 'var(--ink)' }}>
+
+        {/* ── Header ── */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 20px 10px', borderBottom:'1px solid #e8eaed', flexShrink:0, background:'#fff' }}>
+          <div style={{ fontSize:18, fontWeight:400, color:'#3c4043', fontFamily:GS }}>
             {editing ? 'Edit meeting' : 'New meeting'}
           </div>
-          <button onClick={onClose} type="button" style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--ink3)', lineHeight: 1, padding: '0 4px' }}>×</button>
+          <button type="button" onClick={onClose}
+            style={{ border:'none', background:'none', cursor:'pointer', width:34, height:34, borderRadius:'50%', fontSize:18, color:'#5f6368', display:'flex', alignItems:'center', justifyContent:'center' }}
+            onMouseEnter={e=>e.currentTarget.style.background='#f1f3f4'}
+            onMouseLeave={e=>e.currentTarget.style.background='none'}
+          >✕</button>
         </div>
 
-        {/* Modal body — two columns */}
-        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-          {/* Left panel */}
-          <div style={{ flex: '0 0 58%', padding: '20px 22px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* ── Body ── */}
+        <div style={{ display:'flex', flex:1, overflow:'hidden', minHeight:0 }}>
+
+          {/* ─── Left panel ─── */}
+          <div style={{ flex:'0 0 55%', padding:'18px 22px', overflowY:'auto', display:'flex', flexDirection:'column', gap:16 }}>
+
             {/* Title */}
             <div>
-              <label style={LBL}>Meeting title</label>
               <input
+                ref={titleRef}
                 type="text"
                 value={title}
                 onChange={e => setTitle(e.target.value)}
-                placeholder="Meeting title"
-                style={{ ...INPUT_STYLE, fontSize: 15, fontWeight: 600, fontFamily: 'var(--fd)' }}
+                placeholder="Add title"
+                style={{ ...INPUT, fontSize:21, fontFamily:GS, fontWeight:400, border:'none', borderBottom:'2px solid #1a73e8', borderRadius:0, padding:'4px 0 8px', color:'#3c4043', background:'transparent' }}
               />
             </div>
 
-            {/* Date + Times */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 110px', gap: 8 }}>
-              <div>
-                <label style={LBL}>Date</label>
-                <DateField value={date} onChange={v => setDate(v)} />
-              </div>
-              <div>
-                <label style={LBL}>Start</label>
-                <TimeField value={startTime} onChange={v => setStartTime(v)} />
-              </div>
-              <div>
-                <label style={LBL}>End</label>
-                <TimeField value={endTime} onChange={v => setEndTime(v)} />
-              </div>
+            {/* Date picker */}
+            <div>
+              <label style={LABEL}>Date</label>
+              <DateField value={date} onChange={setDate} />
             </div>
+
+            {/* Time range */}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr auto 1fr', gap:8, alignItems:'end' }}>
+              <TimePicker label="Start time" value={startTime} onChange={setStartTime} />
+              <div style={{ fontFamily:RI, fontSize:13, color:'#5f6368', paddingBottom:10, textAlign:'center' }}>–</div>
+              <TimePicker label="End time" value={endTime} onChange={setEndTime} />
+            </div>
+
+            {/* Duration hint */}
+            {startTime && endTime && (
+              <div style={{ fontFamily:RI, fontSize:12, color:'#5f6368', marginTop:-10 }}>
+                Duration: {(() => { const d = timeToMin(endTime)-timeToMin(startTime); if (d<=0) return '—'; const h=Math.floor(d/60), m=d%60; return h>0 ? (m>0?`${h}h ${m}m`:`${h}h`) : `${m}m`; })()}
+              </div>
+            )}
 
             {/* Recurrence */}
             <div>
-              <label style={LBL}>Repeat</label>
-              <select value={recurrence} onChange={e => setRecurrence(e.target.value)} style={SELECT_STYLE}>
-                {RECURRENCE_OPTIONS.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
+              <label style={LABEL}>Repeat</label>
+              <select value={recurrence} onChange={e=>setRecurrence(e.target.value)}
+                style={{ ...INPUT, cursor:'pointer' }}
+                onFocus={e=>e.target.style.borderColor='#1a73e8'}
+                onBlur={e=>e.target.style.borderColor='#dadce0'}
+              >
+                {RECURRENCE.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
               </select>
             </div>
 
-            {/* Meeting type toggle */}
+            {/* Meeting type */}
             <div>
-              <label style={LBL}>Meeting type</label>
-              <div style={{ display: 'inline-flex', background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 8, padding: 3, gap: 3 }}>
-                {[['In-person', '📍 In-person'], ['Online', '💻 Online']].map(([val, lbl]) => (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => { setMtype(val); if (val === 'In-person') setMeetLink(''); }}
-                    style={{ border: 'none', borderRadius: 6, padding: '5px 16px', fontSize: 13, fontFamily: 'var(--fb)', fontWeight: 600, cursor: 'pointer', transition: '.13s', background: mtype === val ? 'var(--accent)' : 'transparent', color: mtype === val ? '#fff' : 'var(--ink2)' }}
-                  >
-                    {lbl}
-                  </button>
+              <label style={LABEL}>Location / type</label>
+              <div style={{ display:'flex', gap:6 }}>
+                {[['In-person','📍 In-person'],['Online','💻 Online']].map(([v,l]) => (
+                  <button key={v} type="button"
+                    onClick={() => { setMtype(v); if (v==='In-person') setMeetLink(''); }}
+                    style={{ flex:1, border:`1.5px solid ${mtype===v?'#1a73e8':'#dadce0'}`, borderRadius:20, padding:'7px 12px', fontSize:13, fontFamily:GS, cursor:'pointer', transition:'.13s', background: mtype===v?'#e8f0fe':'#fff', color: mtype===v?'#1a73e8':'#5f6368', fontWeight: mtype===v?500:400 }}
+                  >{l}</button>
                 ))}
               </div>
             </div>
@@ -216,23 +251,27 @@ export default function EventModal({ initial, pairs, meetings, onSave, onClose, 
             {/* Google Meet */}
             {mtype === 'Online' && (
               <div>
-                <label style={LBL}>Google Meet</label>
+                <label style={LABEL}>Google Meet</label>
                 {meetLink ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <a href={meetLink} target="_blank" rel="noreferrer" style={{ fontFamily: 'var(--fm)', fontSize: 12, color: 'var(--accent)', wordBreak: 'break-all', flex: 1 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', background:'#e8f0fe', borderRadius:6, border:'1px solid #c5d9f1' }}>
+                    <span style={{ fontSize:15 }}>📹</span>
+                    <a href={meetLink} target="_blank" rel="noreferrer"
+                      style={{ fontSize:12, color:'#1a73e8', wordBreak:'break-all', flex:1, fontFamily:RI }}>
                       {meetLink}
                     </a>
-                    <button type="button" onClick={() => setMeetLink('')} style={{ border: '1px solid var(--line)', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontFamily: 'var(--fm)', cursor: 'pointer', background: 'var(--paper)', color: 'var(--ink2)', flexShrink: 0 }}>
+                    <button type="button" onClick={() => setMeetLink('')}
+                      style={{ border:'none', background:'none', cursor:'pointer', fontSize:12, color:'#5f6368', flexShrink:0, fontFamily:RI }}>
                       Remove
                     </button>
                   </div>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setMeetLink(generateMeetLink())}
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid var(--accent)', borderRadius: 7, padding: '7px 14px', fontSize: 13, fontFamily: 'var(--fm)', cursor: 'pointer', background: 'var(--accent-light, #eef2ff)', color: 'var(--accent)', fontWeight: 600 }}
+                  <button type="button" onClick={() => setMeetLink(generateMeet())}
+                    style={{ display:'flex', alignItems:'center', gap:8, border:'1px solid #dadce0', borderRadius:4, padding:'8px 14px', fontSize:13, fontFamily:GS, cursor:'pointer', background:'#fff', color:'#1a73e8', fontWeight:500, width:'100%', boxSizing:'border-box', transition:'background .13s' }}
+                    onMouseEnter={e=>e.currentTarget.style.background='#f8f9fa'}
+                    onMouseLeave={e=>e.currentTarget.style.background='#fff'}
                   >
-                    <span style={{ fontSize: 16 }}>📹</span> Add Google Meet
+                    <span style={{ fontSize:18 }}>📹</span>
+                    Add Google Meet video conferencing
                   </button>
                 )}
               </div>
@@ -240,27 +279,28 @@ export default function EventModal({ initial, pairs, meetings, onSave, onClose, 
 
             {/* Conflict warning */}
             {hasConflict && (
-              <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 8, padding: '9px 13px', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
-                <div style={{ fontFamily: 'var(--fm)', fontSize: 12, color: '#92400e', lineHeight: 1.5 }}>
-                  <strong>Conflict:</strong> another meeting overlaps this time slot. You can still save.
+              <div style={{ background:'#fef7e0', border:'1px solid #f9ab00', borderRadius:6, padding:'10px 14px', display:'flex', gap:10, alignItems:'flex-start' }}>
+                <span style={{ fontSize:16, flexShrink:0 }}>⚠️</span>
+                <div style={{ fontFamily:RI, fontSize:12, color:'#b05e00', lineHeight:1.5 }}>
+                  <strong>Scheduling conflict</strong> — another meeting overlaps this time slot. You can still save.
                 </div>
               </div>
             )}
           </div>
 
-          {/* Divider */}
-          <div style={{ width: 1, background: 'var(--line)', flexShrink: 0 }} />
+          {/* ─── Divider ─── */}
+          <div style={{ width:1, background:'#e8eaed', flexShrink:0 }} />
 
-          {/* Right panel */}
-          <div style={{ flex: 1, padding: '20px 22px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14, background: 'var(--paper)' }}>
+          {/* ─── Right panel ─── */}
+          <div style={{ flex:1, padding:'18px 20px', overflowY:'auto', display:'flex', flexDirection:'column', gap:16, background:'#fafafa' }}>
+
             {/* Pair selector */}
             <div>
-              <label style={LBL}>Convergence unit pair</label>
-              <select
-                value={pairId}
-                onChange={e => { setPairId(e.target.value); setNotify([]); }}
-                style={SELECT_STYLE}
+              <label style={LABEL}>Convergence unit pair</label>
+              <select value={pairId} onChange={e => { setPairId(e.target.value); setNotify([]); }}
+                style={{ ...INPUT, cursor:'pointer' }}
+                onFocus={e=>e.target.style.borderColor='#1a73e8'}
+                onBlur={e=>e.target.style.borderColor='#dadce0'}
               >
                 <option value="">— Select a pair —</option>
                 {pairs.map(p => (
@@ -269,60 +309,75 @@ export default function EventModal({ initial, pairs, meetings, onSave, onClose, 
               </select>
             </div>
 
-            {/* Notify units */}
+            {/* Guests / notify units */}
             {pairUnits.length > 0 && (
               <div>
-                <label style={LBL}>Notify units</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {pairUnits.map(u => (
-                    <label
-                      key={u.id}
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', padding: '7px 10px', border: `1px solid ${notify.includes(u.id) ? 'var(--accent)' : 'var(--line)'}`, borderRadius: 8, background: notify.includes(u.id) ? 'var(--accent-light, #eef2ff)' : '#fff', transition: '.13s' }}
-                    >
-                      <input
-                        type="checkbox"
-                        style={{ width: 14, height: 14, accentColor: 'var(--accent)', flexShrink: 0 }}
-                        checked={notify.includes(u.id)}
-                        onChange={() => toggleNotify(u.id)}
-                      />
-                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: u.color, display: 'inline-block', flexShrink: 0 }} />
-                      <span style={{ fontWeight: 600 }}>{u.abbr}</span>
-                      <span style={{ color: 'var(--ink3)', fontSize: 11, marginLeft: 'auto' }}>{u.name}</span>
-                    </label>
-                  ))}
+                <label style={LABEL}>Notify teams</label>
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  {pairUnits.map(u => {
+                    const checked = notify.includes(u.id);
+                    return (
+                      <label key={u.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', border:`1.5px solid ${checked?'#1a73e8':'#dadce0'}`, borderRadius:6, background: checked?'#e8f0fe':'#fff', cursor:'pointer', transition:'.13s' }}>
+                        <input type="checkbox" checked={checked} onChange={() => setNotify(n => checked ? n.filter(x=>x!==u.id) : [...n,u.id])}
+                          style={{ width:15, height:15, accentColor:'#1a73e8', flexShrink:0 }} />
+                        <span style={{ width:10, height:10, borderRadius:'50%', background:u.color, flexShrink:0 }} />
+                        <div>
+                          <div style={{ fontFamily:GS, fontSize:13, fontWeight:500, color:'#3c4043' }}>{u.abbr}</div>
+                          <div style={{ fontFamily:RI, fontSize:11, color:'#5f6368' }}>{u.name}</div>
+                        </div>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
             )}
 
-            {/* Description */}
+            {/* Description (WYSIWYG) */}
             <div>
-              <label style={LBL}>Description</label>
-              <WysiwygEditor value={description} onChange={setDescription} placeholder="Add agenda or description…" />
+              <label style={LABEL}>Description / agenda</label>
+              <WysiwygEditor value={description} onChange={setDescription} placeholder="Add meeting agenda or description…" />
             </div>
+
+            {/* History (edit mode) */}
+            {editing?.history?.length > 0 && (
+              <div>
+                <label style={LABEL}>History</label>
+                <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                  {editing.history.slice(0,5).map((h, i) => (
+                    <div key={i} style={{ fontFamily:RI, fontSize:11, color:'#5f6368', display:'flex', gap:8, alignItems:'flex-start', padding:'5px 0', borderTop: i>0?'1px solid #e8eaed':'none' }}>
+                      <span style={{ textTransform:'capitalize', fontWeight:500, color:'#3c4043', minWidth:70, flexShrink:0 }}>{h.action}</span>
+                      <div>
+                        {h.old_date && h.new_date && <div>{h.old_date} → {h.new_date}</div>}
+                        {h.reason && <div style={{ color:'#80868b' }}>{h.reason}</div>}
+                        <div style={{ color:'#80868b' }}>{h.changed_at?.slice(0,16).replace('T',' ')} · {h.changed_by_name}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Footer */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 22px', borderTop: '1px solid var(--line)', flexShrink: 0, background: '#fff' }}>
-          <div>
-            {hasConflict && (
-              <span style={{ fontFamily: 'var(--fm)', fontSize: 11, color: '#b45309', display: 'flex', alignItems: 'center', gap: 4 }}>
-                ⚠️ Time conflict detected
-              </span>
-            )}
+        {/* ── Footer ── */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 20px', borderTop:'1px solid #e8eaed', flexShrink:0, background:'#fff' }}>
+          <div style={{ fontFamily:RI, fontSize:11, color:'#80868b' }}>
+            {hasConflict
+              ? <span style={{ color:'#b05e00' }}>⚠️ Conflict detected — still saveable</span>
+              : <span>Ctrl+Enter to save</span>
+            }
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button type="button" onClick={onClose} style={{ border: '1px solid var(--line)', borderRadius: 7, padding: '7px 18px', fontSize: 13, fontFamily: 'var(--fb)', fontWeight: 600, cursor: 'pointer', background: 'var(--paper)', color: 'var(--ink2)' }}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={!pairId || !date || saving}
-              style={{ border: 'none', borderRadius: 7, padding: '7px 20px', fontSize: 13, fontFamily: 'var(--fb)', fontWeight: 700, cursor: !pairId || !date || saving ? 'not-allowed' : 'pointer', background: !pairId || !date ? '#c7cce0' : 'var(--accent)', color: '#fff', opacity: saving ? .7 : 1, transition: '.13s' }}
-            >
-              {saving ? 'Saving…' : editing ? 'Save changes' : 'Schedule meeting'}
-            </button>
+          <div style={{ display:'flex', gap:8 }}>
+            <button type="button" onClick={onClose}
+              style={{ border:'1px solid #dadce0', borderRadius:4, padding:'8px 20px', fontSize:14, fontFamily:GS, cursor:'pointer', background:'#fff', color:'#1a73e8', fontWeight:500 }}
+              onMouseEnter={e=>e.currentTarget.style.background='#f8f9fa'}
+              onMouseLeave={e=>e.currentTarget.style.background='#fff'}
+            >Cancel</button>
+            <button type="button" onClick={handleSave} disabled={!canSave}
+              style={{ border:'none', borderRadius:4, padding:'8px 22px', fontSize:14, fontFamily:GS, fontWeight:500, cursor: canSave?'pointer':'not-allowed', background: canSave?'#1a73e8':'#c2d6f5', color:'#fff', transition:'background .13s' }}
+              onMouseEnter={e=>{ if(canSave) e.currentTarget.style.background='#1765cc'; }}
+              onMouseLeave={e=>{ if(canSave) e.currentTarget.style.background='#1a73e8'; }}
+            >{saving ? 'Saving…' : editing ? 'Save changes' : 'Save'}</button>
           </div>
         </div>
       </div>
