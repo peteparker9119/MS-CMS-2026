@@ -51,7 +51,7 @@ function ReasonModal({ meeting, onConfirm, onClose, saving }) {
   const label = A && B ? `${A.abbr} × ${B.abbr}` : 'this meeting';
   return (
     <>
-      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.45)', zIndex:1049 }} />
+      <div onClick={onClose} style={{ position:'fixed', inset:0, zIndex:1049 }} />
       <div style={{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)', zIndex:1050, width:'min(420px,96vw)', background:'#fff', borderRadius:12, boxShadow:'0 24px 48px rgba(0,0,0,.2)', display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:GS }}>
         <div style={{ padding:'16px 20px', borderBottom:'1px solid #e8eaed', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <span style={{ fontSize:16, fontWeight:500, color:'#3c4043' }}>Cancel meeting — {label}</span>

@@ -218,23 +218,25 @@ export default function DateField({ value, onChange, placeholder = 'Pick a date'
 
   return (
     <>
-      <div style={{ position: 'relative', display: 'block', width: '100%', ...style }}>
+      <div style={{ position: 'relative', display: style?.display ?? 'block', width: style?.display === 'inline-block' ? 'auto' : '100%', ...style }}>
         <button
           ref={btnRef}
           type="button"
           onClick={openCalendar}
           style={{
-            width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8,
-            border: open ? '1.5px solid var(--accent)' : '1px solid var(--line)',
-            borderRadius: 9, padding: '0 12px', height: 38, background: '#fff',
-            fontFamily: 'var(--fb)', fontSize: 13.5,
-            color: parsed ? 'var(--ink)' : 'var(--ink3)',
+            width: style?.display === 'inline-block' ? 'auto' : '100%',
+            textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8,
+            border: open ? '1.5px solid #1a73e8' : '1px solid #dadce0',
+            borderRadius: 20, padding: '5px 12px', height: 34, background: '#fff',
+            fontFamily: 'Google Sans,Roboto,sans-serif', fontSize: 13,
+            color: parsed ? '#3c4043' : '#80868b',
             cursor: 'pointer', transition: 'border-color .15s',
-            boxShadow: open ? '0 0 0 3px var(--accent-glow)' : 'none',
+            boxShadow: open ? '0 0 0 2px rgba(26,115,232,.15)' : 'none',
             whiteSpace: 'nowrap', overflow: 'hidden',
+            fontWeight: 500,
           }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={parsed ? 'var(--accent)' : 'var(--ink3)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={parsed ? '#1a73e8' : '#80868b'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
             <rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
           </svg>
           <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayLabel}</span>
