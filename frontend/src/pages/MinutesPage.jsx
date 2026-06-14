@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getMeetings, createMeeting, submitMinutes, recordNotHeld } from '../api/meetings';
 import { getUnits, getPairs } from '../api/units';
+import { getUsersByUnits } from '../api/items';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../api/client';
@@ -78,15 +79,26 @@ export default function MinutesPage() {
   const totalActions = conductedMeetings.reduce((s,m) => s + (m.minutes?.action_points?.length ?? 0), 0);
   const lastFiled    = [...conductedMeetings].sort((a,b) => new Date(b.date)-new Date(a.date))[0];
 
-  const [selPair,   setSelPair]   = useState('');
-  const [mDate,     setMDate]     = useState('');
-  const [outcome,   setOutcome]   = useState('held');
-  const [attendees, setAttendees] = useState('');
-  const [summary,   setSummary]   = useState('');
-  const [actions,   setActions]   = useState('');
-  const [nhStatus,  setNhStatus]  = useState('postponed');
-  const [reason,    setReason]    = useState('');
-  const [fe,        setFe]        = useState({});
+  const [selPair,     setSelPair]     = useState('');
+  const [mDate,       setMDate]       = useState('');
+  const [outcome,     setOutcome]     = useState('held');
+  const [attendees,   setAttendees]   = useState('');
+  const [summary,     setSummary]     = useState('');
+  const [actionItems, setActionItems] = useState([{ text: '', assigned_to: null, deadline: '' }]);
+  const [nhStatus,    setNhStatus]    = useState('postponed');
+  const [reason,      setReason]      = useState('');
+  const [fe,          setFe]          = useState({});
+
+  const selectedPair = pairs.find(p => String(p.id) === selPair);
+  const { data: pairMembers = [] } = useQuery({
+    queryKey: ['pair-members', selPair],
+    queryFn: () => getUsersByUnits([selectedPair.unit_a.id, selectedPair.unit_b.id]),
+    enabled: !!selectedPair,
+  });
+
+  const addActionItem    = () => setActionItems(prev => [...prev, { text: '', assigned_to: null, deadline: '' }]);
+  const removeActionItem = (i) => setActionItems(prev => prev.filter((_, idx) => idx !== i));
+  const updateActionItem = (i, field, value) => setActionItems(prev => prev.map((it, idx) => idx === i ? { ...it, [field]: value } : it));
 
   const clearFe = (field) => setFe(p => ({ ...p, [field]: '' }));
 
@@ -94,7 +106,7 @@ export default function MinutesPage() {
     mutationFn: ({ meetingId, data }) => outcome === 'held' ? submitMinutes(meetingId, data) : recordNotHeld(meetingId, data),
     onSuccess: () => {
       qc.invalidateQueries(['meetings']);
-      setSummary(''); setActions(''); setAttendees(''); setReason(''); setFe({});
+      setSummary(''); setActionItems([{ text: '', assigned_to: null, deadline: '' }]); setAttendees(''); setReason(''); setFe({});
       toast(outcome === 'held' ? 'Minutes filed' : 'Recorded');
     },
     onError: (err) => toast(getErrorMessage(err)),
@@ -104,10 +116,10 @@ export default function MinutesPage() {
     const errors = {};
     if (!selPair) errors.selPair = 'Select a convergence unit pair';
     if (!mDate)   errors.mDate   = 'Pick a meeting date';
-    const apLines = outcome === 'held'
-      ? actions.split('\n').map(s => s.replace(/^[-•*\d.)\s]+/,'').trim()).filter(Boolean)
+    const apItems = outcome === 'held'
+      ? actionItems.filter(a => a.text.trim()).map(a => ({ text: a.text.trim(), assigned_to: a.assigned_to || null, deadline: a.deadline || null }))
       : [];
-    if (outcome === 'held' && !summary && !apLines.length) errors.summary = 'Add a summary or at least one action point';
+    if (outcome === 'held' && !summary && !apItems.length) errors.summary = 'Add a summary or at least one action point';
     if (outcome === 'notheld' && !reason) errors.reason = 'Provide a reason for not holding the meeting';
     if (Object.keys(errors).length) { setFe(errors); return; }
     setFe({});
@@ -120,10 +132,10 @@ export default function MinutesPage() {
     );
     if (outcome === 'held') {
       if (existing) {
-        submitMutation.mutate({ meetingId: existing.id, data: { attendees, summary, action_points: apLines, source:'written' } });
+        submitMutation.mutate({ meetingId: existing.id, data: { attendees, summary, action_points: apItems, source:'written' } });
       } else {
         const m = await createMeeting({ pair_id: pair.id, date: mDate, status:'conducted', mtype:'In-person' });
-        submitMutation.mutate({ meetingId: m.id, data: { attendees, summary, action_points: apLines, source:'written' } });
+        submitMutation.mutate({ meetingId: m.id, data: { attendees, summary, action_points: apItems, source:'written' } });
       }
     } else {
       if (existing) {
@@ -251,11 +263,48 @@ export default function MinutesPage() {
                     {fe.summary && <div style={ERR}>⚠ {fe.summary}</div>}
                   </div>
                   <div className="mb-3">
-                    <CFormLabel style={{ fontFamily:'var(--fm)', fontSize:11, fontWeight:600, letterSpacing:'.05em', textTransform:'uppercase', color:'var(--ink3)' }}>
-                      Action points <span style={{ textTransform:'none', color:'var(--ink3)' }}>— one per line</span>
-                    </CFormLabel>
-                    <CFormTextarea value={actions} onChange={e => { setActions(e.target.value); clearFe('summary'); }}
-                      placeholder={'VP to share beneficiary list\nSMC to map overlapping schools\nAlign reporting formats'} rows={4} />
+                    <div className="d-flex align-items-center justify-content-between mb-2">
+                      <CFormLabel style={{ fontFamily:'var(--fm)', fontSize:11, fontWeight:600, letterSpacing:'.05em', textTransform:'uppercase', color:'var(--ink3)', margin:0 }}>
+                        Action points
+                      </CFormLabel>
+                      <button type="button" onClick={addActionItem}
+                        style={{ border:'1.5px solid var(--accent)', borderRadius:7, padding:'3px 10px', background:'var(--accent-light)', color:'var(--accent)', fontFamily:'var(--fb)', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                        + Add item
+                      </button>
+                    </div>
+                    {actionItems.map((item, i) => (
+                      <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 160px 130px 28px', gap:6, marginBottom:8, alignItems:'start' }}>
+                        <CFormInput
+                          value={item.text}
+                          onChange={e => updateActionItem(i, 'text', e.target.value)}
+                          placeholder={`Action item ${i + 1}…`}
+                          style={{ fontSize:13 }}
+                        />
+                        <CFormSelect
+                          value={item.assigned_to ?? ''}
+                          onChange={e => updateActionItem(i, 'assigned_to', e.target.value ? Number(e.target.value) : null)}
+                          style={{ fontSize:12 }}
+                        >
+                          <option value="">— Assign to —</option>
+                          {pairMembers.map(m => (
+                            <option key={m.id} value={m.id}>{m.name} ({m.unit_abbr})</option>
+                          ))}
+                        </CFormSelect>
+                        <input
+                          type="date"
+                          value={item.deadline}
+                          onChange={e => updateActionItem(i, 'deadline', e.target.value)}
+                          title="Deadline"
+                          style={{ height:38, border:'1px solid var(--line)', borderRadius:7, padding:'0 8px', fontSize:12, fontFamily:'var(--fm)', color:'var(--ink)', background:'#fff', width:'100%' }}
+                        />
+                        {actionItems.length > 1 ? (
+                          <button type="button" onClick={() => removeActionItem(i)}
+                            style={{ height:38, width:28, border:'1px solid #fca5a5', borderRadius:7, background:'#fff5f5', color:'#dc2626', fontWeight:700, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                            ×
+                          </button>
+                        ) : <span />}
+                      </div>
+                    ))}
                   </div>
                 </>
               ) : (

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from apps.units.serializers import UnitPairSerializer, ConvergenceUnitSerializer
-from .models import Meeting, MeetingMinutes, ActionPoint, ActionPointComment, MeetingNotHeld, ActionPointDeadlineHistory
+from .models import Meeting, MeetingMinutes, ActionPoint, ActionPointComment, MeetingNotHeld, ActionPointDeadlineHistory, MeetingHistory
 
 User = get_user_model()
 
@@ -50,6 +50,19 @@ class ActionPointSerializer(serializers.ModelSerializer):
         return None
 
 
+class MeetingHistorySerializer(serializers.ModelSerializer):
+    changed_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MeetingHistory
+        fields = ['id', 'action', 'reason', 'old_date', 'new_date', 'old_time', 'new_time', 'changed_by_name', 'changed_at']
+
+    def get_changed_by_name(self, obj):
+        if obj.changed_by:
+            return obj.changed_by.get_full_name() or obj.changed_by.username
+        return 'System'
+
+
 class MeetingNotHeldSerializer(serializers.ModelSerializer):
     class Meta:
         model = MeetingNotHeld
@@ -88,15 +101,17 @@ class MeetingListSerializer(serializers.ModelSerializer):
     )
     minutes = MeetingMinutesSerializer(read_only=True)
     not_held = MeetingNotHeldSerializer(read_only=True)
+    history = MeetingHistorySerializer(many=True, read_only=True)
     action_points_done = serializers.SerializerMethodField()
     action_points_total = serializers.SerializerMethodField()
 
     class Meta:
         model = Meeting
         fields = [
-            'id', 'pair', 'pair_id', 'date', 'time', 'status', 'mtype', 'agenda',
+            'id', 'pair', 'pair_id', 'date', 'time', 'end_time', 'status', 'mtype', 'agenda',
+            'title', 'description', 'meet_link', 'recurrence',
             'notify_units', 'notify_unit_ids', 'deadline', 'recorded_at',
-            'minutes', 'not_held',
+            'minutes', 'not_held', 'history',
             'action_points_done', 'action_points_total',
         ]
         read_only_fields = ['id', 'recorded_at']

@@ -1,138 +1,190 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import DateField from '../components/DateField';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getDashboardStats, getDashboardMatrix, getMeetings, updateActionPoint, addComment, getMeetingMembers } from '../api/meetings';
-import { askItemStatus } from '../api/items';
+import {
+  getDashboardStats, getDashboardMatrix, getMeetings,
+  updateActionPoint, addComment, getMeetingMembers,
+} from '../api/meetings';
 import { getUnits } from '../api/units';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import KpiCard from '../components/KpiCard';
-import ConvergenceMatrix from '../components/ConvergenceMatrix';
 import Badge from '../components/Badge';
 import Modal from '../components/Modal';
-import {
-  CCard, CCardBody,
-  CButton,
-  CRow, CCol,
-  CBadge,
-} from '@coreui/react';
+import { CCard, CCardBody, CButton, CRow, CCol, CBadge } from '@coreui/react';
 
-const PRESETS = [['all','All'],['30','Last 30d'],['90','Last 90d']];
+/* ── helpers ── */
+const PRESETS = [['all', 'All'], ['30', 'Last 30d'], ['90', 'Last 90d']];
 
 function presetToRange(k) {
   const now = Date.now();
-  if (k === '30') return { from: new Date(now - 30*864e5).toISOString().slice(0,10), to: null };
-  if (k === '90') return { from: new Date(now - 90*864e5).toISOString().slice(0,10), to: null };
-  if (k === 'q')  return { from: new Date(new Date().getFullYear(), Math.floor(new Date().getMonth()/3)*3, 1).toISOString().slice(0,10), to: null };
+  if (k === '30') return { from: new Date(now - 30 * 864e5).toISOString().slice(0, 10), to: null };
+  if (k === '90') return { from: new Date(now - 90 * 864e5).toISOString().slice(0, 10), to: null };
   return { from: null, to: null };
 }
 
-function UnitDotLabel({ unit }) {
-  return (
-    <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:13 }}>
-      <i style={{ width:9, height:9, borderRadius:'50%', background:unit.color, display:'inline-block' }} />
-      {unit.abbr}
-    </span>
-  );
+function monthLabel(ym) {
+  if (!ym) return 'All time';
+  const [y, m] = ym.split('-');
+  const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${names[Number(m) - 1]} ${y}`;
 }
 
+function last13Months() {
+  const months = [];
+  const now = new Date();
+  for (let i = 0; i < 13; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    months.push(`${y}-${m}`);
+  }
+  return months;
+}
+
+/* ── main component ── */
 export default function DashboardPage() {
   const { user } = useAuth();
   const toast = useToast();
   const qc = useQueryClient();
+  const navigate = useNavigate();
 
-  const [preset,    setPreset]    = useState('all');
-  const [range,     setRange]     = useState({ from:null, to:null });
-  const [unitFocus, setUnitFocus] = useState('all');
-  const [selPair,   setSelPair]   = useState(null);
-  const [modal,     setModal]     = useState(null);
+  const [preset,     setPreset]     = useState('all');
+  const [range,      setRange]      = useState({ from: null, to: null });
+  const [unitFocus,  setUnitFocus]  = useState('all');
+  const [chartMonth, setChartMonth] = useState('');   // '' = all time
+  const [selPair,    setSelPair]    = useState(null); // { pair_id, unit_a_slug, unit_b_slug }
+  const [modal,      setModal]      = useState(null);
 
-  const params = useMemo(() => {
+  const isAdmin = ['super_admin', 'admin'].includes(user?.role);
+
+  /* ── date params (for KPI cards + tiles) ── */
+  const dateParams = useMemo(() => {
     const r = preset !== '' ? presetToRange(preset) : range;
     const p = {};
     if (r.from) p.from = r.from;
     if (r.to)   p.to   = r.to;
+    return p;
+  }, [preset, range]);
+
+  const statsParams = useMemo(() => {
+    const p = { ...dateParams };
     if (unitFocus !== 'all') p.unit = unitFocus;
     return p;
-  }, [preset, range, unitFocus]);
+  }, [dateParams, unitFocus]);
 
-  const { data: units = [] }   = useQuery({ queryKey:['units'],  queryFn: getUnits });
-  const { data: stats }        = useQuery({ queryKey:['stats',   params], queryFn: () => getDashboardStats(params) });
-  const { data: matrix = [] }  = useQuery({ queryKey:['matrix',  params], queryFn: () => getDashboardMatrix(params) });
-  const { data: meetings = [] }= useQuery({ queryKey:['meetings',params], queryFn: () => getMeetings(params) });
+  /* ── chart params (independent month filter) ── */
+  const chartParams = useMemo(() => {
+    if (!chartMonth) return {};
+    const [y, m] = chartMonth.split('-');
+    const lastDay = new Date(Number(y), Number(m), 0).getDate();
+    return {
+      from: `${y}-${m}-01`,
+      to:   `${y}-${m}-${String(lastDay).padStart(2, '0')}`,
+    };
+  }, [chartMonth]);
 
-  const pendingAPs = useMemo(() => {
-    const out = [];
-    meetings.forEach(m => {
-      if (m.status === 'conducted' && m.minutes?.action_points) {
-        m.minutes.action_points.forEach(ap => { if (!ap.done) out.push({ ap, meeting: m }); });
-      }
-    });
-    return out.slice(0, 20);
-  }, [meetings]);
+  /* ── queries ── */
+  const { data: units = [] }      = useQuery({ queryKey: ['units'], queryFn: getUnits });
+  const { data: stats }           = useQuery({ queryKey: ['dash-stats',  statsParams], queryFn: () => getDashboardStats(statsParams) });
+  const { data: matrix = [] }     = useQuery({ queryKey: ['dash-matrix', dateParams],  queryFn: () => getDashboardMatrix(dateParams) });
+  const { data: chartMatrix = [] }= useQuery({ queryKey: ['dash-matrix', chartParams], queryFn: () => getDashboardMatrix(chartParams) });
 
+  const { data: pairMeetings = [], isLoading: pairLoading } = useQuery({
+    queryKey: ['meetings', { pair: selPair?.pair_id, ...dateParams }],
+    queryFn:  () => getMeetings({ pair: selPair?.pair_id, ...dateParams }),
+    enabled:  !!selPair,
+  });
+
+  /* ── action mutations ── */
   const toggleAP = useMutation({
     mutationFn: ({ id }) => updateActionPoint(id, { done: true }),
     onSuccess: () => { qc.invalidateQueries(['meetings']); toast('Action point closed'); },
   });
 
-  const askStatusMut = useMutation({
-    mutationFn: ({ id, note = '' }) => askItemStatus(id, note),
-  });
+  /* ── pair tile data (scoped by role) ── */
+  const visibleMatrix = useMemo(() => {
+    if (isAdmin) return matrix;
+    // POC/team: only pairs involving their unit
+    const slug = user?.unit_slug;
+    if (!slug) return [];
+    return matrix.filter(d => d.unit_a === slug || d.unit_b === slug);
+  }, [matrix, isAdmin, user]);
 
-  const selPairMeetings = useMemo(() => {
-    if (!selPair) return [];
-    return meetings.filter(m =>
-      (m.pair.unit_a.slug === selPair.unit_a && m.pair.unit_b.slug === selPair.unit_b) ||
-      (m.pair.unit_a.slug === selPair.unit_b && m.pair.unit_b.slug === selPair.unit_a)
-    ).sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [selPair, meetings]);
+  /* ── pair mini stats (from pairMeetings) ── */
+  const pairStats = useMemo(() => {
+    if (!pairMeetings.length) return null;
+    const conducted = pairMeetings.filter(m => m.status === 'conducted').length;
+    const moms      = pairMeetings.filter(m => m.minutes).length;
+    let aTot = 0, aDone = 0;
+    pairMeetings.forEach(m => {
+      aTot  += m.action_points_total ?? 0;
+      aDone += m.action_points_done  ?? 0;
+    });
+    return {
+      planned:   pairMeetings.length,
+      conducted,
+      moms,
+      a_tot:  aTot,
+      a_done: aDone,
+      a_pend: aTot - aDone,
+    };
+  }, [pairMeetings]);
 
-  const handleCustom = (field, val) => {
+  /* ── handlers ── */
+  const handleCustomDate = (field, val) => {
     setPreset('');
     setRange(r => ({ ...r, [field]: val || null }));
   };
 
+  const handleTileClick = (row) => {
+    if (selPair?.pair_id === row.pair_id) { setSelPair(null); return; }
+    setSelPair({ pair_id: row.pair_id, unit_a_slug: row.unit_a, unit_b_slug: row.unit_b });
+    setTimeout(() => document.getElementById('tile-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+  };
+
+  /* ── render ── */
   return (
     <>
-      {/* Single filter row */}
-      <div className="seg" style={{ display:'flex', alignItems:'center', marginBottom:18, flexWrap:'nowrap', borderRadius:12, padding:'4px 6px', gap:2 }}>
-        {/* Unit pills (admin only) */}
-        {user?.role === 'admin' && <>
-          <button className={unitFocus==='all'?'on':''} onClick={() => setUnitFocus('all')}>All units</button>
+      {/* ── Filter row ── */}
+      <div className="seg" style={{ display: 'flex', alignItems: 'center', marginBottom: 18, flexWrap: 'nowrap', borderRadius: 12, padding: '4px 6px', gap: 2 }}>
+        {/* Unit pills — admin/super_admin */}
+        {isAdmin && <>
+          <button className={unitFocus === 'all' ? 'on' : ''} onClick={() => setUnitFocus('all')}>All teams</button>
           {units.map(u => (
-            <button key={u.slug} className={unitFocus===u.slug?'on':''} onClick={() => setUnitFocus(unitFocus===u.slug?'all':u.slug)}>
-              <span className="sw" style={{ background:u.color }} />{u.abbr}
+            <button key={u.slug} className={unitFocus === u.slug ? 'on' : ''} onClick={() => setUnitFocus(unitFocus === u.slug ? 'all' : u.slug)}>
+              <span className="sw" style={{ background: u.color }} />{u.abbr}
             </button>
           ))}
-          <span style={{ width:1, alignSelf:'stretch', background:'var(--line)', margin:'4px 8px', flexShrink:0 }} />
+          <span style={{ width: 1, alignSelf: 'stretch', background: 'var(--line)', margin: '4px 8px', flexShrink: 0 }} />
         </>}
 
-        {/* Period presets + date range — pushed to right */}
-        <div style={{ display:'flex', alignItems:'center', gap:2, marginLeft:'auto', flexShrink:0 }}>
-          {PRESETS.map(([k,l]) => (
-            <button key={k} className={preset===k?'on':''} onClick={() => { setPreset(k); setRange({from:null,to:null}); }}>{l}</button>
+        {/* Date presets */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 'auto', flexShrink: 0 }}>
+          {PRESETS.map(([k, l]) => (
+            <button key={k} className={preset === k ? 'on' : ''} onClick={() => { setPreset(k); setRange({ from: null, to: null }); }}>{l}</button>
           ))}
-          <span style={{ width:1, alignSelf:'stretch', background:'var(--line)', margin:'4px 8px', flexShrink:0 }} />
+          <span style={{ width: 1, alignSelf: 'stretch', background: 'var(--line)', margin: '4px 8px', flexShrink: 0 }} />
         </div>
 
         {/* Custom date range */}
-        <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
-          <div style={{ width:106 }}><DateField value={range.from ?? ''} onChange={v => handleCustom('from', v)} placeholder="From" portal /></div>
-          <span style={{ fontFamily:'var(--fm)', fontSize:12, color:'var(--ink3)', flexShrink:0 }}>–</span>
-          <div style={{ width:106 }}><DateField value={range.to ?? ''} onChange={v => handleCustom('to', v)} placeholder="To" portal /></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+          <div style={{ width: 106 }}><DateField value={range.from ?? ''} onChange={v => handleCustomDate('from', v)} placeholder="From" portal /></div>
+          <span style={{ fontFamily: 'var(--fm)', fontSize: 12, color: 'var(--ink3)', flexShrink: 0 }}>–</span>
+          <div style={{ width: 106 }}><DateField value={range.to ?? ''} onChange={v => handleCustomDate('to', v)} placeholder="To" portal /></div>
         </div>
       </div>
 
-      {/* KPI cards */}
-      <CRow className="g-3 mb-3">
+      {/* ── KPI Cards ── */}
+      <CRow className="g-3 mb-4">
         {[
-          { label:'Meetings planned', value:stats?.planned??'—',   delta:`across ${unitFocus==='all'?'all pairs':unitFocus}` },
-          { label:'Conducted',        value:stats?.conducted??'—', delta:stats?`${stats.planned ? Math.round(stats.conducted/stats.planned*100) : 0}% of planned held`:'—' },
-          { label:'MoMs prepared',    value:stats?.moms??'—',      delta:'one per conducted meeting' },
-          { label:'Action items',     value:stats?.a_tot??'—',     delta:'derived from all MoMs' },
-          { label:'Pending',          value:stats?.a_pend??'—',    delta:'open · awaiting closure', amber:true },
-          { label:'Closed %',         value:stats ? `${stats.act_pct}%` : '—', delta:stats ? `${stats.a_done} closed · ${stats.a_pend} open` : '—', hero:true },
+          { label: 'Meetings planned',    value: stats?.planned    ?? '—', delta: unitFocus === 'all' ? 'across all teams' : `team: ${unitFocus}` },
+          { label: 'Conducted',           value: stats?.conducted  ?? '—', delta: stats ? `${stats.planned ? Math.round(stats.conducted / stats.planned * 100) : 0}% of planned` : '—' },
+          { label: 'MoMs prepared',       value: stats?.moms       ?? '—', delta: 'minutes filed' },
+          { label: 'Action items',        value: stats?.a_tot      ?? '—', delta: 'from all MoMs' },
+          { label: 'Completed',           value: stats?.a_done     ?? '—', delta: stats ? `${stats.act_pct}% completion rate` : '—', hero: true },
+          { label: 'Pending',             value: stats?.a_pend     ?? '—', delta: 'open · awaiting closure', amber: true },
         ].map((card, i) => (
           <CCol key={i} xs={6} sm={4} xl={2}>
             <KpiCard {...card} />
@@ -140,151 +192,239 @@ export default function DashboardPage() {
         ))}
       </CRow>
 
-      {/* Pending action items */}
-      {pendingAPs.length > 0 && (
-        <CCard className="mb-3" style={{ background:'#FBF1DC', borderColor:'#EAC36A' }}>
-          <CCardBody>
-            <div className="d-flex align-items-center justify-content-between mb-3">
-              <h5 style={{ fontFamily:'var(--fd)', fontWeight:600, fontSize:22, color:'#7a5408', margin:0 }}>Pending action items</h5>
-              <CBadge color="danger" style={{ borderRadius:99, padding:'5px 13px', fontSize:13 }}>{pendingAPs.length}</CBadge>
-            </div>
-            <div style={{ display:'flex', flexDirection:'column', gap:7, maxHeight:300, overflowY:'auto' }}>
-              {pendingAPs.map(({ ap, meeting }) => {
-                const A = meeting.pair.unit_a, B = meeting.pair.unit_b;
-                return (
-                  <div key={ap.id}
-                    style={{ display:'grid', gridTemplateColumns:'auto 1fr auto', gap:12, alignItems:'center', background:'#fff', border:'1px solid #EAD7A6', borderRadius:10, padding:'11px 14px', cursor:'pointer' }}
-                    onClick={() => setModal({ type:'action-point', ap, meeting })}>
-                    <span style={{ width:9, height:9, borderRadius:'50%', background:'var(--bad)', display:'inline-block' }} />
-                    <div>
-                      <div style={{ fontSize:15 }}>{ap.text}{ap.deadline && (() => {
-                          const d = new Date(ap.deadline);
-                          const diff = (d - new Date()) / 864e5;
-                          const bg = diff < 0 ? '#dc2626' : diff <= 3 ? '#f59e0b' : '#059669';
-                          return <span style={{ fontSize:10, background:bg, color:'#fff', borderRadius:4, padding:'1px 6px', marginLeft:4, fontWeight:700 }}>{ap.deadline}</span>;
-                        })()}</div>
-                      <div style={{ fontFamily:'var(--fm)', fontSize:13, color:'var(--ink3)', marginTop:3, display:'flex', gap:7 }}>
-                        <UnitDotLabel unit={A} /> × <UnitDotLabel unit={B} /> · {meeting.date}
-                      </div>
-                    </div>
-                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                      <span style={{ color:'var(--ink3)', fontSize:18 }}>›</span>
-                      {user?.role === 'admin' && (() => {
-                        const sending = askStatusMut.isPending && askStatusMut.variables?.id === ap.id;
-                        return (
-                          <button
-                            disabled={sending}
-                            onClick={e => {
-                              e.stopPropagation();
-                              askStatusMut.mutate({ id: ap.id }, {
-                                onSuccess: (data) => toast(data?.sent > 0 ? `Notified ${data.sent} POC user(s)` : 'No POC users found for this pair'),
-                                onError:   ()     => toast('Failed to send — check backend'),
-                              });
-                            }}
-                            style={{ border:'1px solid var(--accent)', background: sending ? 'var(--line)' : 'var(--accent-light)', color: sending ? 'var(--ink3)' : 'var(--accent)', borderRadius:6, padding:'3px 9px', fontSize:11, fontWeight:700, cursor: sending ? 'not-allowed' : 'pointer', whiteSpace:'nowrap', fontFamily:'var(--fb)', opacity: sending ? 0.6 : 1 }}
-                          >
-                            {sending ? 'Sending…' : 'Ask status'}
-                          </button>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CCardBody>
-        </CCard>
-      )}
-
-      {/* Programme bars + Matrix */}
+      {/* ── Team Chart + Convergence Tiles ── */}
       <CRow className="g-3 mb-3">
+
+        {/* Left: Team participation chart */}
         <CCol md={5}>
           <CCard className="h-100">
             <CCardBody>
-              <div className="d-flex align-items-center justify-content-between mb-3">
-                <h5 style={{ fontFamily:'var(--fd)', fontWeight:600, fontSize:22, margin:0 }}>By programme</h5>
-                <span style={{ fontFamily:'var(--fm)', fontSize:13, color:'var(--ink3)' }}>participation in period</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontFamily: 'var(--fd)', fontWeight: 600, fontSize: 18, color: 'var(--ink)' }}>Team chart</div>
+                  <div style={{ fontFamily: 'var(--fm)', fontSize: 12, color: 'var(--ink3)', marginTop: 2 }}>participation rate per team</div>
+                </div>
+                {/* Month filter */}
+                <select
+                  value={chartMonth}
+                  onChange={e => setChartMonth(e.target.value)}
+                  style={{ border: '1px solid var(--line)', borderRadius: 7, padding: '5px 10px', fontSize: 12, fontFamily: 'var(--fm)', background: '#fff', color: 'var(--ink)', cursor: 'pointer' }}
+                >
+                  <option value="">All time</option>
+                  {last13Months().map(ym => (
+                    <option key={ym} value={ym}>{monthLabel(ym)}</option>
+                  ))}
+                </select>
               </div>
-              <p style={{ fontSize:15, lineHeight:1.55, color:'var(--ink2)', marginBottom:16 }}>
-                Participation rate per unit across all its pairings. Click a unit to focus.
-              </p>
-              {units.map(u => {
-                const pd = matrix.filter(d => d.unit_a === u.slug || d.unit_b === u.slug);
-                const total = pd.reduce((s,d) => s+d.planned,0);
-                const done  = pd.reduce((s,d) => s+d.conducted,0);
-                const rate  = total ? done/total : 0;
+
+              {units.length === 0 ? (
+                <div style={{ fontSize: 13, color: 'var(--ink3)', textAlign: 'center', paddingTop: 24 }}>No teams found.</div>
+              ) : units.map(u => {
+                const pd   = chartMatrix.filter(d => d.unit_a === u.slug || d.unit_b === u.slug);
+                const total = pd.reduce((s, d) => s + d.planned, 0);
+                const done  = pd.reduce((s, d) => s + d.conducted, 0);
+                const rate  = total ? done / total : 0;
                 const focused = unitFocus === u.slug;
                 return (
-                  <div key={u.slug} onClick={() => setUnitFocus(focused?'all':u.slug)}
-                    style={{ display:'grid', gridTemplateColumns:'106px 1fr 60px', gap:11, alignItems:'center', padding:'9px', borderRadius:9, cursor:'pointer', background:focused?'var(--paper)':'transparent', boxShadow:focused?'inset 3px 0 0 var(--ink)':'none' }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, fontWeight:500 }}>
-                      <span style={{ width:10, height:10, borderRadius:'50%', background:u.color, flexShrink:0 }} />{u.abbr}
+                  <div key={u.slug}
+                    onClick={() => isAdmin && setUnitFocus(focused ? 'all' : u.slug)}
+                    style={{
+                      display: 'grid', gridTemplateColumns: '110px 1fr 56px',
+                      gap: 10, alignItems: 'center', padding: '9px 8px',
+                      borderRadius: 9, cursor: isAdmin ? 'pointer' : 'default',
+                      background: focused ? 'var(--paper)' : 'transparent',
+                      boxShadow: focused ? 'inset 3px 0 0 var(--ink)' : 'none',
+                      marginBottom: 2,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 500, overflow: 'hidden' }}>
+                      <span style={{ width: 9, height: 9, borderRadius: '50%', background: u.color, flexShrink: 0 }} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.abbr}</span>
                     </div>
-                    <div style={{ height:9, background:'var(--line2)', borderRadius:99, overflow:'hidden' }}>
-                      <div style={{ height:'100%', width:`${rate*100}%`, background:u.color, borderRadius:99, transition:'width .5s' }} />
+                    <div style={{ height: 8, background: 'var(--line2)', borderRadius: 99, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${rate * 100}%`, background: u.color, borderRadius: 99, transition: 'width .4s' }} />
                     </div>
-                    <div style={{ fontFamily:'var(--fm)', fontSize:13, textAlign:'right', color:'var(--ink2)' }}>{done}/{total}</div>
+                    <div style={{ fontFamily: 'var(--fm)', fontSize: 12, textAlign: 'right', color: 'var(--ink2)' }}>
+                      {done}/{total}
+                    </div>
                   </div>
                 );
               })}
+
+              {chartMonth && (
+                <div style={{ marginTop: 14, padding: '8px 10px', background: 'var(--paper)', borderRadius: 8, fontSize: 11, fontFamily: 'var(--fm)', color: 'var(--ink3)' }}>
+                  Showing data for <strong>{monthLabel(chartMonth)}</strong>.
+                  <button onClick={() => setChartMonth('')} style={{ border: 'none', background: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, fontFamily: 'var(--fm)', marginLeft: 4 }}>Clear</button>
+                </div>
+              )}
             </CCardBody>
           </CCard>
         </CCol>
+
+        {/* Right: Convergence unit tiles */}
         <CCol md={7}>
           <CCard className="h-100">
             <CCardBody>
-              <div className="d-flex align-items-center justify-content-between mb-3">
-                <h5 style={{ fontFamily:'var(--fd)', fontWeight:600, fontSize:22, margin:0 }}>Convergence units</h5>
-                <span style={{ fontFamily:'var(--fm)', fontSize:13, color:'var(--ink3)' }}>conducted ÷ planned</span>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontFamily: 'var(--fd)', fontWeight: 600, fontSize: 18, color: 'var(--ink)' }}>Convergence units</div>
+                <div style={{ fontFamily: 'var(--fm)', fontSize: 12, color: 'var(--ink3)', marginTop: 2 }}>click a tile to view meetings</div>
               </div>
-              <p style={{ fontSize:15, lineHeight:1.55, color:'var(--ink2)', marginBottom:16 }}>
-                Each cell is a unit-pair. Greener = more consistent. Click a cell to see its meetings below.
-              </p>
-              <ConvergenceMatrix
-                units={units} matrixData={matrix} selectedPair={selPair}
-                onSelect={d => { setSelPair(d); setTimeout(() => document.getElementById('detail')?.scrollIntoView({ behavior:'smooth', block:'start' }), 60); }}
-              />
+
+              {visibleMatrix.length === 0 ? (
+                <div style={{ fontSize: 13, color: 'var(--ink3)', textAlign: 'center', paddingTop: 32 }}>No convergence pairs found.</div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
+                  {visibleMatrix.map(row => {
+                    const uA = units.find(u => u.slug === row.unit_a);
+                    const uB = units.find(u => u.slug === row.unit_b);
+                    if (!uA || !uB) return null;
+                    const rate   = row.planned ? row.conducted / row.planned : 0;
+                    const active = selPair?.pair_id === row.pair_id;
+                    const rateColor = rate >= 0.8 ? '#059669' : rate >= 0.5 ? '#d97706' : rate > 0 ? '#dc2626' : 'var(--ink3)';
+                    return (
+                      <div key={row.pair_id}
+                        onClick={() => handleTileClick(row)}
+                        style={{
+                          border: `2px solid ${active ? 'var(--accent)' : 'var(--line)'}`,
+                          borderRadius: 12, padding: '12px 13px', cursor: 'pointer',
+                          background: active ? 'var(--accent-light)' : '#fff',
+                          transition: 'border-color .15s, background .15s',
+                          userSelect: 'none',
+                        }}
+                        onMouseEnter={e => { if (!active) e.currentTarget.style.borderColor = 'var(--accent)'; }}
+                        onMouseLeave={e => { if (!active) e.currentTarget.style.borderColor = 'var(--line)'; }}
+                      >
+                        {/* Pair name */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8, flexWrap: 'wrap' }}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: uA.color, flexShrink: 0 }} />
+                          <span style={{ fontFamily: 'var(--fm)', fontSize: 11, fontWeight: 600, color: 'var(--ink2)' }}>{uA.abbr}</span>
+                          <span style={{ fontSize: 10, color: 'var(--ink3)' }}>×</span>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: uB.color, flexShrink: 0 }} />
+                          <span style={{ fontFamily: 'var(--fm)', fontSize: 11, fontWeight: 600, color: 'var(--ink2)' }}>{uB.abbr}</span>
+                        </div>
+
+                        {/* Count */}
+                        <div style={{ fontFamily: 'var(--fd)', fontSize: 22, fontWeight: 700, lineHeight: 1, color: 'var(--ink)', marginBottom: 4 }}>
+                          {row.planned}
+                        </div>
+                        <div style={{ fontFamily: 'var(--fm)', fontSize: 11, color: 'var(--ink3)', marginBottom: 8 }}>meetings planned</div>
+
+                        {/* Progress bar */}
+                        <div style={{ height: 5, background: 'var(--line2)', borderRadius: 99, overflow: 'hidden', marginBottom: 5 }}>
+                          <div style={{ height: '100%', width: `${rate * 100}%`, background: rateColor, borderRadius: 99, transition: 'width .4s' }} />
+                        </div>
+                        <div style={{ fontFamily: 'var(--fm)', fontSize: 10, color: rateColor, fontWeight: 700 }}>
+                          {row.conducted}/{row.planned} conducted
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </CCardBody>
           </CCard>
         </CCol>
       </CRow>
 
-      {/* Pair detail */}
+      {/* ── Tile detail ── */}
       {selPair && (
-        <CCard id="detail" className="mb-3">
+        <CCard id="tile-detail" className="mb-3">
           <CCardBody>
             {(() => {
-              const A = units.find(u => u.slug === selPair.unit_a);
-              const B = units.find(u => u.slug === selPair.unit_b);
-              if (!A || !B) return null;
-              const apDone  = selPairMeetings.reduce((s,m) => s+(m.action_points_done??0),0);
-              const apTotal = selPairMeetings.reduce((s,m) => s+(m.action_points_total??0),0);
+              const uA = units.find(u => u.slug === selPair.unit_a_slug);
+              const uB = units.find(u => u.slug === selPair.unit_b_slug);
+              if (!uA || !uB) return null;
+
               return (
                 <>
-                  <div style={{ fontFamily:'var(--fd)', fontWeight:600, fontSize:22, display:'flex', alignItems:'center', gap:11, flexWrap:'wrap', letterSpacing:'-.01em', marginBottom:16 }}>
-                    <span style={{ width:13, height:13, borderRadius:'50%', background:A.color, display:'inline-block' }} />
-                    {A.name}<span style={{ color:'var(--ink3)', fontWeight:400, fontSize:18 }}>×</span>
-                    <span style={{ width:13, height:13, borderRadius:'50%', background:B.color, display:'inline-block' }} />
-                    {B.name}
+                  {/* Header */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
+                    <div style={{ fontFamily: 'var(--fd)', fontWeight: 600, fontSize: 20, display: 'flex', alignItems: 'center', gap: 10, letterSpacing: '-.01em' }}>
+                      <span style={{ width: 12, height: 12, borderRadius: '50%', background: uA.color, display: 'inline-block' }} />
+                      {uA.name}
+                      <span style={{ color: 'var(--ink3)', fontWeight: 400, fontSize: 16 }}>×</span>
+                      <span style={{ width: 12, height: 12, borderRadius: '50%', background: uB.color, display: 'inline-block' }} />
+                      {uB.name}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <CButton
+                        size="sm" color="primary" variant="outline"
+                        onClick={() => navigate(`/meetings`)}
+                        style={{ fontFamily: 'var(--fb)', fontSize: 12 }}
+                      >
+                        More details →
+                      </CButton>
+                      <button
+                        onClick={() => setSelPair(null)}
+                        style={{ border: '1px solid var(--line)', background: 'var(--paper)', borderRadius: 7, padding: '4px 12px', fontSize: 12, cursor: 'pointer', color: 'var(--ink3)' }}
+                      >✕ Close</button>
+                    </div>
                   </div>
-                  <div className="d-flex gap-2 flex-wrap mb-4">
-                    {[['Planned',selPairMeetings.length],['Conducted',selPairMeetings.filter(m=>m.status==='conducted').length],['MoMs',selPairMeetings.filter(m=>m.status==='conducted').length],['Action items',apTotal],['Pending',apTotal-apDone],['Closed %',apTotal?`${Math.round(apDone/apTotal*100)}%`:'—']].map(([l,v]) => (
-                      <div key={l} style={{ background:'var(--paper)', border:'1px solid var(--line)', borderRadius:10, padding:'13px 17px', minWidth:100 }}>
-                        <div style={{ fontFamily:'var(--fm)', fontSize:11, textTransform:'uppercase', letterSpacing:'.05em', color:'var(--ink3)' }}>{l}</div>
-                        <div style={{ fontFamily:'var(--fd)', fontWeight:600, fontSize:22, lineHeight:1.1, marginTop:4 }}>{v}</div>
+
+                  {/* Mini KPI cards */}
+                  {pairLoading ? (
+                    <div style={{ fontSize: 13, color: 'var(--ink3)', marginBottom: 18 }}>Loading…</div>
+                  ) : pairStats && (
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
+                      {[
+                        ['Planned',    pairStats.planned],
+                        ['Conducted',  pairStats.conducted],
+                        ['MoMs',       pairStats.moms],
+                        ['Action items', pairStats.a_tot],
+                        ['Completed',  pairStats.a_done],
+                        ['Pending',    pairStats.a_pend],
+                      ].map(([l, v]) => (
+                        <div key={l} style={{ background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 10, padding: '11px 16px', minWidth: 90 }}>
+                          <div style={{ fontFamily: 'var(--fm)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--ink3)', marginBottom: 4 }}>{l}</div>
+                          <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 20, lineHeight: 1 }}>{v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Meeting list */}
+                  <div style={{ fontFamily: 'var(--fd)', fontWeight: 600, fontSize: 15, marginBottom: 10, color: 'var(--ink)' }}>Meetings</div>
+                  {pairLoading ? (
+                    <div style={{ fontSize: 13, color: 'var(--ink3)' }}>Loading meetings…</div>
+                  ) : pairMeetings.length === 0 ? (
+                    <div style={{ fontSize: 13, color: 'var(--ink3)' }}>No meetings in this period.</div>
+                  ) : (
+                    <div style={{ border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden' }}>
+                      {/* Table header */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 100px 100px', gap: 0, background: 'var(--paper)', borderBottom: '1px solid var(--line)', padding: '8px 14px' }}>
+                        {['Date', 'Meeting between', 'Type', 'Status'].map(h => (
+                          <div key={h} style={{ fontFamily: 'var(--fm)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--ink3)' }}>{h}</div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                  <div className="d-flex align-items-center justify-content-between mb-3">
-                    <h5 style={{ fontFamily:'var(--fd)', fontWeight:600, fontSize:18, margin:0 }}>Meetings &amp; minutes</h5>
-                    <span style={{ fontFamily:'var(--fm)', fontSize:13, color:'var(--ink3)' }}>newest first · click to expand</span>
-                  </div>
-                  <div className="d-flex flex-column gap-2">
-                    {selPairMeetings.length === 0 && <div style={{ fontSize:15, color:'var(--ink3)' }}>No meetings in this period.</div>}
-                    {selPairMeetings.map((m, idx) => (
-                      <MeetingCard key={m.id} meeting={m} defaultOpen={idx===0} onAPClick={ap => setModal({ type:'action-point', ap, meeting:m })} />
-                    ))}
-                  </div>
+                      {/* Rows */}
+                      {pairMeetings.sort((a, b) => new Date(b.date) - new Date(a.date)).map((m, i) => {
+                        const A = m.pair.unit_a, B = m.pair.unit_b;
+                        return (
+                          <div key={m.id}
+                            style={{
+                              display: 'grid', gridTemplateColumns: '120px 1fr 100px 100px',
+                              gap: 0, padding: '10px 14px', alignItems: 'center',
+                              borderBottom: i < pairMeetings.length - 1 ? '1px solid var(--line)' : 'none',
+                              background: i % 2 === 0 ? '#fff' : 'var(--paper)',
+                            }}
+                          >
+                            <div style={{ fontFamily: 'var(--fm)', fontSize: 13, color: 'var(--ink2)' }}>{m.date}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500 }}>
+                              <span style={{ width: 7, height: 7, borderRadius: '50%', background: A.color, flexShrink: 0 }} />
+                              {A.abbr}
+                              <span style={{ color: 'var(--ink3)', fontSize: 11 }}>×</span>
+                              <span style={{ width: 7, height: 7, borderRadius: '50%', background: B.color, flexShrink: 0 }} />
+                              {B.abbr}
+                            </div>
+                            <div style={{ fontFamily: 'var(--fm)', fontSize: 12, color: 'var(--ink2)' }}>
+                              {m.mtype ? (m.mtype === 'Online' ? '💻 Online' : '📍 In-person') : '—'}
+                            </div>
+                            <div><Badge status={m.status} /></div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </>
               );
             })()}
@@ -292,12 +432,12 @@ export default function DashboardPage() {
         </CCard>
       )}
 
-      {/* Action point modal */}
+      {/* ── Action point modal ── */}
       {modal?.type === 'action-point' && (
         <ActionPointModal
           ap={modal.ap} meeting={modal.meeting}
           onClose={() => setModal(null)}
-          onToggle={(id) => toggleAP.mutate({ id })}
+          onToggle={id => toggleAP.mutate({ id })}
           toast={toast} qc={qc}
         />
       )}
@@ -305,69 +445,7 @@ export default function DashboardPage() {
   );
 }
 
-function MeetingCard({ meeting: m, defaultOpen, onAPClick }) {
-  const [open, setOpen] = useState(defaultOpen);
-  const apDone  = m.action_points_done  ?? 0;
-  const apTotal = m.action_points_total ?? 0;
-  const aggLabel = m.status === 'conducted' ? `${apDone}/${apTotal} actions` : m.status === 'scheduled' ? m.time ?? '' : '';
-
-  return (
-    <div className={`meet${open?' open':''}`}>
-      <div className="mh" onClick={() => setOpen(o => !o)}>
-        <span className="date">{m.date}</span>
-        <Badge status={m.status} />
-        {m.mtype && <span className="mtypechip">{m.mtype==='Online'?'💻':'📍'} {m.mtype}</span>}
-        <span className="agg">{aggLabel}</span>
-        <span className="chev">›</span>
-      </div>
-      {open && (
-        <div className="mbody">
-          {m.status === 'conducted' && m.minutes && (
-            <>
-              <div style={{ fontSize:15, lineHeight:1.6, color:'var(--ink2)', margin:'14px 0 2px' }}>
-                <span style={{ fontFamily:'var(--fm)', fontSize:11, letterSpacing:'.07em', textTransform:'uppercase', color:'var(--ink3)', display:'block', marginBottom:6 }}>Minutes of meeting</span>
-                {m.minutes.summary}
-              </div>
-              {m.minutes.action_points?.length > 0 && (
-                <div style={{ marginTop:16 }}>
-                  <div className="d-flex align-items-center justify-content-between mb-2">
-                    <span style={{ fontFamily:'var(--fm)', fontSize:11, letterSpacing:'.07em', textTransform:'uppercase', color:'var(--ink3)' }}>Action points</span>
-                    <span style={{ fontFamily:'var(--fm)', fontSize:13, color:'var(--ink2)' }}>{apDone}/{apTotal} closed</span>
-                  </div>
-                  <div style={{ height:7, background:'var(--line2)', borderRadius:99, overflow:'hidden', marginBottom:13 }}>
-                    <div style={{ height:'100%', width:`${apTotal?apDone/apTotal*100:0}%`, background:'var(--ok)', borderRadius:99 }} />
-                  </div>
-                  {m.minutes.action_points.map(ap => (
-                    <div key={ap.id} onClick={() => onAPClick(ap)}
-                      style={{ display:'flex', gap:10, alignItems:'flex-start', padding:'7px 4px', fontSize:15, cursor:'pointer', borderRadius:7 }}>
-                      <span style={{ width:17, height:17, borderRadius:5, border:`1.5px solid ${ap.done?'var(--ok)':'var(--ink3)'}`, background:ap.done?'var(--ok)':'transparent', flexShrink:0, marginTop:2, position:'relative', display:'inline-block' }}>
-                        {ap.done && <span style={{ position:'absolute', left:4.5, top:1.5, width:4, height:8, border:'solid #fff', borderWidth:'0 2px 2px 0', transform:'rotate(45deg)', display:'block' }} />}
-                      </span>
-                      <span style={{ color:ap.done?'var(--ink3)':'var(--ink)', textDecoration:ap.done?'line-through':'none' }}>{ap.text}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-          {(m.status === 'postponed' || m.status === 'missed') && m.not_held && (
-            <div style={{ fontSize:15, lineHeight:1.55, color:'var(--ink2)', marginTop:14 }}>
-              <span style={{ fontFamily:'var(--fm)', fontSize:11, letterSpacing:'.07em', textTransform:'uppercase', color:'var(--bad)', display:'block', marginBottom:6 }}>{m.status} — reason</span>
-              {m.not_held.reason}
-            </div>
-          )}
-          {m.status === 'scheduled' && (
-            <div style={{ paddingTop:14, fontSize:15, color:'var(--ink2)' }}>
-              <span style={{ fontFamily:'var(--fm)', fontSize:11, letterSpacing:'.07em', textTransform:'uppercase', color:'var(--ink3)', display:'block', marginBottom:5 }}>Agenda</span>
-              {m.agenda || '—'}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
+/* ─────────────────── ActionPointModal ─────────────────── */
 function ActionPointModal({ ap, meeting, onClose, onToggle, toast, qc }) {
   const [comment,  setComment]  = useState('');
   const [posting,  setPosting]  = useState(false);
@@ -378,23 +456,17 @@ function ActionPointModal({ ap, meeting, onClose, onToggle, toast, qc }) {
 
   const { data: members = [] } = useQuery({
     queryKey: ['meeting-members', meeting.id],
-    queryFn: () => getMeetingMembers(meeting.id),
+    queryFn:  () => getMeetingMembers(meeting.id),
   });
 
   const handleSaveAP = async () => {
     setSaving(true);
     try {
-      await updateActionPoint(ap.id, {
-        assigned_to: assignee || null,
-        deadline: deadline || null,
-      });
+      await updateActionPoint(ap.id, { assigned_to: assignee || null, deadline: deadline || null });
       qc.invalidateQueries(['meetings']);
       toast('Saved');
-    } catch {
-      toast('Failed to save');
-    } finally {
-      setSaving(false);
-    }
+    } catch { toast('Failed to save'); }
+    finally { setSaving(false); }
   };
 
   const handleComment = async () => {
@@ -410,117 +482,88 @@ function ActionPointModal({ ap, meeting, onClose, onToggle, toast, qc }) {
 
   return (
     <Modal onClose={onClose}>
-      {/* ── Sticky header ── */}
-      <div style={{
-        position:'sticky', top:0, zIndex:10,
-        background:'var(--panel)',
-        padding:'20px 24px 16px',
-        borderBottom:'1px solid var(--line)',
-        display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:14,
-      }}>
+      {/* Sticky header */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--panel)', padding: '20px 24px 16px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14 }}>
         <div>
-          <div style={{ fontFamily:'var(--fd)', fontWeight:600, fontSize:18, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', lineHeight:1.35 }}>
-            <span style={{ width:10, height:10, borderRadius:'50%', background:A.color, display:'inline-block', flexShrink:0 }} />
+          <div style={{ fontFamily: 'var(--fd)', fontWeight: 600, fontSize: 18, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', lineHeight: 1.35 }}>
+            <span style={{ width: 10, height: 10, borderRadius: '50%', background: A.color, display: 'inline-block', flexShrink: 0 }} />
             {A.name}
-            <span style={{ color:'var(--ink3)', fontWeight:400, fontSize:15 }}>×</span>
-            <span style={{ width:10, height:10, borderRadius:'50%', background:B.color, display:'inline-block', flexShrink:0 }} />
+            <span style={{ color: 'var(--ink3)', fontWeight: 400, fontSize: 15 }}>×</span>
+            <span style={{ width: 10, height: 10, borderRadius: '50%', background: B.color, display: 'inline-block', flexShrink: 0 }} />
             {B.name}
           </div>
-          <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:8 }}>
-            <CBadge color="success" style={{ fontFamily:'var(--fm)', fontSize:11, letterSpacing:'.03em', textTransform:'uppercase', padding:'4px 10px', borderRadius:99 }}>open action</CBadge>
-            <span style={{ fontFamily:'var(--fm)', fontSize:11, color:'var(--ink3)' }}>Meeting · {meeting.date}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+            <CBadge color="success" style={{ fontFamily: 'var(--fm)', fontSize: 11, letterSpacing: '.03em', textTransform: 'uppercase', padding: '4px 10px', borderRadius: 99 }}>open action</CBadge>
+            <span style={{ fontFamily: 'var(--fm)', fontSize: 11, color: 'var(--ink3)' }}>Meeting · {meeting.date}</span>
           </div>
         </div>
-        <button
-          onClick={onClose}
-          style={{
-            flexShrink:0, width:32, height:32, borderRadius:'50%',
-            border:'1px solid var(--line)', background:'var(--paper)',
-            display:'flex', alignItems:'center', justifyContent:'center',
-            cursor:'pointer', fontSize:15, color:'var(--ink2)', marginTop:2,
-          }}
-        >✕</button>
+        <button onClick={onClose} style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--line)', background: 'var(--paper)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 15, color: 'var(--ink2)', marginTop: 2 }}>✕</button>
       </div>
 
-      {/* ── Body ── */}
-      <div style={{ padding:'20px 24px 24px' }}>
-        {/* Pending action item card */}
-        <div style={{ background:'#FBF1DC', border:'1px solid #EAC36A', borderRadius:12, padding:'14px 16px', marginBottom:18 }}>
-          <span style={{ fontFamily:'var(--fm)', fontSize:11, letterSpacing:'.07em', textTransform:'uppercase', color:'#7a5408', display:'block', marginBottom:6 }}>Pending action item</span>
-          <div style={{ fontSize:15, lineHeight:1.45, fontWeight:500 }}>{ap.text}</div>
+      {/* Body */}
+      <div style={{ padding: '20px 24px 24px' }}>
+        <div style={{ background: '#FBF1DC', border: '1px solid #EAC36A', borderRadius: 12, padding: '14px 16px', marginBottom: 18 }}>
+          <span style={{ fontFamily: 'var(--fm)', fontSize: 11, letterSpacing: '.07em', textTransform: 'uppercase', color: '#7a5408', display: 'block', marginBottom: 6 }}>Pending action item</span>
+          <div style={{ fontSize: 15, lineHeight: 1.45, fontWeight: 500 }}>{ap.text}</div>
         </div>
 
-        {/* Assign + Deadline */}
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
           <div>
-            <div style={{ fontFamily:'var(--fm)', fontSize:11, fontWeight:600, color:'var(--ink3)', marginBottom:4, textTransform:'uppercase', letterSpacing:'.05em' }}>Assign to</div>
-            <select
-              value={assignee ?? ''}
-              onChange={e => setAssignee(e.target.value ? Number(e.target.value) : null)}
-              style={{ width:'100%', border:'1px solid var(--line)', borderRadius:7, padding:'7px 10px', fontSize:13, background:'#fff' }}
-            >
+            <div style={{ fontFamily: 'var(--fm)', fontSize: 11, fontWeight: 600, color: 'var(--ink3)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.05em' }}>Assign to</div>
+            <select value={assignee ?? ''} onChange={e => setAssignee(e.target.value ? Number(e.target.value) : null)}
+              style={{ width: '100%', border: '1px solid var(--line)', borderRadius: 7, padding: '7px 10px', fontSize: 13, background: '#fff' }}>
               <option value="">— Unassigned —</option>
-              {members.map(m => (
-                <option key={m.id} value={m.id}>{m.name} ({m.unit_abbr})</option>
-              ))}
+              {members.map(m => <option key={m.id} value={m.id}>{m.name} ({m.unit_abbr})</option>)}
             </select>
           </div>
           <div>
-            <div style={{ fontFamily:'var(--fm)', fontSize:11, fontWeight:600, color:'var(--ink3)', marginBottom:4, textTransform:'uppercase', letterSpacing:'.05em' }}>Deadline</div>
-            <input
-              type="date"
-              value={deadline}
-              onChange={e => setDeadline(e.target.value)}
-              style={{ width:'100%', border:'1px solid var(--line)', borderRadius:7, padding:'7px 10px', fontSize:13 }}
-            />
+            <div style={{ fontFamily: 'var(--fm)', fontSize: 11, fontWeight: 600, color: 'var(--ink3)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.05em' }}>Deadline</div>
+            <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)}
+              style={{ width: '100%', border: '1px solid var(--line)', borderRadius: 7, padding: '7px 10px', fontSize: 13 }} />
           </div>
         </div>
 
-        {/* From the minutes */}
         {meeting.minutes?.summary && (
           <>
             <div className="seclab">From the minutes</div>
-            <div style={{ fontSize:15, lineHeight:1.6, color:'var(--ink2)', marginBottom:4 }}>{meeting.minutes.summary}</div>
+            <div style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--ink2)', marginBottom: 4 }}>{meeting.minutes.summary}</div>
           </>
         )}
 
-        {/* Deadline history */}
         {ap.deadline_history?.length > 0 && (
           <>
             <div className="seclab">Deadline history</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 16 }}>
               {ap.deadline_history.map((h, i) => (
-                <div key={i} style={{ fontSize:12, color:'var(--ink3)', display:'flex', gap:6, alignItems:'center' }}>
-                  <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--line2)', flexShrink:0 }} />
-                  <span>{h.changed_at?.slice(0,10)}</span>
-                  <span style={{ color:'var(--ink2)' }}>{h.old_deadline ?? 'none'} → {h.new_deadline ?? 'none'}</span>
-                  <span style={{ marginLeft:'auto', fontSize:11 }}>by {h.changed_by_name}</span>
+                <div key={i} style={{ fontSize: 12, color: 'var(--ink3)', display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--line2)', flexShrink: 0 }} />
+                  <span>{h.changed_at?.slice(0, 10)}</span>
+                  <span style={{ color: 'var(--ink2)' }}>{h.old_deadline ?? 'none'} → {h.new_deadline ?? 'none'}</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 11 }}>by {h.changed_by_name}</span>
                 </div>
               ))}
             </div>
           </>
         )}
 
-        {/* Comments */}
         {ap.comments?.length > 0 && (
           <>
             <div className="seclab">Comments</div>
             <div className="d-flex flex-column gap-2 mt-2">
               {ap.comments.map((c, i) => (
-                <div key={i} style={{ background:'#fff', border:'1px solid var(--line)', borderRadius:10, padding:'13px 15px' }}>
+                <div key={i} style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 10, padding: '13px 15px' }}>
                   <div className="d-flex align-items-center gap-2 mb-2">
-                    <span style={{ width:26, height:26, borderRadius:'50%', background:'var(--ink)', color:'#fff', fontFamily:'var(--fm)', fontSize:11, display:'flex', alignItems:'center', justifyContent:'center' }}>MS</span>
-                    <span style={{ fontSize:15, fontWeight:600 }}>{c.created_by_name || 'Admin'}</span>
-                    <span style={{ fontFamily:'var(--fm)', fontSize:11, color:'var(--ink3)', marginLeft:'auto' }}>{c.created_at?.slice(0,10)}</span>
+                    <span style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--ink)', color: '#fff', fontFamily: 'var(--fm)', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>MS</span>
+                    <span style={{ fontSize: 15, fontWeight: 600 }}>{c.created_by_name || 'Admin'}</span>
+                    <span style={{ fontFamily: 'var(--fm)', fontSize: 11, color: 'var(--ink3)', marginLeft: 'auto' }}>{c.created_at?.slice(0, 10)}</span>
                   </div>
-                  <div style={{ fontSize:15, lineHeight:1.5, color:'var(--ink2)' }}>{c.text}</div>
+                  <div style={{ fontSize: 15, lineHeight: 1.5, color: 'var(--ink2)' }}>{c.text}</div>
                 </div>
               ))}
             </div>
           </>
         )}
 
-        {/* Comment input */}
         <div className="cbox">
           <textarea placeholder="Add a comment or follow-up…" value={comment} onChange={e => setComment(e.target.value)} />
           <div className="crow">
@@ -529,12 +572,11 @@ function ActionPointModal({ ap, meeting, onClose, onToggle, toast, qc }) {
           </div>
         </div>
 
-        {/* Footer actions */}
-        <div style={{ display:'flex', gap:10, marginTop:20, paddingTop:16, borderTop:'1px solid var(--line)' }}>
+        <div style={{ display: 'flex', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--line)' }}>
           {!ap.done && (
-            <CButton color="dark" style={{ flex:1, justifyContent:'center' }} onClick={() => { onToggle(ap.id); onClose(); }}>Mark closed</CButton>
+            <CButton color="dark" style={{ flex: 1, justifyContent: 'center' }} onClick={() => { onToggle(ap.id); onClose(); }}>Mark closed</CButton>
           )}
-          <CButton color="primary" onClick={handleSaveAP} disabled={saving} style={{ fontFamily:'var(--fb)', fontSize:13 }}>
+          <CButton color="primary" onClick={handleSaveAP} disabled={saving} style={{ fontFamily: 'var(--fb)', fontSize: 13 }}>
             {saving ? 'Saving…' : 'Save changes'}
           </CButton>
           <CButton color="dark" variant="outline" onClick={onClose}>Close</CButton>

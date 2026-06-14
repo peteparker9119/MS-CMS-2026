@@ -1,62 +1,306 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getMeetings, createMeeting, updateMeeting, deleteMeeting } from '../api/meetings';
-import { getPairs } from '../api/units';
-import { useToast } from '../context/ToastContext';
-import Badge from '../components/Badge';
-import DateField from '../components/DateField';
-import TimeField from '../components/TimeField';
 import {
-  CCard, CCardBody,
-  CButton,
-  CFormLabel, CFormSelect, CFormTextarea,
-  CRow, CCol,
-  CModal, CModalHeader, CModalTitle, CModalBody, CModalFooter,
-} from '@coreui/react';
+  getMeetings, createMeeting, updateMeeting, cancelMeeting,
+} from '../api/meetings';
+import { getPairs } from '../api/units';
+import { getLetters, uploadLetter } from '../api/documents';
+import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
+import WeekCalendar from '../components/WeekCalendar';
+import EventModal from '../components/EventModal';
+import Badge from '../components/Badge';
 
 const MONTHS   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTHS_S = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DOW      = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const fmt      = d => `${d.getDate()} ${MONTHS_S[d.getMonth()]} ${d.getFullYear()}`;
-const LBL      = { fontFamily: 'var(--fm)', fontSize: 11, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--ink3)' };
 
+const STATUS_COLOR = {
+  conducted:  '#1D9E75',
+  scheduled:  '#378ADD',
+  postponed:  '#E0A21C',
+  missed:     '#D85A30',
+  cancelled:  '#9ca3af',
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function getMonday(d) {
+  const day  = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const m    = new Date(d);
+  m.setDate(diff);
+  m.setHours(0, 0, 0, 0);
+  return m;
+}
+
+function minToTime(min) {
+  return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+}
+
+function timeToMin(t) {
+  if (!t) return 0;
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function toIso(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// ── Reason modal (for cancel / not-held reason) ───────────────────────────────
+function ReasonModal({ meeting, action, onConfirm, onClose, saving }) {
+  const [reason, setReason] = useState('');
+  const A = meeting?.pair?.unit_a;
+  const B = meeting?.pair?.unit_b;
+  const label = A && B ? `${A.abbr} × ${B.abbr}` : 'this meeting';
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.35)', zIndex: 1040 }} />
+      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 1050, width: 'min(420px, 96vw)', background: '#fff', borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,.22)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ padding: '16px 22px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 16, color: 'var(--ink)', textTransform: 'capitalize' }}>
+            {action === 'cancel' ? 'Cancel' : 'Reason'} — {label}
+          </span>
+          <button onClick={onClose} type="button" style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--ink3)', lineHeight: 1, padding: '0 4px' }}>×</button>
+        </div>
+        <div style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ fontFamily: 'var(--fm)', fontSize: 13, color: 'var(--ink2)' }}>
+            {action === 'cancel'
+              ? `Please provide a reason for cancelling the ${label} meeting scheduled on ${meeting?.date}.`
+              : `Provide a reason for rescheduling.`}
+          </div>
+          <textarea
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            placeholder="Reason (optional)"
+            rows={3}
+            style={{ resize: 'none', border: '1px solid var(--line)', borderRadius: 7, padding: '8px 10px', fontSize: 13, fontFamily: 'var(--fm)', color: 'var(--ink)', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+          />
+        </div>
+        <div style={{ padding: '12px 22px', borderTop: '1px solid var(--line)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} type="button" style={{ border: '1px solid var(--line)', borderRadius: 7, padding: '7px 16px', fontSize: 13, fontFamily: 'var(--fb)', fontWeight: 600, cursor: 'pointer', background: 'var(--paper)', color: 'var(--ink2)' }}>
+            Back
+          </button>
+          <button
+            onClick={() => onConfirm(reason)}
+            disabled={saving}
+            type="button"
+            style={{ border: 'none', borderRadius: 7, padding: '7px 18px', fontSize: 13, fontFamily: 'var(--fb)', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', background: action === 'cancel' ? '#ef4444' : 'var(--accent)', color: '#fff', opacity: saving ? .7 : 1 }}
+          >
+            {saving ? 'Processing…' : action === 'cancel' ? 'Cancel meeting' : 'Confirm'}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── D.O. Letters tab ──────────────────────────────────────────────────────────
+function DOLettersTab({ user }) {
+  const toast = useToast();
+  const qc    = useQueryClient();
+  const [filterMonth, setFilterMonth] = useState('');
+  const [file,  setFile]  = useState(null);
+  const [ftitle,setFtitle]= useState('');
+  const fileRef = useRef();
+
+  const { data: letters = [], isLoading } = useQuery({
+    queryKey: ['do-letters'],
+    queryFn: () => getLetters({}),
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: (fd) => uploadLetter(fd),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['do-letters'] });
+      setFile(null); setFtitle('');
+      if (fileRef.current) fileRef.current.value = '';
+      toast('Letter uploaded');
+    },
+    onError: () => toast('Upload failed'),
+  });
+
+  const canUpload = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'poc' || user?.role === 'team';
+
+  const filtered = useMemo(() => {
+    if (!filterMonth) return letters;
+    return letters.filter(l => l.date?.startsWith(filterMonth));
+  }, [letters, filterMonth]);
+
+  const handleUpload = () => {
+    if (!file) { toast('Select a file'); return; }
+    const fd = new FormData();
+    fd.append('file', file);
+    if (ftitle.trim()) fd.append('title', ftitle.trim());
+    uploadMutation.mutate(fd);
+  };
+
+  return (
+    <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+      {/* Upload form */}
+      {canUpload && (
+        <div style={{ flex: '0 0 300px', border: '1px solid var(--line)', borderRadius: 12, padding: '18px 20px', background: '#fff', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>Upload D.O. Letter</div>
+          <div>
+            <label style={{ fontFamily: 'var(--fm)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--ink3)', display: 'block', marginBottom: 4 }}>Title (optional)</label>
+            <input
+              type="text"
+              value={ftitle}
+              onChange={e => setFtitle(e.target.value)}
+              placeholder="Letter title…"
+              style={{ width: '100%', border: '1px solid var(--line)', borderRadius: 7, padding: '7px 10px', fontSize: 13, fontFamily: 'var(--fm)', outline: 'none', boxSizing: 'border-box' }}
+            />
+          </div>
+          <div>
+            <label style={{ fontFamily: 'var(--fm)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--ink3)', display: 'block', marginBottom: 4 }}>File (PDF / DOC)</label>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".pdf,.doc,.docx"
+              onChange={e => setFile(e.target.files[0] || null)}
+              style={{ fontSize: 12, fontFamily: 'var(--fm)', color: 'var(--ink2)', width: '100%' }}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleUpload}
+            disabled={uploadMutation.isPending || !file}
+            style={{ border: 'none', borderRadius: 7, padding: '8px 16px', fontSize: 13, fontFamily: 'var(--fb)', fontWeight: 700, cursor: !file || uploadMutation.isPending ? 'not-allowed' : 'pointer', background: 'var(--accent)', color: '#fff', opacity: !file ? .5 : 1 }}
+          >
+            {uploadMutation.isPending ? 'Uploading…' : 'Upload letter'}
+          </button>
+        </div>
+      )}
+
+      {/* Letters list */}
+      <div style={{ flex: 1, minWidth: 300, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>D.O. Letters ({filtered.length})</div>
+          <input
+            type="month"
+            value={filterMonth}
+            onChange={e => setFilterMonth(e.target.value)}
+            style={{ border: '1px solid var(--line)', borderRadius: 7, padding: '5px 10px', fontSize: 12, fontFamily: 'var(--fm)', color: 'var(--ink2)', outline: 'none' }}
+          />
+        </div>
+        {isLoading && <div style={{ fontFamily: 'var(--fm)', fontSize: 13, color: 'var(--ink3)' }}>Loading…</div>}
+        {!isLoading && filtered.length === 0 && <div style={{ fontFamily: 'var(--fm)', fontSize: 13, color: 'var(--ink3)' }}>No letters found.</div>}
+        {filtered.map(l => (
+          <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', border: '1px solid var(--line)', borderRadius: 10, background: '#fff' }}>
+            <span style={{ fontSize: 22 }}>📄</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: 'var(--fm)', fontSize: 13, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.title || l.filename || 'Untitled'}</div>
+              <div style={{ fontFamily: 'var(--fm)', fontSize: 11, color: 'var(--ink3)', marginTop: 2 }}>{l.date || ''}</div>
+            </div>
+            {l.file_url && (
+              <a href={l.file_url} target="_blank" rel="noreferrer" style={{ border: '1px solid var(--accent)', borderRadius: 7, padding: '5px 12px', fontSize: 12, fontFamily: 'var(--fm)', fontWeight: 600, color: 'var(--accent)', textDecoration: 'none', flexShrink: 0 }}>
+                Download
+              </a>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 export default function PlannerPage() {
   const toast = useToast();
   const qc    = useQueryClient();
+  const { user } = useAuth();
+  const now   = new Date();
 
-  const now = new Date();
-  const [calMonth, setCalMonth] = useState(new Date(now.getFullYear(), now.getMonth(), 1));
-  const [selDay,   setSelDay]   = useState(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
+  const [view,      setView]      = useState('week');
+  const [weekStart, setWeekStart] = useState(getMonday(now));
+  const [calMonth,  setCalMonth]  = useState(new Date(now.getFullYear(), now.getMonth(), 1));
+  const [selDay,    setSelDay]    = useState(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
 
-  const [schedModalOpen,     setSchedModalOpen]     = useState(false);
-  const [reschedModalOpen,   setReschedModalOpen]   = useState(false);
-  const [reschedMeeting,     setReschedMeeting]     = useState(null);
+  const [eventModal,  setEventModal]  = useState(null);  // { date, startMin, endMin, meeting? }
+  const [reasonModal, setReasonModal] = useState(null);  // { meeting, action: 'cancel' }
 
-  const [fPair,   setFPair]   = useState('');
-  const [fDate,   setFDate]   = useState('');
-  const [fTime,   setFTime]   = useState('11:00');
-  const [fAgenda, setFAgenda] = useState('');
-  const [fType,   setFType]   = useState('In-person');
-  const [fNotify, setFNotify] = useState([]);
+  const { data: pairs    = [] } = useQuery({ queryKey: ['pairs'],    queryFn: getPairs });
+  const { data: meetings = [] } = useQuery({ queryKey: ['meetings'], queryFn: () => getMeetings({}) });
 
-  // Reschedule form fields
-  const [rDate,   setRDate]   = useState('');
-  const [rTime,   setRTime]   = useState('');
-  const [rAgenda, setRAgenda] = useState('');
+  // ── Mutations ────────────────────────────────────────────────────────────────
+  const createMutation = useMutation({
+    mutationFn: createMeeting,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['meetings'] });
+      setEventModal(null);
+      toast('Meeting scheduled');
+    },
+    onError: () => toast('Failed to schedule'),
+  });
 
-  const { data: pairs    = [] } = useQuery({ queryKey:['pairs'],    queryFn: getPairs });
-  const { data: meetings = [] } = useQuery({ queryKey:['meetings'], queryFn: () => getMeetings({}) });
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => updateMeeting(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['meetings'] });
+      setEventModal(null);
+      toast('Meeting updated');
+    },
+    onError: () => toast('Failed to update'),
+  });
 
-  const upcoming = useMemo(() =>
-    meetings.filter(m => m.status === 'scheduled' && new Date(m.date) >= new Date(now.toDateString()))
-      .sort((a,b) => new Date(a.date) - new Date(b.date)),
-    [meetings] // eslint-disable-line react-hooks/exhaustive-deps
-  );
+  const cancelMutation = useMutation({
+    mutationFn: ({ id, reason }) => cancelMeeting(id, reason),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['meetings'] });
+      setReasonModal(null);
+      toast('Meeting cancelled');
+    },
+    onError: () => toast('Failed to cancel'),
+  });
+
+  // ── Handlers ─────────────────────────────────────────────────────────────────
+  const handleEventSave = (data, editingId) => {
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, data });
+    } else {
+      createMutation.mutate(data);
+    }
+  };
+
+  const handleCancelConfirm = (reason) => {
+    if (!reasonModal) return;
+    cancelMutation.mutate({ id: reasonModal.meeting.id, reason });
+  };
+
+  const openNewMeeting = (date, startMin = 9 * 60, endMin = 10 * 60) => {
+    setEventModal({ date: date instanceof Date ? toIso(date) : date, startMin, endMin });
+  };
+
+  const openEditMeeting = (meeting) => {
+    setEventModal({
+      date:     meeting.date,
+      startMin: meeting.time ? timeToMin(meeting.time) : 9 * 60,
+      endMin:   meeting.end_time ? timeToMin(meeting.end_time) : (meeting.time ? timeToMin(meeting.time) + 60 : 10 * 60),
+      meeting,
+    });
+  };
+
+  const openCancel = (meeting) => setReasonModal({ meeting, action: 'cancel' });
+
+  const todayIso = toIso(now);
+
+  // ── Month calendar data ───────────────────────────────────────────────────────
+  const year     = calMonth.getFullYear();
+  const mo       = calMonth.getMonth();
+  const first    = new Date(year, mo, 1);
+  const startDay = new Date(year, mo, 1 - first.getDay());
+  const calDays  = Array.from({ length: 42 }, (_, i) => {
+    const d = new Date(startDay);
+    d.setDate(startDay.getDate() + i);
+    return d;
+  });
 
   const byDay = useMemo(() => {
     const map = {};
     meetings.forEach(m => {
-      const d = new Date(m.date);
+      const d   = new Date(m.date);
       const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
       (map[key] = map[key] || []).push(m);
     });
@@ -68,316 +312,256 @@ export default function PlannerPage() {
     return byDay[key] || [];
   }, [selDay, byDay]);
 
-  const scheduleMutation = useMutation({
-    mutationFn: createMeeting,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['meetings'] });
-      setFPair(''); setFDate(''); setFTime('11:00'); setFAgenda(''); setFType('In-person'); setFNotify([]);
-      setSchedModalOpen(false);
-      toast('Meeting scheduled');
-    },
-    onError: () => toast('Failed to schedule'),
-  });
+  const upcoming = useMemo(() =>
+    meetings
+      .filter(m => m.status === 'scheduled' && new Date(m.date) >= new Date(now.toDateString()))
+      .sort((a, b) => new Date(a.date) - new Date(b.date)),
+    [meetings] // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
-  const cancelMutation = useMutation({
-    mutationFn: deleteMeeting,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['meetings'] }); toast('Meeting cancelled'); },
-  });
+  // ── Week navigation label ────────────────────────────────────────────────────
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  const weekLabel = weekStart.getMonth() === weekEnd.getMonth()
+    ? `${MONTHS[weekStart.getMonth()]} ${weekStart.getDate()}–${weekEnd.getDate()}, ${weekStart.getFullYear()}`
+    : `${MONTHS_S[weekStart.getMonth()]} ${weekStart.getDate()} – ${MONTHS_S[weekEnd.getMonth()]} ${weekEnd.getDate()}, ${weekStart.getFullYear()}`;
 
-  const rescheduleMutation = useMutation({
-    mutationFn: ({ id, data }) => updateMeeting(id, data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['meetings'] });
-      setReschedModalOpen(false);
-      setReschedMeeting(null);
-      toast('Meeting rescheduled');
-    },
-    onError: () => toast('Failed to reschedule'),
-  });
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
-  const openReschedule = (m) => {
-    setReschedMeeting(m);
-    setRDate(m.date);
-    setRTime(m.time ?? '');
-    setRAgenda(m.agenda ?? '');
-    setReschedModalOpen(true);
-  };
-
-  const handleReschedule = () => {
-    if (!rDate) { toast('Pick a new date'); return; }
-    rescheduleMutation.mutate({ id: reschedMeeting.id, data: { date: rDate, time: rTime || null, agenda: rAgenda } });
-  };
-
-  const handleSchedule = () => {
-    if (!fPair) { toast('Select a convergence unit'); return; }
-    if (!fDate) { toast('Pick a date'); return; }
-    scheduleMutation.mutate({ pair_id: parseInt(fPair), date: fDate, time: fTime || null, agenda: fAgenda, mtype: fType, notify_unit_ids: fNotify.map(Number) });
-  };
-
-  const openScheduleModal = (isoDate) => {
-    setFDate(isoDate);
-    setSchedModalOpen(true);
-  };
-
-  const selectedPairUnits = useMemo(() => {
-    if (!fPair) return [];
-    const pair = pairs.find(p => p.id === parseInt(fPair));
-    return pair ? [pair.unit_a, pair.unit_b] : [];
-  }, [fPair, pairs]);
-
-  const year = calMonth.getFullYear(), mo = calMonth.getMonth();
-  const first    = new Date(year, mo, 1);
-  const startDay = new Date(year, mo, 1 - first.getDay());
-  const calDays  = Array.from({ length: 42 }, (_, i) => { const d = new Date(startDay); d.setDate(startDay.getDate() + i); return d; });
-
-  const STATUS_COLOR = { conducted:'#1D9E75', scheduled:'#378ADD', postponed:'#E0A21C', missed:'#D85A30' };
-
-  const todayIso = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  // ── View tab pills ────────────────────────────────────────────────────────────
+  const VIEWS = [
+    { key: 'month',     label: 'Month' },
+    { key: 'week',      label: 'Week' },
+    { key: 'doletters', label: 'D.O. Letters' },
+  ];
 
   return (
     <>
-      {/* Header bar */}
+      {/* ── Header bar ── */}
       <div className="filterbar">
         <div className="period">
           <div className="l">Meeting planner</div>
           <div className="v">Schedule &amp; notify across all convergence units</div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <CButton color="dark" size="sm" onClick={() => openScheduleModal(todayIso)} style={{ fontFamily: 'var(--fb)', fontSize: 13 }}>
-            + Schedule Meeting
-          </CButton>
-          <CButton color="dark" variant="outline" size="sm" onClick={() => {
-            if (!window.Notification) { toast('Not supported'); return; }
-            Notification.requestPermission().then(p => toast(p==='granted'?'Browser alerts enabled':'Alerts not enabled'));
-          }}>
-            🔔 Enable browser alerts
-          </CButton>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* View switcher */}
+          <div style={{ display: 'inline-flex', background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 8, padding: 3, gap: 2 }}>
+            {VIEWS.map(v => (
+              <button
+                key={v.key}
+                type="button"
+                onClick={() => setView(v.key)}
+                style={{ border: 'none', borderRadius: 6, padding: '5px 14px', fontSize: 12, fontFamily: 'var(--fb)', fontWeight: 600, cursor: 'pointer', transition: '.13s', background: view === v.key ? 'var(--accent)' : 'transparent', color: view === v.key ? '#fff' : 'var(--ink2)' }}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+
+          {(isAdmin || user?.role === 'poc') && (
+            <button
+              type="button"
+              onClick={() => openNewMeeting(todayIso)}
+              style={{ border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontFamily: 'var(--fb)', fontWeight: 700, cursor: 'pointer', background: 'var(--accent)', color: '#fff', display: 'flex', alignItems: 'center', gap: 5 }}
+            >
+              + New meeting
+            </button>
+          )}
         </div>
       </div>
 
-      <CRow className="g-3">
-        {/* Calendar */}
-        <CCol lg={6}>
-          <CCard>
-            <CCardBody style={{ padding:'18px 20px' }}>
-              <div className="d-flex align-items-center justify-content-between mb-3">
-                <div style={{ fontFamily:'var(--fd)', fontWeight:700, fontSize:22 }}>{MONTHS[mo]} {year}</div>
-                <div style={{ display:'inline-flex', gap:3, background:'var(--paper)', border:'1px solid var(--line)', borderRadius:99, padding:3 }}>
-                  {[['‹',-1],['·',0],['›',1]].map(([l,n]) => (
-                    <button key={l} type="button"
-                      onClick={() => n===0 ? setCalMonth(new Date(now.getFullYear(),now.getMonth(),1)) : setCalMonth(new Date(year,mo+n,1))}
-                      style={{ border:0, background:'none', fontFamily:'var(--fm)', fontSize: n===0 ? 14 : 22, lineHeight:1, padding: n===0 ? '5px 10px' : '1px 11px', borderRadius:99, cursor:'pointer', color:'var(--ink2)', fontWeight: n===0 ? 400 : 600 }}>
-                      {l}
-                    </button>
-                  ))}
-                </div>
-              </div>
+      {/* ── Week view ── */}
+      {view === 'week' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* Week navigation */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'inline-flex', background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 99, padding: 3, gap: 0 }}>
+              <button type="button" onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d); }}
+                style={{ border: 0, background: 'none', fontSize: 20, lineHeight: 1, padding: '1px 12px', borderRadius: 99, cursor: 'pointer', color: 'var(--ink2)', fontWeight: 600 }}>‹</button>
+              <button type="button" onClick={() => setWeekStart(getMonday(new Date()))}
+                style={{ border: 0, background: 'none', fontFamily: 'var(--fm)', fontSize: 12, lineHeight: 1, padding: '5px 12px', borderRadius: 99, cursor: 'pointer', color: 'var(--ink2)' }}>Today</button>
+              <button type="button" onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d); }}
+                style={{ border: 0, background: 'none', fontSize: 20, lineHeight: 1, padding: '1px 12px', borderRadius: 99, cursor: 'pointer', color: 'var(--ink2)', fontWeight: 600 }}>›</button>
+            </div>
+            <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 20, color: 'var(--ink)' }}>{weekLabel}</div>
+          </div>
 
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:5 }}>
+          <WeekCalendar
+            weekStart={weekStart}
+            meetings={meetings}
+            onSlotClick={(date, startMin, endMin) => openNewMeeting(date, startMin, endMin)}
+            onDragCreate={(date, startMin, endMin) => openNewMeeting(date, startMin, endMin)}
+            onEventClick={openEditMeeting}
+          />
+        </div>
+      )}
+
+      {/* ── Month view ── */}
+      {view === 'month' && (
+        <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          {/* Calendar grid */}
+          <div style={{ flex: '1 1 460px', border: '1px solid var(--line)', borderRadius: 12, background: '#fff', overflow: 'hidden' }}>
+            {/* Month nav header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--line)', background: 'var(--paper)' }}>
+              <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 20, color: 'var(--ink)' }}>{MONTHS[mo]} {year}</div>
+              <div style={{ display: 'inline-flex', gap: 3, background: '#fff', border: '1px solid var(--line)', borderRadius: 99, padding: 3 }}>
+                {[['‹', -1], ['·', 0], ['›', 1]].map(([l, n]) => (
+                  <button key={l} type="button"
+                    onClick={() => n === 0
+                      ? setCalMonth(new Date(now.getFullYear(), now.getMonth(), 1))
+                      : setCalMonth(new Date(year, mo + n, 1))}
+                    style={{ border: 0, background: 'none', fontFamily: 'var(--fm)', fontSize: n === 0 ? 14 : 22, lineHeight: 1, padding: n === 0 ? '5px 10px' : '1px 11px', borderRadius: 99, cursor: 'pointer', color: 'var(--ink2)', fontWeight: n === 0 ? 400 : 600 }}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ padding: '12px 14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4 }}>
                 {DOW.map(d => (
-                  <div key={d} style={{ fontFamily:'var(--fm)', fontSize:11, fontWeight:600, color:'var(--ink3)', textAlign:'center', padding:'6px 0 4px', textTransform:'uppercase', letterSpacing:'.06em' }}>{d}</div>
+                  <div key={d} style={{ fontFamily: 'var(--fm)', fontSize: 11, fontWeight: 600, color: 'var(--ink3)', textAlign: 'center', padding: '6px 0 4px', textTransform: 'uppercase', letterSpacing: '.06em' }}>{d}</div>
                 ))}
                 {calDays.map((d, i) => {
-                  const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-                  const evs = byDay[key] || [];
-                  const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                  const key     = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+                  const evs     = byDay[key] || [];
+                  const iso     = toIso(d);
                   const isOther    = d.getMonth() !== mo;
                   const isToday    = d.toDateString() === now.toDateString();
                   const isSelected = d.toDateString() === selDay.toDateString();
                   return (
                     <div key={i}
-                      onClick={() => { setSelDay(new Date(d)); openScheduleModal(iso); }}
-                      style={{ minHeight:72, border:`1px solid ${isSelected?'var(--accent)':isToday?'var(--info)':'var(--line)'}`, borderRadius:9, padding:'7px 9px', cursor:'pointer', background:isSelected?'var(--accent-light)':isToday?'#f5f7ff':'#fff', display:'flex', flexDirection:'column', gap:4, opacity:isOther?.35:1, transition:'.13s', boxShadow:isSelected?'0 0 0 2px var(--accent)':isToday?'0 0 0 2px var(--info)':'none' }}>
-                      <div style={{ fontFamily:'var(--fd)', fontSize:15, fontWeight:700, color: isToday?'var(--accent)':isSelected?'var(--accent-dark)':'var(--ink)', lineHeight:1 }}>{d.getDate()}</div>
-                      <div style={{ display:'flex', flexDirection:'column', gap:2, marginTop:3, overflow:'hidden' }}>
-                        {evs.slice(0,3).map((m,j) => (
-                          <div key={j} style={{ display:'flex', alignItems:'center', gap:3 }}>
-                            <span style={{ width:6, height:6, borderRadius:'50%', background:STATUS_COLOR[m.status]??'#ccc', flexShrink:0 }} />
-                            <span style={{ fontFamily:'var(--fm)', fontSize:11, fontWeight:600, color:'var(--ink2)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', lineHeight:1.3 }}>
+                      onClick={() => { setSelDay(new Date(d)); openNewMeeting(iso); }}
+                      style={{ minHeight: 72, border: `1px solid ${isSelected ? 'var(--accent)' : isToday ? 'var(--info, #4dabf7)' : 'var(--line)'}`, borderRadius: 8, padding: '7px 9px', cursor: 'pointer', background: isSelected ? 'var(--accent-light, #eef2ff)' : isToday ? '#f5f7ff' : '#fff', display: 'flex', flexDirection: 'column', gap: 3, opacity: isOther ? .35 : 1, transition: '.13s', boxShadow: isSelected ? '0 0 0 2px var(--accent)' : isToday ? '0 0 0 2px var(--info, #4dabf7)' : 'none' }}>
+                      <div style={{ fontFamily: 'var(--fd)', fontSize: 15, fontWeight: 700, color: isToday ? 'var(--accent)' : isSelected ? 'var(--accent)' : 'var(--ink)', lineHeight: 1 }}>{d.getDate()}</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 2, overflow: 'hidden' }}>
+                        {evs.slice(0, 3).map((m, j) => (
+                          <div key={j} onClick={e => { e.stopPropagation(); openEditMeeting(m); }} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_COLOR[m.status] ?? '#ccc', flexShrink: 0 }} />
+                            <span style={{ fontFamily: 'var(--fm)', fontSize: 11, fontWeight: 600, color: 'var(--ink2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.3 }}>
                               {m.pair.unit_a.abbr}×{m.pair.unit_b.abbr}
                             </span>
                           </div>
                         ))}
-                        {evs.length>3 && <span style={{ fontFamily:'var(--fm)', fontSize:11, fontWeight:600, color:'var(--ink3)' }}>+{evs.length-3}</span>}
+                        {evs.length > 3 && <span style={{ fontFamily: 'var(--fm)', fontSize: 11, fontWeight: 600, color: 'var(--ink3)' }}>+{evs.length - 3}</span>}
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              <div style={{ marginTop:18 }}>
-                <div style={{ fontFamily:'var(--fm)', fontSize:11, letterSpacing:'.07em', textTransform:'uppercase', color:'var(--ink3)', marginBottom:8 }}>On {fmt(selDay)}</div>
+              {/* Selected day detail */}
+              <div style={{ marginTop: 16, borderTop: '1px solid var(--line)', paddingTop: 14 }}>
+                <div style={{ fontFamily: 'var(--fm)', fontSize: 11, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--ink3)', marginBottom: 8 }}>On {fmt(selDay)}</div>
                 {selDayMeetings.length === 0
-                  ? <div style={{ fontSize:13, color:'var(--ink3)' }}>Nothing scheduled.</div>
+                  ? <div style={{ fontSize: 13, color: 'var(--ink3)' }}>Nothing scheduled.</div>
                   : selDayMeetings.map(m => {
                       const A = m.pair.unit_a, B = m.pair.unit_b;
                       return (
-                        <div key={m.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 11px', border:'1px solid var(--line)', borderRadius:9, marginBottom:7, background:'#fff', fontSize:13 }}>
-                          <span style={{ fontFamily:'var(--fm)', fontSize:11, color:'var(--ink3)', minWidth:52 }}>{m.time??''}</span>
+                        <div key={m.id}
+                          onClick={() => openEditMeeting(m)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 11px', border: '1px solid var(--line)', borderRadius: 9, marginBottom: 7, background: '#fff', fontSize: 13, cursor: 'pointer' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--paper)'}
+                          onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                        >
+                          <span style={{ fontFamily: 'var(--fm)', fontSize: 11, color: 'var(--ink3)', minWidth: 52 }}>{m.time ?? ''}</span>
                           <Badge status={m.status} />
-                          <span style={{ display:'flex', alignItems:'center', gap:6 }}>
-                            <i style={{ width:8, height:8, borderRadius:'50%', background:A.color, display:'inline-block' }} />{A.abbr} ×
-                            <i style={{ width:8, height:8, borderRadius:'50%', background:B.color, display:'inline-block' }} />{B.abbr}
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <i style={{ width: 8, height: 8, borderRadius: '50%', background: A.color, display: 'inline-block' }} />{A.abbr} ×
+                            <i style={{ width: 8, height: 8, borderRadius: '50%', background: B.color, display: 'inline-block' }} />{B.abbr}
                           </span>
+                          {m.title && <span style={{ fontFamily: 'var(--fm)', fontSize: 11, color: 'var(--ink3)', marginLeft: 'auto', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</span>}
                         </div>
                       );
                     })
                 }
               </div>
-            </CCardBody>
-          </CCard>
-        </CCol>
+            </div>
+          </div>
 
-        {/* Upcoming meetings (right column on desktop) */}
-        <CCol lg={6}>
-          <CCard style={{ height: '100%' }}>
-            <CCardBody>
-              <div className="d-flex align-items-center justify-content-between mb-3">
-                <h5 style={{ fontFamily:'var(--fd)', fontWeight:600, fontSize:18, margin:0 }}>Upcoming meetings</h5>
-                <span style={{ fontFamily:'var(--fm)', fontSize:11, color:'var(--ink3)' }}>soonest first</span>
-              </div>
+          {/* Upcoming sidebar */}
+          <div style={{ flex: '1 1 320px', border: '1px solid var(--line)', borderRadius: 12, background: '#fff', overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--line)', background: 'var(--paper)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 16, color: 'var(--ink)' }}>Upcoming meetings</div>
+              <span style={{ fontFamily: 'var(--fm)', fontSize: 11, color: 'var(--ink3)' }}>soonest first</span>
+            </div>
+            <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 600, overflowY: 'auto' }}>
               {upcoming.length === 0
-                ? <div style={{ fontSize:13, color:'var(--ink3)' }}>No upcoming meetings scheduled yet.</div>
+                ? <div style={{ fontSize: 13, color: 'var(--ink3)', textAlign: 'center', padding: 20 }}>No upcoming meetings.</div>
                 : upcoming.map(m => {
                     const d = new Date(m.date);
                     const A = m.pair.unit_a, B = m.pair.unit_b;
-                    const tg = m.notify_units?.map(u => u.abbr).join(', ') || 'none';
                     return (
-                      <div key={m.id} style={{ display:'grid', gridTemplateColumns:'auto 1fr auto', gap:14, alignItems:'center', border:'1px solid var(--line)', borderRadius:12, padding:'14px 16px', marginBottom:10, background:'var(--paper)' }}>
-                        <div style={{ textAlign:'center', minWidth:62 }}>
-                          <div style={{ fontFamily:'var(--fd)', fontWeight:700, fontSize:22, lineHeight:1 }}>{d.getDate()}</div>
-                          <div style={{ fontFamily:'var(--fm)', fontSize:11, textTransform:'uppercase', color:'var(--ink3)' }}>{MONTHS_S[d.getMonth()]}</div>
-                        </div>
-                        <div>
-                          <div style={{ fontFamily:'var(--fd)', fontWeight:600, fontSize:18, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                            <span style={{ width:11, height:11, borderRadius:'50%', background:A.color, display:'inline-block' }} />{A.name}
-                            <span style={{ color:'var(--ink3)', fontWeight:400 }}>×</span>
-                            <span style={{ width:11, height:11, borderRadius:'50%', background:B.color, display:'inline-block' }} />{B.name}
+                      <div key={m.id} style={{ border: '1px solid var(--line)', borderRadius: 10, padding: '12px 14px', background: 'var(--paper)' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                          {/* Date badge */}
+                          <div style={{ textAlign: 'center', minWidth: 48, flexShrink: 0 }}>
+                            <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 20, lineHeight: 1 }}>{d.getDate()}</div>
+                            <div style={{ fontFamily: 'var(--fm)', fontSize: 10, textTransform: 'uppercase', color: 'var(--ink3)' }}>{MONTHS_S[d.getMonth()]}</div>
                           </div>
-                          <div style={{ fontFamily:'var(--fm)', fontSize:11, color:'var(--ink3)', marginTop:5, display:'flex', gap:10, flexWrap:'wrap' }}>
-                            <span>🕘 {m.time??'—'}</span><span>🔔 {tg}</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            {m.title && <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 14, color: 'var(--ink)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</div>}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: A.color, display: 'inline-block', flexShrink: 0 }} />
+                              <span style={{ fontFamily: 'var(--fm)', fontSize: 12, fontWeight: 600, color: 'var(--ink)' }}>{A.abbr}</span>
+                              <span style={{ color: 'var(--ink3)', fontSize: 12 }}>×</span>
+                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: B.color, display: 'inline-block', flexShrink: 0 }} />
+                              <span style={{ fontFamily: 'var(--fm)', fontSize: 12, fontWeight: 600, color: 'var(--ink)' }}>{B.abbr}</span>
+                            </div>
+                            <div style={{ fontFamily: 'var(--fm)', fontSize: 11, color: 'var(--ink3)', marginTop: 4, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                              {m.time && <span>🕘 {m.time}</span>}
+                              <span>{m.mtype === 'Online' ? '💻 Online' : '📍 In-person'}</span>
+                            </div>
                           </div>
-                          {m.agenda && <div style={{ fontFamily:'var(--fm)', fontSize:11, color:'var(--ink3)', marginTop:4 }}>{m.agenda}</div>}
                         </div>
-                        <div className="d-flex flex-column gap-2">
-                          <CButton size="sm" color="dark" variant="outline" onClick={() => window.open(`mailto:?subject=MS-CMS Meeting: ${A.abbr} × ${B.abbr} on ${m.date}&body=Date: ${m.date}%0ATime: ${m.time??''}%0AAgenda: ${m.agenda??''}`)}>
-                            ✉ Email
-                          </CButton>
-                          <CButton size="sm" color="dark" variant="outline" onClick={() => openReschedule(m)} style={{ fontFamily:'var(--fb)', fontSize:11 }}>
-                            ✎ Reschedule
-                          </CButton>
-                          <CButton size="sm" color="danger" onClick={() => cancelMutation.mutate(m.id)}>Cancel</CButton>
-                        </div>
+                        {isAdmin && (
+                          <div style={{ display: 'flex', gap: 6, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--line)' }}>
+                            <button type="button" onClick={() => openEditMeeting(m)}
+                              style={{ flex: 1, border: '1px solid var(--line)', borderRadius: 6, padding: '5px 0', fontSize: 11, fontFamily: 'var(--fb)', fontWeight: 600, cursor: 'pointer', background: 'var(--paper)', color: 'var(--ink2)' }}>
+                              ✎ Edit
+                            </button>
+                            <button type="button" onClick={() => openCancel(m)}
+                              style={{ flex: 1, border: '1px solid #fca5a5', borderRadius: 6, padding: '5px 0', fontSize: 11, fontFamily: 'var(--fb)', fontWeight: 600, cursor: 'pointer', background: '#fff5f5', color: '#ef4444' }}>
+                              ✕ Cancel
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })
               }
-            </CCardBody>
-          </CCard>
-        </CCol>
-      </CRow>
-
-      {/* Reschedule modal */}
-      {reschedMeeting && (
-        <CModal visible={reschedModalOpen} onClose={() => { setReschedModalOpen(false); setReschedMeeting(null); }} size="md" alignment="center">
-          <CModalHeader style={{ borderBottom:'1px solid var(--line)', paddingBottom:14 }}>
-            <CModalTitle style={{ fontFamily:'var(--fd)', fontWeight:600, fontSize:18 }}>
-              Reschedule — {reschedMeeting.pair.unit_a.abbr} × {reschedMeeting.pair.unit_b.abbr}
-            </CModalTitle>
-          </CModalHeader>
-          <CModalBody style={{ padding:'20px 24px', display:'flex', flexDirection:'column', gap:14 }}>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 140px', gap:10 }}>
-              <div>
-                <CFormLabel style={LBL}>New date</CFormLabel>
-                <DateField value={rDate} onChange={v => setRDate(v)} />
-              </div>
-              <div>
-                <CFormLabel style={LBL}>Time</CFormLabel>
-                <TimeField value={rTime} onChange={setRTime} />
-              </div>
             </div>
-            <div>
-              <CFormLabel style={LBL}>Agenda <span style={{ textTransform:'none', opacity:.6 }}>(optional)</span></CFormLabel>
-              <CFormTextarea value={rAgenda} onChange={e => setRAgenda(e.target.value)} placeholder="Updated agenda…" rows={2} style={{ resize:'none' }} />
-            </div>
-          </CModalBody>
-          <CModalFooter style={{ borderTop:'1px solid var(--line)', paddingTop:14 }}>
-            <CButton color="secondary" variant="outline" onClick={() => { setReschedModalOpen(false); setReschedMeeting(null); }} style={{ fontFamily:'var(--fb)', fontSize:13 }}>Cancel</CButton>
-            <CButton color="dark" onClick={handleReschedule} disabled={rescheduleMutation.isPending} style={{ fontFamily:'var(--fb)', fontSize:13 }}>
-              {rescheduleMutation.isPending ? 'Saving…' : 'Save changes'}
-            </CButton>
-          </CModalFooter>
-        </CModal>
+          </div>
+        </div>
       )}
 
-      {/* Schedule meeting modal */}
-      <CModal visible={schedModalOpen} onClose={() => setSchedModalOpen(false)} size="md" alignment="center">
-        <CModalHeader style={{ borderBottom:'1px solid var(--line)', paddingBottom:14 }}>
-          <CModalTitle style={{ fontFamily:'var(--fd)', fontWeight:600, fontSize:18 }}>Schedule a meeting</CModalTitle>
-        </CModalHeader>
-        <CModalBody style={{ padding:'20px 24px', display:'flex', flexDirection:'column', gap:14 }}>
+      {/* ── D.O. Letters view ── */}
+      {view === 'doletters' && (
+        <DOLettersTab user={user} />
+      )}
 
-          <div>
-            <CFormLabel style={LBL}>Convergence unit pair</CFormLabel>
-            <CFormSelect value={fPair} onChange={e => { setFPair(e.target.value); setFNotify([]); }}>
-              <option value="">— Select a pair —</option>
-              {pairs.map(p => <option key={p.id} value={p.id}>{p.unit_a.name} × {p.unit_b.name}</option>)}
-            </CFormSelect>
-          </div>
+      {/* ── Event create/edit modal ── */}
+      {eventModal && (
+        <EventModal
+          initial={eventModal}
+          pairs={pairs}
+          meetings={meetings}
+          onSave={handleEventSave}
+          onClose={() => setEventModal(null)}
+          saving={createMutation.isPending || updateMutation.isPending}
+        />
+      )}
 
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 140px', gap:10 }}>
-            <div>
-              <CFormLabel style={LBL}>Date</CFormLabel>
-              <DateField value={fDate} onChange={v => setFDate(v)} />
-            </div>
-            <div>
-              <CFormLabel style={LBL}>Time</CFormLabel>
-              <TimeField value={fTime} onChange={setFTime} />
-            </div>
-          </div>
-
-          <div>
-            <CFormLabel style={LBL}>Meeting type</CFormLabel>
-            <div style={{ display:'inline-flex', background:'var(--paper)', border:'1px solid var(--line)', borderRadius:8, padding:3, gap:3 }}>
-              {['In-person','Online'].map(t => (
-                <button key={t} type="button" onClick={() => setFType(t)}
-                  style={{ border:'none', borderRadius:6, padding:'5px 16px', fontSize:13, fontFamily:'var(--fb)', fontWeight:600, cursor:'pointer', transition:'.13s', background:fType===t?'var(--accent)':'transparent', color:fType===t?'#fff':'var(--ink2)' }}>
-                  {t==='In-person'?'📍 In-person':'💻 Online'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {selectedPairUnits.length > 0 && (
-            <div>
-              <CFormLabel style={LBL}>Notify units</CFormLabel>
-              <div style={{ display:'flex', gap:8 }}>
-                {selectedPairUnits.map(u => (
-                  <label key={u.id} style={{ flex:1, display:'flex', alignItems:'center', gap:7, fontSize:13, cursor:'pointer', padding:'7px 10px', border:`1px solid ${fNotify.includes(u.id)?'var(--accent)':'var(--line)'}`, borderRadius:8, background:fNotify.includes(u.id)?'var(--accent-light)':'#fff', transition:'.13s' }}>
-                    <input type="checkbox" style={{ width:14, height:14, accentColor:'var(--accent)', flexShrink:0 }} checked={fNotify.includes(u.id)}
-                      onChange={e => setFNotify(n => e.target.checked ? [...n,u.id] : n.filter(x => x!==u.id))} />
-                    <span style={{ width:8, height:8, borderRadius:'50%', background:u.color, display:'inline-block', flexShrink:0 }} />
-                    <span style={{ fontWeight:500 }}>{u.abbr}</span>
-                    <span style={{ color:'var(--ink3)', fontSize:11, marginLeft:'auto' }}>{u.member_name}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div>
-            <CFormLabel style={LBL}>Agenda <span style={{ textTransform:'none', opacity:.6 }}>(optional)</span></CFormLabel>
-            <CFormTextarea value={fAgenda} onChange={e => setFAgenda(e.target.value)} placeholder="Purpose / points to cover…" rows={2} style={{ resize:'none' }} />
-          </div>
-
-        </CModalBody>
-        <CModalFooter style={{ borderTop:'1px solid var(--line)', paddingTop:14 }}>
-          <CButton color="secondary" variant="outline" onClick={() => setSchedModalOpen(false)} style={{ fontFamily:'var(--fb)', fontSize:13 }}>Cancel</CButton>
-          <CButton color="dark" onClick={handleSchedule} disabled={scheduleMutation.isPending || !fDate} style={{ fontFamily:'var(--fb)', fontSize:13, background:'#3b5bdb', borderColor:'#3b5bdb' }}>
-            {scheduleMutation.isPending ? 'Scheduling…' : 'Schedule meeting'}
-          </CButton>
-        </CModalFooter>
-      </CModal>
+      {/* ── Reason / cancel modal ── */}
+      {reasonModal && (
+        <ReasonModal
+          meeting={reasonModal.meeting}
+          action={reasonModal.action}
+          onConfirm={handleCancelConfirm}
+          onClose={() => setReasonModal(null)}
+          saving={cancelMutation.isPending}
+        />
+      )}
     </>
   );
 }

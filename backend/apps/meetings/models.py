@@ -7,11 +7,13 @@ class Meeting(models.Model):
     STATUS_CONDUCTED = 'conducted'
     STATUS_POSTPONED = 'postponed'
     STATUS_MISSED = 'missed'
+    STATUS_CANCELLED = 'cancelled'
     STATUS_CHOICES = [
         (STATUS_SCHEDULED, 'Scheduled'),
         (STATUS_CONDUCTED, 'Conducted'),
         (STATUS_POSTPONED, 'Postponed'),
         (STATUS_MISSED, 'Missed'),
+        (STATUS_CANCELLED, 'Cancelled'),
     ]
 
     TYPE_INPERSON = 'In-person'
@@ -24,10 +26,26 @@ class Meeting(models.Model):
     pair = models.ForeignKey('units.UnitPair', on_delete=models.CASCADE, related_name='meetings')
     date = models.DateField()
     time = models.TimeField(null=True, blank=True)
+    end_time = models.TimeField(null=True, blank=True)
     status = models.CharField(max_length=15, choices=STATUS_CHOICES, default=STATUS_SCHEDULED)
     mtype = models.CharField(max_length=15, choices=TYPE_CHOICES, default=TYPE_INPERSON)
     google_event_id = models.CharField(max_length=200, blank=True, default='')
     agenda = models.TextField(blank=True)
+    title = models.CharField(max_length=200, blank=True, default='')
+    description = models.TextField(blank=True, default='')
+    meet_link = models.CharField(max_length=300, blank=True, default='')
+    recurrence = models.CharField(
+        max_length=10,
+        choices=[
+            ('none', 'Does not repeat'),
+            ('daily', 'Daily'),
+            ('weekly', 'Weekly'),
+            ('monthly', 'Monthly'),
+            ('custom', 'Custom'),
+        ],
+        default='none',
+        blank=True,
+    )
     notify_units = models.ManyToManyField('units.ConvergenceUnit', blank=True, related_name='notified_meetings')
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
@@ -147,3 +165,30 @@ class MeetingNotHeld(models.Model):
 
     def __str__(self):
         return f'{self.status} — {self.meeting}'
+
+
+class MeetingHistory(models.Model):
+    ACTION_SCHEDULED   = 'scheduled'
+    ACTION_RESCHEDULED = 'rescheduled'
+    ACTION_CANCELLED   = 'cancelled'
+    ACTION_CHOICES = [
+        ('scheduled',   'Scheduled'),
+        ('rescheduled', 'Rescheduled'),
+        ('cancelled',   'Cancelled'),
+    ]
+    meeting    = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name='history')
+    action     = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    changed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='meeting_history')
+    reason     = models.TextField(blank=True, default='')
+    old_date   = models.DateField(null=True, blank=True)
+    new_date   = models.DateField(null=True, blank=True)
+    old_time   = models.TimeField(null=True, blank=True)
+    new_time   = models.TimeField(null=True, blank=True)
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'meetings_meetinghistory'
+        ordering = ['-changed_at']
+
+    def __str__(self):
+        return f'{self.action} — {self.meeting}'

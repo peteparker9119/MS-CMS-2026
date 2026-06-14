@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.units.models import ConvergenceUnit, UnitPair
-from .models import Meeting, MeetingMinutes, ActionPoint, ActionPointComment, MeetingNotHeld
+from .models import Meeting, MeetingMinutes, ActionPoint, ActionPointComment, MeetingNotHeld, MeetingHistory
 from .serializers import (
     MeetingListSerializer, MeetingMinutesSerializer,
     ActionPointSerializer, ActionPointCommentSerializer, MeetingNotHeldSerializer,
@@ -40,10 +40,11 @@ class MeetingViewSet(viewsets.ModelViewSet):
         ).prefetch_related(
             'notify_units',
             'minutes__action_points__comments',
+            'history',
         )
 
         user = self.request.user
-        if user.is_poc and user.unit:
+        if not user.is_admin and user.unit:
             qs = qs.filter(Q(pair__unit_a=user.unit) | Q(pair__unit_b=user.unit))
 
         # filters
@@ -66,8 +67,22 @@ class MeetingViewSet(viewsets.ModelViewSet):
 
         return qs
 
+    def perform_update(self, serializer):
+        old = self.get_object()
+        old_date = old.date
+        old_time = old.time
+        instance = serializer.save()
+        if instance.date != old_date or instance.time != old_time:
+            MeetingHistory.objects.create(
+                meeting=instance, action='rescheduled',
+                changed_by=self.request.user,
+                old_date=old_date, new_date=instance.date,
+                old_time=old_time, new_time=instance.time,
+            )
+
     def perform_create(self, serializer):
         meeting = serializer.save(created_by=self.request.user)
+        MeetingHistory.objects.create(meeting=meeting, action='scheduled', changed_by=self.request.user)
         from apps.notifications.utils import notify_users
         from django.contrib.auth import get_user_model
         User = get_user_model()
@@ -87,6 +102,21 @@ class MeetingViewSet(viewsets.ModelViewSet):
                 'mtype': meeting.mtype or 'In-person',
             },
         )
+
+    @action(detail=True, methods=['post'], url_path='cancel', permission_classes=[IsAdminOrReadOnly])
+    def cancel(self, request, pk=None):
+        meeting = self.get_object()
+        reason = request.data.get('reason', '')
+        old_date = meeting.date
+        old_time = meeting.time
+        meeting.status = Meeting.STATUS_CANCELLED
+        meeting.save(update_fields=['status'])
+        MeetingHistory.objects.create(
+            meeting=meeting, action='cancelled',
+            changed_by=request.user, reason=reason,
+            old_date=old_date, old_time=old_time,
+        )
+        return Response({'status': 'cancelled'})
 
     @action(detail=True, methods=['get', 'post'], url_path='minutes')
     def minutes(self, request, pk=None):
@@ -112,6 +142,9 @@ class MeetingViewSet(viewsets.ModelViewSet):
         validated = ser.validated_data
         validated.pop('action_points_input', None)
 
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
         # EC-07: wrap all MoM writes in a single transaction so a mid-write
         # failure can't leave minutes saved but action points or status missing.
         with transaction.atomic():
@@ -122,14 +155,25 @@ class MeetingViewSet(viewsets.ModelViewSet):
 
             if action_points_input:
                 mom.action_points.all().delete()
-                for i, text in enumerate(action_points_input):
-                    text = text.strip()
+                for i, ap_data in enumerate(action_points_input):
+                    # Support both plain strings (legacy) and structured dicts
+                    if isinstance(ap_data, str):
+                        text = ap_data.strip()
+                        assigned_to_id = None
+                        deadline = None
+                    else:
+                        text = (ap_data.get('text') or '').strip()
+                        assigned_to_id = ap_data.get('assigned_to')
+                        deadline = ap_data.get('deadline') or None
                     if text:
+                        assigned_to = User.objects.filter(pk=assigned_to_id).first() if assigned_to_id else None
                         ActionPoint.objects.create(
                             minutes=mom,
                             aid=_next_aid(),
                             text=text,
                             order=i,
+                            assigned_to=assigned_to,
+                            deadline=deadline,
                         )
 
             meeting.status = Meeting.STATUS_CONDUCTED
@@ -172,7 +216,7 @@ class ActionPointViewSet(viewsets.ModelViewSet):
         ).prefetch_related('comments')
 
         user = self.request.user
-        if user.is_poc and user.unit:
+        if not user.is_admin and user.unit:
             qs = qs.filter(
                 Q(minutes__meeting__pair__unit_a=user.unit) |
                 Q(minutes__meeting__pair__unit_b=user.unit)
@@ -282,7 +326,8 @@ class DashboardStatsView(APIView):
             meeting_qs = meeting_qs.filter(
                 Q(pair__unit_a__slug=unit_slug) | Q(pair__unit_b__slug=unit_slug)
             )
-        if request.user.is_poc and request.user.unit:
+        # Scope to user's unit for non-admin roles (poc + team)
+        if not request.user.is_admin and request.user.unit:
             meeting_qs = meeting_qs.filter(
                 Q(pair__unit_a=request.user.unit) | Q(pair__unit_b=request.user.unit)
             )
@@ -316,7 +361,7 @@ class DashboardStatsView(APIView):
 
 
 class DashboardMatrixView(APIView):
-    """Returns per-pair conducted/planned counts for the 7×7 matrix."""
+    """Returns per-pair conducted/planned counts for the convergence tile grid."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -324,6 +369,12 @@ class DashboardMatrixView(APIView):
         date_to = request.query_params.get('to')
 
         pairs = UnitPair.objects.select_related('unit_a', 'unit_b').all()
+
+        # Scope to user's unit for non-admin roles (poc + team)
+        user = request.user
+        if not user.is_admin and user.unit:
+            pairs = pairs.filter(Q(unit_a=user.unit) | Q(unit_b=user.unit))
+
         result = []
         for pair in pairs:
             qs = pair.meetings.all()
