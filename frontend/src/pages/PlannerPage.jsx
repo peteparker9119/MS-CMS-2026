@@ -276,7 +276,8 @@ export default function PlannerPage() {
   });
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
-  const openNewMeeting = (date, startMin = 9*60, endMin = 10*60) =>
+  // startMin/endMin only provided by slot-clicks; FAB button omits them → no pre-fill
+  const openNewMeeting = (date, startMin, endMin) =>
     setEventModal({ date: date instanceof Date ? toIso(date) : date, startMin, endMin });
 
   const openEditMeeting = (meeting) => setEventModal({
