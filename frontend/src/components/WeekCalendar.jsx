@@ -350,36 +350,38 @@ export default function WeekCalendar({
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ display:'flex', flexDirection:'column', height: height || 'calc(100vh - 148px)', background:C.bodyBg, borderRadius:8, boxShadow:'0 1px 2px rgba(60,64,67,.3),0 2px 6px rgba(60,64,67,.15)', overflow:'hidden', userSelect:'none' }}>
+    <div style={{ display:'flex', flexDirection:'column', height: height || 'calc(100vh - 148px)', background:C.bodyBg, overflow:'hidden', userSelect:'none' }}>
 
-      {/* ── Day header ── */}
-      <div style={{ display:'grid', gridTemplateColumns:`${GUTTER_W}px repeat(7,1fr)`, background:C.headerBg, borderBottom:`1px solid ${C.hourLine}`, flexShrink:0, boxShadow:'0 2px 3px rgba(0,0,0,.1)', zIndex:10 }}>
-        {/* GMT corner */}
-        <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'flex-end', padding:'8px 6px 10px', borderRight:`1px solid ${C.hourLine}` }}>
-          <span style={{ fontSize:9, color:C.timeLbl, fontFamily:'Roboto,sans-serif', letterSpacing:0 }}>
-            GMT{new Date().getTimezoneOffset() <= 0 ? `+${-new Date().getTimezoneOffset()/60}` : `-${new Date().getTimezoneOffset()/60}`}
-          </span>
+      {/* ── Scrollable container — header is sticky INSIDE so widths always match ── */}
+      <div ref={scrollEl} style={{ flex:1, overflowY:'scroll', overscrollBehavior:'contain', position:'relative' }}>
+
+        {/* ── Sticky day header ── */}
+        <div style={{ position:'sticky', top:0, zIndex:10, display:'grid', gridTemplateColumns:`${GUTTER_W}px repeat(7,1fr)`, background:C.headerBg, borderBottom:`1px solid ${C.hourLine}`, boxShadow:'0 2px 4px rgba(60,64,67,.1)' }}>
+          {/* GMT corner */}
+          <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'flex-end', padding:'8px 6px 10px', borderRight:`1px solid ${C.hourLine}` }}>
+            <span style={{ fontSize:9, color:C.timeLbl, fontFamily:'Roboto,sans-serif', letterSpacing:0 }}>
+              GMT{new Date().getTimezoneOffset() <= 0 ? `+${-new Date().getTimezoneOffset()/60}` : `-${new Date().getTimezoneOffset()/60}`}
+            </span>
+          </div>
+          {days.map((d, i) => {
+            const isToday = isoDate(d) === todayIso;
+            return (
+              <div key={i} style={{ textAlign:'center', padding:'10px 4px 12px', borderRight: i<6 ? `1px solid ${C.hourLine}` : 'none' }}>
+                <div style={{ fontFamily:'Roboto,sans-serif', fontSize:11, fontWeight:500, letterSpacing:'.8px', textTransform:'uppercase', color: isToday ? C.todayCircle : C.dayLbl }}>
+                  {DOW3[i]}
+                </div>
+                <div style={{ width:46, height:46, borderRadius:'50%', margin:'4px auto 2px', display:'flex', alignItems:'center', justifyContent:'center', background: isToday ? C.todayCircle : 'transparent', transition:'background .15s' }}>
+                  <span style={{ fontFamily:'Google Sans,Roboto,sans-serif', fontSize:24, fontWeight:400, color: isToday ? '#fff' : C.dateLbl, lineHeight:1 }}>
+                    {d.getDate()}
+                  </span>
+                </div>
+                <div style={{ fontFamily:'Roboto,sans-serif', fontSize:10, color: isToday ? C.todayCircle : C.timeLbl, fontWeight: isToday ? 500 : 400 }}>{MON3[d.getMonth()]}</div>
+              </div>
+            );
+          })}
         </div>
-        {days.map((d, i) => {
-          const isToday = isoDate(d) === todayIso;
-          return (
-            <div key={i} style={{ textAlign:'center', padding:'8px 4px 10px', borderRight: i<6 ? `1px solid ${C.hourLine}` : 'none' }}>
-              <div style={{ fontFamily:'Roboto,sans-serif', fontSize:11, fontWeight:500, letterSpacing:'.8px', textTransform:'uppercase', color: isToday ? C.todayCircle : C.dayLbl }}>
-                {DOW3[i]}
-              </div>
-              <div style={{ width:44, height:44, borderRadius:'50%', margin:'4px auto 2px', display:'flex', alignItems:'center', justifyContent:'center', background: isToday ? C.todayCircle : 'transparent' }}>
-                <span style={{ fontFamily:'Google Sans,Roboto,sans-serif', fontSize:22, fontWeight:400, color: isToday ? '#fff' : C.dateLbl, lineHeight:1 }}>
-                  {d.getDate()}
-                </span>
-              </div>
-              <div style={{ fontFamily:'Roboto,sans-serif', fontSize:10, color:C.timeLbl }}>{MON3[d.getMonth()]}</div>
-            </div>
-          );
-        })}
-      </div>
 
-      {/* ── Scrollable time grid ── */}
-      <div ref={scrollEl} style={{ flex:1, overflowY:'scroll', position:'relative', overscrollBehavior:'contain' }}>
+        {/* ── Time grid ── */}
         <div style={{ display:'grid', gridTemplateColumns:`${GUTTER_W}px repeat(7,1fr)`, position:'relative', minHeight:TOTAL_H }}>
 
           {/* ── Time gutter ── */}

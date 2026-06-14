@@ -122,15 +122,15 @@ function MiniCalendar({ meetings, onDateClick, weekStart }) {
   return (
     <div style={{ userSelect:'none' }}>
       {/* Month header */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'4px 4px 6px' }}>
-        <span style={{ fontFamily:GS, fontSize:13, fontWeight:500, color:'#3c4043' }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'4px 2px 8px' }}>
+        <span style={{ fontFamily:GS, fontSize:14, fontWeight:500, color:'#3c4043', cursor:'default' }}>
           {MONTHS_S[mo]} {yr}
         </span>
-        <div style={{ display:'flex' }}>
+        <div style={{ display:'flex', gap:2 }}>
           {[['‹', -1],['›', 1]].map(([icon, dir]) => (
             <button key={dir} type="button"
               onClick={() => setMonth(new Date(yr, mo + dir, 1))}
-              style={{ border:0, background:'none', cursor:'pointer', width:28, height:28, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', color:'#5f6368', fontSize:16 }}
+              style={{ border:0, background:'none', cursor:'pointer', width:30, height:30, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', color:'#5f6368', fontSize:18, fontWeight:300 }}
               onMouseEnter={e => e.currentTarget.style.background='#f1f3f4'}
               onMouseLeave={e => e.currentTarget.style.background='none'}>
               {icon}
@@ -140,14 +140,14 @@ function MiniCalendar({ meetings, onDateClick, weekStart }) {
       </div>
 
       {/* DOW headers */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', marginBottom:2 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', marginBottom:4 }}>
         {['S','M','T','W','T','F','S'].map((d,i) => (
-          <div key={i} style={{ fontFamily:RI, fontSize:10, color:'#70757a', textAlign:'center', padding:'2px 0', fontWeight:500 }}>{d}</div>
+          <div key={i} style={{ fontFamily:RI, fontSize:11, color:'#70757a', textAlign:'center', padding:'3px 0', fontWeight:500, letterSpacing:'.3px' }}>{d}</div>
         ))}
       </div>
 
       {/* Day cells */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:1 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)' }}>
         {days.map((d, i) => {
           const iso      = toIso(d);
           const isOther  = d.getMonth() !== mo;
@@ -157,12 +157,12 @@ function MiniCalendar({ meetings, onDateClick, weekStart }) {
           return (
             <div key={i} onClick={() => onDateClick(new Date(d))}
               title={iso}
-              style={{ width:26, height:26, margin:'1px auto', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', borderRadius:'50%', cursor:'pointer', position:'relative', background: isToday ? '#1a73e8' : inWeek ? '#e8f0fe' : 'transparent', color: isToday ? '#fff' : isOther ? '#bdc1c6' : '#3c4043' }}
+              style={{ height:32, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', borderRadius:'50%', cursor:'pointer', position:'relative', background: isToday ? '#1a73e8' : inWeek ? '#e8f0fe' : 'transparent', color: isToday ? '#fff' : isOther ? '#bdc1c6' : '#3c4043', transition:'background .12s' }}
               onMouseEnter={e => { if (!isToday) e.currentTarget.style.background = inWeek ? '#d2e3fc' : '#f1f3f4'; }}
               onMouseLeave={e => { e.currentTarget.style.background = isToday ? '#1a73e8' : inWeek ? '#e8f0fe' : 'transparent'; }}>
-              <span style={{ fontFamily:RI, fontSize:11, fontWeight: isToday?700:400, lineHeight:1 }}>{d.getDate()}</span>
+              <span style={{ fontFamily:RI, fontSize:12, fontWeight: isToday?700:400, lineHeight:1 }}>{d.getDate()}</span>
               {hasEvent && !isToday && (
-                <span style={{ width:4, height:4, borderRadius:'50%', background: inWeek ? '#1a73e8' : '#70757a', position:'absolute', bottom:1, left:'50%', transform:'translateX(-50%)' }} />
+                <span style={{ width:4, height:4, borderRadius:'50%', background: inWeek ? '#1a73e8' : '#70757a', position:'absolute', bottom:2, left:'50%', transform:'translateX(-50%)' }} />
               )}
             </div>
           );
@@ -184,45 +184,47 @@ function UpcomingList({ meetings, onOpen }) {
   );
 
   if (list.length === 0) return (
-    <div style={{ padding:'12px 8px 4px', fontFamily:RI, fontSize:12, color:'#80868b', textAlign:'center' }}>
+    <div style={{ padding:'16px 4px 4px', fontFamily:RI, fontSize:12, color:'#80868b', textAlign:'center', lineHeight:1.6 }}>
+      <div style={{ fontSize:28, marginBottom:6 }}>📅</div>
       No upcoming meetings
     </div>
   );
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:4, marginTop:8 }}>
-      <div style={{ fontFamily:RI, fontSize:11, color:'#80868b', textTransform:'uppercase', letterSpacing:'.5px', padding:'4px 4px 2px' }}>
+    <div style={{ display:'flex', flexDirection:'column', gap:2, marginTop:4 }}>
+      <div style={{ fontFamily:RI, fontSize:11, fontWeight:600, color:'#5f6368', textTransform:'uppercase', letterSpacing:'.8px', padding:'4px 4px 6px' }}>
         Upcoming
       </div>
       {list.map(m => {
         const A = m.pair?.unit_a, B = m.pair?.unit_b;
         const d = new Date(m.date + 'T00:00:00');
         const isToday = m.date === toIso(now);
+        const color = A?.color || STATUS_COLOR.scheduled;
         return (
           <div key={m.id} onClick={() => onOpen(m)}
-            style={{ display:'flex', gap:8, alignItems:'flex-start', padding:'6px 6px', borderRadius:8, cursor:'pointer' }}
+            style={{ display:'flex', gap:10, alignItems:'flex-start', padding:'8px 6px', borderRadius:10, cursor:'pointer', transition:'background .12s' }}
             onMouseEnter={e => e.currentTarget.style.background='#f1f3f4'}
             onMouseLeave={e => e.currentTarget.style.background='transparent'}>
             {/* Date badge */}
-            <div style={{ flexShrink:0, width:30, textAlign:'center' }}>
-              <div style={{ fontFamily:RI, fontSize:9, textTransform:'uppercase', color: isToday ? '#1a73e8' : '#80868b', letterSpacing:'.5px' }}>
+            <div style={{ flexShrink:0, width:36, textAlign:'center', background: isToday ? '#e8f0fe' : '#f8f9fa', borderRadius:8, padding:'4px 0' }}>
+              <div style={{ fontFamily:RI, fontSize:9, textTransform:'uppercase', color: isToday ? '#1a73e8' : '#70757a', letterSpacing:'.5px', fontWeight:600 }}>
                 {MONTHS_S[d.getMonth()]}
               </div>
-              <div style={{ fontFamily:GS, fontSize:15, fontWeight:400, color: isToday ? '#1a73e8' : '#3c4043', lineHeight:1 }}>
+              <div style={{ fontFamily:GS, fontSize:17, fontWeight:500, color: isToday ? '#1a73e8' : '#3c4043', lineHeight:1.2 }}>
                 {d.getDate()}
               </div>
             </div>
             {/* Event info */}
-            <div style={{ flex:1, minWidth:0 }}>
-              {m.title && (
-                <div style={{ fontFamily:GS, fontSize:12, fontWeight:500, color:'#3c4043', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.title}</div>
-              )}
-              <div style={{ display:'flex', alignItems:'center', gap:4, marginTop: m.title ? 1 : 0 }}>
-                <span style={{ width:8, height:8, borderRadius:'50%', background: A?.color || '#1a73e8', flexShrink:0 }} />
-                <span style={{ fontFamily:RI, fontSize:11, color:'#5f6368' }}>{A?.abbr} × {B?.abbr}</span>
+            <div style={{ flex:1, minWidth:0, paddingTop:1 }}>
+              <div style={{ fontFamily:GS, fontSize:12, fontWeight:500, color:'#3c4043', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                {m.title || `${A?.abbr} × ${B?.abbr}`}
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:5, marginTop:3 }}>
+                <span style={{ width:7, height:7, borderRadius:'50%', background:color, flexShrink:0 }} />
+                <span style={{ fontFamily:RI, fontSize:11, color:'#5f6368', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{A?.abbr} × {B?.abbr}</span>
               </div>
               {m.time && (
-                <div style={{ fontFamily:RI, fontSize:11, color:'#80868b', marginTop:1 }}>{fmtTime(m.time)}</div>
+                <div style={{ fontFamily:RI, fontSize:11, color:'#80868b', marginTop:2 }}>{fmtTime(m.time)}</div>
               )}
             </div>
           </div>
@@ -372,7 +374,7 @@ export default function PlannerPage() {
         <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
 
           {/* ── Left sidebar ── */}
-          <div style={{ width:220, flexShrink:0, borderRight:'1px solid #e8eaed', background:'#fff', overflowY:'auto', padding:'16px 12px 20px' }}>
+          <div style={{ width:268, flexShrink:0, borderRight:'1px solid #e8eaed', background:'#fff', overflowY:'auto', padding:'16px 16px 24px' }}>
             {/* Mini month calendar */}
             <MiniCalendar
               meetings={meetings}
@@ -381,7 +383,7 @@ export default function PlannerPage() {
             />
 
             {/* Divider */}
-            <div style={{ height:1, background:'#e8eaed', margin:'14px -4px' }} />
+            <div style={{ height:1, background:'#e8eaed', margin:'16px -8px' }} />
 
             {/* Upcoming */}
             <UpcomingList meetings={meetings} onOpen={openEditMeeting} />
