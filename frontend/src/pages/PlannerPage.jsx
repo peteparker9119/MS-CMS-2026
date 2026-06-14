@@ -467,7 +467,7 @@ export default function PlannerPage() {
             ))}
           </div>
 
-          {(isAdmin || user?.role === 'poc') && (
+          {(isAdmin || user?.role === 'poc') && view !== 'week' && (
             <button
               type="button"
               onClick={() => openNewMeeting(todayIso)}
@@ -482,28 +482,56 @@ export default function PlannerPage() {
       {/* ── Week view ── */}
       {view === 'week' && (
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-          {/* Mini calendar sidebar */}
-          <MiniCalendar
-            meetings={meetings}
-            onDateClick={(d) => {
-              setWeekStart(getMonday(d));
-            }}
-            weekStart={weekStart}
-          />
+          {/* Mini calendar sidebar — sticky */}
+          <div style={{ flexShrink: 0, position: 'sticky', top: 16 }}>
+            <MiniCalendar
+              meetings={meetings}
+              onDateClick={(d) => setWeekStart(getMonday(d))}
+              weekStart={weekStart}
+            />
+            {/* Quick new meeting button below mini calendar */}
+            {(isAdmin || user?.role === 'poc') && (
+              <button
+                type="button"
+                onClick={() => openNewMeeting(todayIso)}
+                style={{ marginTop: 12, width: '100%', border: 'none', borderRadius: 8, padding: '8px 0', fontSize: 13, fontFamily: 'var(--fb)', fontWeight: 600, cursor: 'pointer', background: '#1a73e8', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+                onMouseEnter={e => e.currentTarget.style.background = '#1765cc'}
+                onMouseLeave={e => e.currentTarget.style.background = '#1a73e8'}
+              >
+                + New meeting
+              </button>
+            )}
+          </div>
 
           {/* Week grid + nav */}
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {/* Week navigation */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ display: 'inline-flex', background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 99, padding: 3, gap: 0 }}>
-                <button type="button" onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d); }}
-                  style={{ border: 0, background: 'none', fontSize: 20, lineHeight: 1, padding: '1px 12px', borderRadius: 99, cursor: 'pointer', color: 'var(--ink2)', fontWeight: 600 }}>‹</button>
-                <button type="button" onClick={() => setWeekStart(getMonday(new Date()))}
-                  style={{ border: 0, background: 'none', fontFamily: 'var(--fm)', fontSize: 12, lineHeight: 1, padding: '5px 12px', borderRadius: 99, cursor: 'pointer', color: 'var(--ink2)' }}>Today</button>
-                <button type="button" onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d); }}
-                  style={{ border: 0, background: 'none', fontSize: 20, lineHeight: 1, padding: '1px 12px', borderRadius: 99, cursor: 'pointer', color: 'var(--ink2)', fontWeight: 600 }}>›</button>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* GCal-style week navigation bar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button type="button" onClick={() => setWeekStart(getMonday(new Date()))}
+                style={{ border: '1px solid #dadce0', borderRadius: 6, padding: '6px 14px', fontSize: 13, fontFamily: 'Google Sans,Roboto,sans-serif', fontWeight: 500, cursor: 'pointer', background: '#fff', color: '#3c4043' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#f8f9fa'}
+                onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                Today
+              </button>
+              <div style={{ display: 'inline-flex', border: '1px solid #dadce0', borderRadius: 6, overflow: 'hidden' }}>
+                <button type="button"
+                  onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d); }}
+                  style={{ border: 'none', borderRight: '1px solid #dadce0', background: '#fff', width: 36, height: 34, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5f6368' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#f8f9fa'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="15,18 9,12 15,6"/></svg>
+                </button>
+                <button type="button"
+                  onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d); }}
+                  style={{ border: 'none', background: '#fff', width: 36, height: 34, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5f6368' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#f8f9fa'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9,18 15,12 9,6"/></svg>
+                </button>
               </div>
-              <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 20, color: 'var(--ink)' }}>{weekLabel}</div>
+              <h2 style={{ fontFamily: 'Google Sans,Roboto,sans-serif', fontSize: 20, fontWeight: 400, color: '#3c4043', margin: 0 }}>
+                {weekLabel}
+              </h2>
             </div>
 
             <WeekCalendar

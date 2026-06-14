@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 
 // ── Layout constants ─────────────────────────────────────────────────────────
-const HOUR_START  = 0;        // show full 24h (like GCal)
+const HOUR_START  = 0;        // start at midnight (auto-scroll brings to current time)
 const HOUR_END    = 24;
 const TOTAL_HRS   = HOUR_END - HOUR_START;
 const ROW_H       = 48;       // px per hour  (12px per 15 min)
