@@ -12,30 +12,41 @@ function minToTime(min) {
   const c = Math.max(0, Math.min(min, 23 * 60 + 59));
   return `${String(Math.floor(c / 60)).padStart(2, '0')}:${String(c % 60).padStart(2, '0')}`;
 }
+function fmtDisp(t) {
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  const ap = h >= 12 ? 'PM' : 'AM';
+  const hr = h > 12 ? h - 12 : h === 0 ? 12 : h;
+  return m === 0 ? `${hr} ${ap}` : `${hr}:${String(m).padStart(2, '0')} ${ap}`;
+}
+function fmtDateLong(iso) {
+  if (!iso) return null;
+  const d = new Date(iso + 'T00:00:00');
+  const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${DOW[d.getDay()]}, ${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}`;
+}
+function tzLabel() {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone.replace(/_/g,' '); } catch { return 'Local time'; }
+}
 function randPart(n) {
-  return Array.from({ length: n }, () => 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]).join('');
+  return Array.from({ length: n }, () => 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random()*26)]).join('');
 }
 function generateMeet() {
   return `https://meet.google.com/${randPart(3)}-${randPart(4)}-${randPart(3)}`;
 }
-function tzLabel() {
-  try { return Intl.DateTimeFormat().resolvedOptions().timeZone.replace(/_/g, ' '); } catch { return 'Local time'; }
-}
-
-// ── Fonts ─────────────────────────────────────────────────────────────────────
-const GS = 'Google Sans,Roboto,sans-serif';
-const RI = 'Roboto,sans-serif';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
-const BLUE    = '#1a73e8';
-const BLUE_BG = '#e8f0fe';
-const BLUE_BD = '#c5d9f1';
-const LINE    = '#dadce0';
-const INK     = '#3c4043';
-const INK2    = '#5f6368';
-const INK3    = '#80868b';
+const GS   = 'Google Sans,Roboto,sans-serif';
+const RI   = 'Roboto,sans-serif';
+const BLUE = '#1a73e8';
+const BBG  = '#e8f0fe';
+const LINE = '#dadce0';
+const INK  = '#3c4043';
+const INK2 = '#5f6368';
+const INK3 = '#80868b';
 
-// ── SVG Icons ─────────────────────────────────────────────────────────────────
+// ── Icons ─────────────────────────────────────────────────────────────────────
 function Ic({ size = 20, color = INK2, children }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -51,15 +62,16 @@ const IcMapPin = () => <Ic><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z
 const IcVideo  = () => <Ic><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></Ic>;
 const IcUsers  = () => <Ic><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></Ic>;
 const IcText   = () => <Ic><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></Ic>;
-const IcCheck  = ({ color = BLUE }) => <Ic size={16} color={color}><polyline points="20 6 9 17 4 12"/></Ic>;
 const IcX      = () => <Ic size={18}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></Ic>;
+const IcEdit   = () => <Ic size={14} color={INK3}><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4z"/></Ic>;
+const IcCheck  = ({ color = BLUE }) => <Ic size={16} color={color}><polyline points="20 6 9 17 4 12"/></Ic>;
 function IcStatus({ color }) { return <Ic color={color}><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></Ic>; }
 
-// ── Field row (icon + content) ─────────────────────────────────────────────────
-function FR({ icon, children, alignTop = false }) {
+// ── Field row ─────────────────────────────────────────────────────────────────
+function FR({ icon, children }) {
   return (
-    <div style={{ display: 'flex', gap: 14, padding: '7px 0', alignItems: alignTop ? 'flex-start' : 'flex-start' }}>
-      <div style={{ width: 22, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: 9 }}>
+    <div style={{ display: 'flex', gap: 14, padding: '10px 0', alignItems: 'flex-start' }}>
+      <div style={{ width: 22, flexShrink: 0, paddingTop: 11, display: 'flex', justifyContent: 'center' }}>
         {icon}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
@@ -67,37 +79,122 @@ function FR({ icon, children, alignTop = false }) {
   );
 }
 
-// ── Divider ───────────────────────────────────────────────────────────────────
-const HR = () => <div style={{ height: 1, background: '#f1f3f4', margin: '2px 0' }} />;
+// ── Thin divider ──────────────────────────────────────────────────────────────
+const HR = () => <div style={{ height: 1, background: '#f1f3f4', margin: '0 0' }} />;
 
-// ── Time select chips ─────────────────────────────────────────────────────────
+// ── Time options (every 15 min) ───────────────────────────────────────────────
 const TIME_OPTS = (() => {
   const list = [];
   for (let h = 0; h < 24; h++)
     for (let m = 0; m < 60; m += 15) {
-      const v = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      const v = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
       const ap = h >= 12 ? 'PM' : 'AM';
-      const hr = h > 12 ? h - 12 : h === 0 ? 12 : h;
-      list.push({ v, l: `${hr}:${String(m).padStart(2, '0')} ${ap}` });
+      const hr = h > 12 ? h-12 : h===0 ? 12 : h;
+      list.push({ v, l: `${hr}:${String(m).padStart(2,'0')} ${ap}` });
     }
   return list;
 })();
 
-function TimeChip({ value, onChange }) {
+// ── Date + Time SANDWICH ──────────────────────────────────────────────────────
+// Collapsed: shows "Mon, 13 Jun 2026 · 5:00 PM – 6:00 PM (1h)" as one clickable row
+// Expanded:  DateField calendar + start/end time selects (no pre-fills until user picks)
+function DateTimeSandwich({ date, startTime, endTime, onDateChange, onStartChange, onEndChange, durStr }) {
+  const [open, setOpen] = useState(!date); // start open if no date yet
+
+  const dateLabel  = fmtDateLong(date);
+  const startLabel = fmtDisp(startTime);
+  const endLabel   = fmtDisp(endTime);
+  const hasTimes   = !!(startTime || endTime);
+
+  const timeSelStyle = (val) => ({
+    flex: 1, minWidth: 100, border: `1px solid ${LINE}`, borderRadius: 8,
+    padding: '8px 10px', fontSize: 13, fontFamily: GS, outline: 'none',
+    cursor: 'pointer', background: '#fff',
+    color: val ? INK : INK3,
+  });
+
+  if (!open && dateLabel) {
+    return (
+      <div onClick={() => setOpen(true)}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+          padding: '8px 12px', borderRadius: 10, cursor: 'pointer',
+          background: '#f8f9fa', border: `1px solid transparent`,
+          transition: 'all .12s',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.background='#f1f3f4'; e.currentTarget.style.borderColor=LINE; }}
+        onMouseLeave={e => { e.currentTarget.style.background='#f8f9fa'; e.currentTarget.style.borderColor='transparent'; }}>
+        {/* Date */}
+        <span style={{ fontFamily: GS, fontSize: 14, fontWeight: 400, color: INK }}>{dateLabel}</span>
+        {/* Time range */}
+        {hasTimes && (
+          <>
+            <span style={{ color: '#bdc1c6', fontSize: 16, lineHeight: 1 }}>·</span>
+            <span style={{ fontFamily: GS, fontSize: 14, color: INK }}>
+              {startLabel || '—'}{' '}<span style={{ color: INK3 }}>–</span>{' '}{endLabel || '—'}
+            </span>
+            {durStr && (
+              <span style={{ fontFamily: RI, fontSize: 11, color: INK3, background: '#e8eaed', borderRadius: 8, padding: '2px 8px' }}>
+                {durStr}
+              </span>
+            )}
+          </>
+        )}
+        <IcEdit />
+      </div>
+    );
+  }
+
   return (
-    <select value={value} onChange={e => onChange(e.target.value)}
-      style={{
-        border: `1px solid ${LINE}`, borderRadius: 8, padding: '6px 10px',
-        fontSize: 13, fontFamily: GS, color: INK, background: '#fff',
-        outline: 'none', cursor: 'pointer',
-        minWidth: 96, fontWeight: 500,
-      }}
-      onFocus={e => { e.target.style.borderColor = BLUE; e.target.style.boxShadow = `0 0 0 2px ${BLUE}22`; }}
-      onBlur={e  => { e.target.style.borderColor = LINE;  e.target.style.boxShadow = 'none'; }}>
-      {TIME_OPTS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
-    </select>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* Date picker */}
+      <DateField value={date} onChange={onDateChange} placeholder="Add date" />
+
+      {/* Start – End time */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <select value={startTime} onChange={e => onStartChange(e.target.value)}
+          style={timeSelStyle(startTime)}
+          onFocus={e => { e.target.style.borderColor=BLUE; e.target.style.color=INK; }}
+          onBlur={e  => { e.target.style.borderColor=LINE; }}>
+          <option value="">Start time</option>
+          {TIME_OPTS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+        </select>
+
+        <span style={{ color: INK2, fontFamily: RI, fontSize: 15, flexShrink: 0 }}>–</span>
+
+        <select value={endTime} onChange={e => onEndChange(e.target.value)}
+          style={timeSelStyle(endTime)}
+          onFocus={e => { e.target.style.borderColor=BLUE; e.target.style.color=INK; }}
+          onBlur={e  => { e.target.style.borderColor=LINE; }}>
+          <option value="">End time</option>
+          {TIME_OPTS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+        </select>
+
+        {durStr && (
+          <span style={{ fontFamily: RI, fontSize: 12, color: INK3, flexShrink: 0, background: '#f1f3f4', borderRadius: 8, padding: '4px 8px' }}>
+            {durStr}
+          </span>
+        )}
+      </div>
+
+      {/* Timezone */}
+      <div style={{ fontFamily: RI, fontSize: 11, color: INK3, paddingLeft: 2 }}>
+        {tzLabel()}
+      </div>
+
+      {/* Collapse to sandwich when date is chosen */}
+      {dateLabel && (
+        <button type="button" onClick={() => setOpen(false)}
+          style={{ alignSelf: 'flex-start', border: `1px solid ${LINE}`, borderRadius: 16, padding: '4px 16px', fontSize: 12, fontFamily: GS, cursor: 'pointer', background: '#fff', color: BLUE, fontWeight: 500 }}
+          onMouseEnter={e => e.currentTarget.style.background = BBGF}
+          onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+          Done
+        </button>
+      )}
+    </div>
   );
 }
+const BBGF = '#e8f0fe'; // reuse
 
 // ── Custom recurrence panel ────────────────────────────────────────────────────
 const DOW7 = ['S','M','T','W','T','F','S'];
@@ -110,59 +207,46 @@ function CustomRecurrencePanel({ value, onChange }) {
   const [endDate,  setEndDate]  = useState(value?.endDate  ?? '');
   const [endCount, setEndCount] = useState(value?.endCount ?? 5);
 
-  const emit = (patch) => {
+  const emit = patch => {
     const next = { every, unit, days, ends, endDate, endCount, ...patch };
     onChange(next);
-    if (patch.every    !== undefined) setEvery(patch.every);
-    if (patch.unit     !== undefined) setUnit(patch.unit);
-    if (patch.days     !== undefined) setDays(patch.days);
-    if (patch.ends     !== undefined) setEnds(patch.ends);
-    if (patch.endDate  !== undefined) setEndDate(patch.endDate);
-    if (patch.endCount !== undefined) setEndCount(patch.endCount);
+    if (patch.every    != null) setEvery(patch.every);
+    if (patch.unit     != null) setUnit(patch.unit);
+    if (patch.days     != null) setDays(patch.days);
+    if (patch.ends     != null) setEnds(patch.ends);
+    if (patch.endDate  != null) setEndDate(patch.endDate);
+    if (patch.endCount != null) setEndCount(patch.endCount);
   };
 
-  const toggleDay = i => {
-    const nd = days.includes(i) ? days.filter(d => d !== i) : [...days, i];
-    emit({ days: nd });
-  };
-
-  const fld = (extra = {}) => ({
-    border: `1px solid ${LINE}`, borderRadius: 8, padding: '6px 10px',
-    fontSize: 13, fontFamily: RI, color: INK, background: '#fff', outline: 'none',
-    ...extra,
-  });
+  const fld = (extra={}) => ({ border:`1px solid ${LINE}`, borderRadius:8, padding:'7px 10px', fontSize:13, fontFamily:RI, color:INK, background:'#fff', outline:'none', ...extra });
 
   return (
-    <div style={{ marginTop: 8, padding: '16px 18px', background: '#f8f9fa', borderRadius: 12, border: `1px solid ${LINE}`, display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div style={{ marginTop:8, padding:'16px 18px', background:'#f8f9fa', borderRadius:12, border:`1px solid ${LINE}`, display:'flex', flexDirection:'column', gap:14 }}>
       {/* Every N unit */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <span style={{ fontFamily: RI, fontSize: 13, color: INK2, minWidth: 80 }}>Repeat every</span>
+      <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+        <span style={{ fontFamily:RI, fontSize:13, color:INK2 }}>Repeat every</span>
         <input type="number" min={1} max={99} value={every}
-          onChange={e => emit({ every: Math.max(1, parseInt(e.target.value) || 1) })}
-          style={{ ...fld({ width: 58, textAlign: 'center' }) }} />
-        <select value={unit} onChange={e => emit({ unit: e.target.value })}
-          style={{ ...fld({ cursor: 'pointer', minWidth: 90 }) }}>
-          {['day','week','month','year'].map(u => (
-            <option key={u} value={u}>{u}{every > 1 ? 's' : ''}</option>
-          ))}
+          onChange={e => emit({ every: Math.max(1, parseInt(e.target.value)||1) })}
+          style={{ ...fld({ width:56, textAlign:'center' }) }} />
+        <select value={unit} onChange={e => emit({ unit:e.target.value })}
+          style={{ ...fld({ cursor:'pointer', minWidth:90 }) }}>
+          {['day','week','month','year'].map(u => <option key={u} value={u}>{u}{every>1?'s':''}</option>)}
         </select>
       </div>
 
-      {/* Day-of-week buttons (weekly) */}
+      {/* Day-of-week (weekly) */}
       {unit === 'week' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <span style={{ fontFamily: RI, fontSize: 12, color: INK2, fontWeight: 500 }}>On</span>
-          <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <span style={{ fontFamily:RI, fontSize:12, color:INK2, fontWeight:500 }}>On</span>
+          <div style={{ display:'flex', gap:6 }}>
             {DOW7.map((d, i) => {
               const on = days.includes(i);
               return (
-                <button key={i} type="button" onClick={() => toggleDay(i)}
-                  style={{
-                    width: 36, height: 36, borderRadius: '50%', border: `1.5px solid ${on ? BLUE : LINE}`,
-                    background: on ? BLUE : '#fff', color: on ? '#fff' : INK,
-                    fontFamily: GS, fontSize: 12, fontWeight: on ? 600 : 400, cursor: 'pointer',
-                    transition: 'all .12s', flexShrink: 0,
-                  }}>
+                <button key={i} type="button" onClick={() => {
+                  const nd = on ? days.filter(x=>x!==i) : [...days,i];
+                  emit({ days:nd });
+                }}
+                  style={{ width:36, height:36, borderRadius:'50%', border:`1.5px solid ${on?BLUE:LINE}`, background:on?BLUE:'#fff', color:on?'#fff':INK, fontFamily:GS, fontSize:12, fontWeight:on?600:400, cursor:'pointer', transition:'all .12s' }}>
                   {d}
                 </button>
               );
@@ -172,25 +256,25 @@ function CustomRecurrencePanel({ value, onChange }) {
       )}
 
       {/* Ends */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <span style={{ fontFamily: RI, fontSize: 12, color: INK2, fontWeight: 500 }}>Ends</span>
-        {[['never','Never'], ['date','On date'], ['count','After']].map(([v, l]) => (
-          <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-            <input type="radio" name="recur-ends" value={v} checked={ends === v}
-              onChange={() => emit({ ends: v })}
-              style={{ accentColor: BLUE, width: 15, height: 15, flexShrink: 0 }} />
-            <span style={{ fontFamily: RI, fontSize: 13, color: INK, minWidth: 60 }}>{l}</span>
-            {v === 'date' && ends === 'date' && (
-              <input type="date" value={endDate} onChange={e => emit({ endDate: e.target.value })}
+      <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+        <span style={{ fontFamily:RI, fontSize:12, color:INK2, fontWeight:500 }}>Ends</span>
+        {[['never','Never'],['date','On date'],['count','After']].map(([v,l]) => (
+          <label key={v} style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer' }}>
+            <input type="radio" name="recur-ends" value={v} checked={ends===v}
+              onChange={() => emit({ ends:v })}
+              style={{ accentColor:BLUE, width:15, height:15, flexShrink:0 }} />
+            <span style={{ fontFamily:RI, fontSize:13, color:INK, minWidth:60 }}>{l}</span>
+            {v==='date' && ends==='date' && (
+              <input type="date" value={endDate} onChange={e => emit({ endDate:e.target.value })}
                 style={{ ...fld() }} />
             )}
-            {v === 'count' && ends === 'count' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {v==='count' && ends==='count' && (
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                 <input type="number" min={1} max={999} value={endCount}
-                  onChange={e => emit({ endCount: Math.max(1, parseInt(e.target.value) || 1) })}
-                  style={{ ...fld({ width: 64, textAlign: 'center' }) }} />
-                <span style={{ fontFamily: RI, fontSize: 13, color: INK2 }}>
-                  occurrence{endCount !== 1 ? 's' : ''}
+                  onChange={e => emit({ endCount:Math.max(1,parseInt(e.target.value)||1) })}
+                  style={{ ...fld({ width:64, textAlign:'center' }) }} />
+                <span style={{ fontFamily:RI, fontSize:13, color:INK2 }}>
+                  occurrence{endCount!==1?'s':''}
                 </span>
               </div>
             )}
@@ -203,131 +287,100 @@ function CustomRecurrencePanel({ value, onChange }) {
 
 // ── Unit filter + pair picker ─────────────────────────────────────────────────
 function UnitPicker({ pairs, pairId, onPairChange, notify, onNotifyChange }) {
-  // Unique units from all pairs
   const units = useMemo(() => {
     const map = {};
-    pairs.forEach(p => { map[p.unit_a.id] = p.unit_a; map[p.unit_b.id] = p.unit_b; });
-    return Object.values(map).sort((a, b) => a.abbr.localeCompare(b.abbr));
+    pairs.forEach(p => { map[p.unit_a.id]=p.unit_a; map[p.unit_b.id]=p.unit_b; });
+    return Object.values(map).sort((a,b) => a.abbr.localeCompare(b.abbr));
   }, [pairs]);
 
-  // Unit filter (multi-select chips)
   const [filter, setFilter] = useState(() => {
     if (!pairId) return [];
     const p = pairs.find(p => p.id === parseInt(pairId));
     return p ? [p.unit_a.id, p.unit_b.id] : [];
   });
 
-  const toggleFilter = uid =>
-    setFilter(f => f.includes(uid) ? f.filter(id => id !== uid) : [...f, uid]);
+  const toggleFilter = uid => setFilter(f => f.includes(uid) ? f.filter(id=>id!==uid) : [...f,uid]);
 
-  const clearFilter = () => { setFilter([]); };
+  const visiblePairs = useMemo(() =>
+    filter.length===0 ? pairs : pairs.filter(p => filter.some(uid => p.unit_a.id===uid || p.unit_b.id===uid)),
+    [pairs, filter]
+  );
 
-  // Pairs that include at least one filtered unit (or all if no filter)
-  const visiblePairs = useMemo(() => {
-    if (filter.length === 0) return pairs;
-    return pairs.filter(p =>
-      filter.some(uid => p.unit_a.id === uid || p.unit_b.id === uid)
-    );
-  }, [pairs, filter]);
+  const selPair = pairId ? pairs.find(p=>p.id===parseInt(pairId)) : null;
 
-  const selPair = pairId ? pairs.find(p => p.id === parseInt(pairId)) : null;
-
-  const selectPair = (p) => {
+  const selectPair = p => {
     onPairChange(String(p.id));
     onNotifyChange(() => [p.unit_a.id, p.unit_b.id]);
   };
 
-  const Chip = ({ on, color, onClick, children }) => (
-    <button type="button" onClick={onClick}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 5,
-        padding: '5px 13px',
-        border: `1.5px solid ${on ? (color || BLUE) : LINE}`,
-        borderRadius: 20, cursor: 'pointer', transition: 'all .12s',
-        background: on ? (color ? color + '18' : BLUE_BG) : '#fff',
-        fontFamily: GS, fontSize: 12,
-        color: on ? (color || BLUE) : INK2,
-        fontWeight: on ? 600 : 400,
-        flexShrink: 0,
-      }}>
-      {children}
-    </button>
-  );
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {/* ── Team filter chips ── */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        <Chip on={filter.length === 0} onClick={clearFilter}>All</Chip>
-        {units.map(u => (
-          <Chip key={u.id} on={filter.includes(u.id)} color={u.color} onClick={() => toggleFilter(u.id)}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: u.color || BLUE, display: 'inline-block', flexShrink: 0 }} />
-            {u.abbr}
-          </Chip>
-        ))}
-      </div>
-
-      {/* ── Pair cards ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {visiblePairs.length === 0 ? (
-          <div style={{ padding: '10px 0', fontFamily: RI, fontSize: 13, color: INK3 }}>
-            No convergence pairs match the selected teams.
-          </div>
-        ) : visiblePairs.map(p => {
-          const sel   = pairId === String(p.id);
-          const colorA = p.unit_a.color || BLUE;
-          const colorB = p.unit_b.color || '#34a853';
+    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+      {/* Filter chips */}
+      <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+        {/* All */}
+        <button type="button" onClick={() => setFilter([])}
+          style={{ padding:'4px 13px', border:`1.5px solid ${filter.length===0?BLUE:LINE}`, borderRadius:20, cursor:'pointer', transition:'all .12s', background:filter.length===0?BBGF:'#fff', fontFamily:GS, fontSize:12, color:filter.length===0?BLUE:INK2, fontWeight:filter.length===0?600:400 }}>
+          All
+        </button>
+        {units.map(u => {
+          const on = filter.includes(u.id);
+          const c  = u.color || BLUE;
           return (
-            <button key={p.id} type="button" onClick={() => selectPair(p)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
-                border: `1.5px solid ${sel ? BLUE : LINE}`,
-                borderRadius: 10, cursor: 'pointer',
-                background: sel ? BLUE_BG : '#fff',
-                transition: 'all .12s', textAlign: 'left', width: '100%', boxSizing: 'border-box',
-              }}
-              onMouseEnter={e => { if (!sel) { e.currentTarget.style.background = '#f8f9fa'; e.currentTarget.style.borderColor = '#bdc1c6'; } }}
-              onMouseLeave={e => { if (!sel) { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = LINE; } }}>
-              {/* Color pair dots */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
-                <span style={{ width: 11, height: 11, borderRadius: '50%', background: colorA, display: 'inline-block' }} />
-                <span style={{ fontSize: 10, color: INK3, fontWeight: 400 }}>×</span>
-                <span style={{ width: 11, height: 11, borderRadius: '50%', background: colorB, display: 'inline-block' }} />
-              </div>
-              {/* Abbr */}
-              <span style={{ fontFamily: GS, fontSize: 13, fontWeight: sel ? 600 : 500, color: sel ? BLUE : INK, flex: 1, minWidth: 0 }}>
-                {p.unit_a.abbr} × {p.unit_b.abbr}
-              </span>
-              {/* Full name (muted) */}
-              <span style={{ fontFamily: RI, fontSize: 11, color: INK3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180, flexShrink: 1 }}>
-                {p.unit_a.name} × {p.unit_b.name}
-              </span>
-              {sel && (
-                <span style={{ flexShrink: 0, marginLeft: 4 }}>
-                  <IcCheck />
-                </span>
-              )}
+            <button key={u.id} type="button" onClick={() => toggleFilter(u.id)}
+              style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'4px 12px', border:`1.5px solid ${on?c:LINE}`, borderRadius:20, cursor:'pointer', transition:'all .12s', background:on?c+'18':'#fff', fontFamily:GS, fontSize:12, color:on?c:INK2, fontWeight:on?600:400 }}>
+              <span style={{ width:7, height:7, borderRadius:'50%', background:c, display:'inline-block' }} />
+              {u.abbr}
             </button>
           );
         })}
       </div>
 
-      {/* ── Notify chips ── */}
+      {/* Pair cards */}
+      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+        {visiblePairs.length===0 ? (
+          <div style={{ padding:'8px 2px', fontFamily:RI, fontSize:13, color:INK3 }}>
+            No pairs match the selected teams.
+          </div>
+        ) : visiblePairs.map(p => {
+          const sel = pairId===String(p.id);
+          const cA  = p.unit_a.color || BLUE;
+          const cB  = p.unit_b.color || '#34a853';
+          return (
+            <button key={p.id} type="button" onClick={() => selectPair(p)}
+              style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', border:`1.5px solid ${sel?BLUE:LINE}`, borderRadius:10, cursor:'pointer', background:sel?BBGF:'#fff', transition:'all .12s', textAlign:'left', width:'100%', boxSizing:'border-box' }}
+              onMouseEnter={e => { if(!sel){ e.currentTarget.style.background='#f8f9fa'; e.currentTarget.style.borderColor='#bdc1c6'; } }}
+              onMouseLeave={e => { if(!sel){ e.currentTarget.style.background='#fff'; e.currentTarget.style.borderColor=LINE; } }}>
+              <div style={{ display:'flex', alignItems:'center', gap:3, flexShrink:0 }}>
+                <span style={{ width:10, height:10, borderRadius:'50%', background:cA, display:'inline-block' }} />
+                <span style={{ fontSize:10, color:INK3 }}>×</span>
+                <span style={{ width:10, height:10, borderRadius:'50%', background:cB, display:'inline-block' }} />
+              </div>
+              <span style={{ fontFamily:GS, fontSize:13, fontWeight:sel?600:500, color:sel?BLUE:INK, flex:1, minWidth:0 }}>
+                {p.unit_a.abbr} × {p.unit_b.abbr}
+              </span>
+              <span style={{ fontFamily:RI, fontSize:11, color:INK3, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:180 }}>
+                {p.unit_a.name} × {p.unit_b.name}
+              </span>
+              {sel && <span style={{ flexShrink:0, marginLeft:4 }}><IcCheck /></span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Notify chips */}
       {selPair && (
         <div>
-          <div style={{ fontFamily: RI, fontSize: 11, color: INK3, textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>
-            Notify teams
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ fontFamily:RI, fontSize:11, color:INK3, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6 }}>Notify teams</div>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
             {[selPair.unit_a, selPair.unit_b].map(u => {
               const checked = notify.includes(u.id);
               return (
-                <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 12px', border: `1.5px solid ${checked ? BLUE : LINE}`, borderRadius: 20, background: checked ? BLUE_BG : '#fff', cursor: 'pointer', transition: 'all .12s', userSelect: 'none' }}>
+                <label key={u.id} style={{ display:'flex', alignItems:'center', gap:7, padding:'6px 12px', border:`1.5px solid ${checked?BLUE:LINE}`, borderRadius:20, background:checked?BBGF:'#fff', cursor:'pointer', transition:'all .12s', userSelect:'none' }}>
                   <input type="checkbox" checked={checked}
-                    onChange={() => onNotifyChange(n => checked ? n.filter(x => x !== u.id) : [...n, u.id])}
-                    style={{ width: 14, height: 14, accentColor: BLUE, margin: 0 }} />
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: u.color, display: 'inline-block', flexShrink: 0 }} />
-                  <span style={{ fontFamily: GS, fontSize: 13, color: checked ? BLUE : INK, fontWeight: checked ? 500 : 400 }}>{u.abbr}</span>
+                    onChange={() => onNotifyChange(n => checked ? n.filter(x=>x!==u.id) : [...n,u.id])}
+                    style={{ width:14, height:14, accentColor:BLUE, margin:0 }} />
+                  <span style={{ width:8, height:8, borderRadius:'50%', background:u.color, display:'inline-block', flexShrink:0 }} />
+                  <span style={{ fontFamily:GS, fontSize:13, color:checked?BLUE:INK, fontWeight:checked?500:400 }}>{u.abbr}</span>
                 </label>
               );
             })}
@@ -338,78 +391,78 @@ function UnitPicker({ pairs, pairId, onPairChange, notify, onNotifyChange }) {
   );
 }
 
-// ── Status options ────────────────────────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
 const STATUS_OPTIONS = [
-  { v: 'scheduled', l: 'Scheduled', color: BLUE      },
-  { v: 'conducted', l: 'Conducted', color: '#0b8043' },
-  { v: 'postponed', l: 'Postponed', color: '#e37400' },
-  { v: 'missed',    l: 'Missed',    color: '#d93025' },
-  { v: 'cancelled', l: 'Cancelled', color: INK3      },
+  { v:'scheduled', l:'Scheduled', color:BLUE      },
+  { v:'conducted', l:'Conducted', color:'#0b8043' },
+  { v:'postponed', l:'Postponed', color:'#e37400' },
+  { v:'missed',    l:'Missed',    color:'#d93025' },
+  { v:'cancelled', l:'Cancelled', color:INK3      },
 ];
-
-// ── Recurrence options ────────────────────────────────────────────────────────
 const RECURRENCE = [
-  { v: 'none',    l: 'Does not repeat' },
-  { v: 'daily',   l: 'Every day'       },
-  { v: 'weekly',  l: 'Every week'      },
-  { v: 'monthly', l: 'Every month'     },
-  { v: 'custom',  l: 'Custom…'         },
+  { v:'none',    l:'Does not repeat' },
+  { v:'daily',   l:'Every day'       },
+  { v:'weekly',  l:'Every week'      },
+  { v:'monthly', l:'Every month'     },
+  { v:'custom',  l:'Custom…'         },
 ];
 
-// ── Main EventModal ───────────────────────────────────────────────────────────
-export default function EventModal({ initial, pairs, meetings, onSave, onClose, saving = false }) {
+// ── Main modal ────────────────────────────────────────────────────────────────
+export default function EventModal({ initial, pairs, meetings, onSave, onClose, saving=false }) {
   const editing  = initial?.meeting ?? null;
   const titleRef = useRef(null);
 
   const toIso = d => d instanceof Date
-    ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    : (d || '');
+    ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    : (d||'');
 
-  const initDate  = editing?.date  || toIso(initial?.date) || '';
-  const initStart = minToTime(initial?.startMin ?? (editing?.time ? timeToMin(editing.time) : 9 * 60));
-  const initEnd   = minToTime(initial?.endMin   ?? (editing?.end_time ? timeToMin(editing.end_time) : timeToMin(initStart) + 60));
+  const initDate  = editing?.date || toIso(initial?.date) || '';
+  // Only pre-fill times from slot-click (initial.startMin) or from existing meeting
+  const initStart = editing?.time     || (initial?.startMin != null ? minToTime(initial.startMin) : '');
+  const initEnd   = editing?.end_time || (initial?.endMin   != null ? minToTime(initial.endMin)   : '');
 
   const [title,       setTitle]       = useState(editing?.title       || '');
   const [date,        setDate]        = useState(initDate);
-  const [startTime,   setStartTime]   = useState(editing?.time        || initStart);
-  const [endTime,     setEndTime]     = useState(editing?.end_time    || initEnd);
+  const [startTime,   setStartTime]   = useState(initStart);
+  const [endTime,     setEndTime]     = useState(initEnd);
   const [recurrence,  setRecurrence]  = useState(editing?.recurrence  || 'none');
   const [customRec,   setCustomRec]   = useState(null);
   const [mtype,       setMtype]       = useState(editing?.mtype       || 'In-person');
   const [meetLink,    setMeetLink]    = useState(editing?.meet_link   || '');
   const [pairId,      setPairId]      = useState(editing?.pair?.id ? String(editing.pair.id) : '');
-  const [notify,      setNotify]      = useState(() => editing?.notify_units?.map(u => u.id) || []);
+  const [notify,      setNotify]      = useState(() => editing?.notify_units?.map(u=>u.id) || []);
   const [description, setDescription] = useState(editing?.description || '');
   const [meetStatus,  setMeetStatus]  = useState(editing?.status      || 'scheduled');
   const [location,    setLocation]    = useState(editing?.location    || '');
 
   useEffect(() => { titleRef.current?.focus(); }, []);
 
-  // Auto-extend end time to preserve duration when start changes
+  // Auto-extend end to preserve duration when start changes
   const prevStart = useRef(startTime);
   useEffect(() => {
+    if (!prevStart.current || !startTime) { prevStart.current = startTime; return; }
     const prevM = timeToMin(prevStart.current);
     const curM  = timeToMin(startTime);
     const endM  = timeToMin(endTime);
     const dur   = endM - prevM;
-    if (dur > 0 && dur <= 4 * 60) setEndTime(minToTime(curM + dur));
+    if (dur > 0 && dur <= 4*60) setEndTime(minToTime(curM + dur));
     prevStart.current = startTime;
   }, [startTime]); // eslint-disable-line
 
-  // Duration label
   const durStr = useMemo(() => {
+    if (!startTime || !endTime) return null;
     const d = timeToMin(endTime) - timeToMin(startTime);
     if (d <= 0) return null;
-    const h = Math.floor(d / 60), m = d % 60;
-    return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+    const h = Math.floor(d/60), m = d%60;
+    return h>0 ? (m>0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
   }, [startTime, endTime]);
 
   // Conflict detection
-  const sMin = timeToMin(startTime), eMin = timeToMin(endTime) || sMin + 60;
+  const sMin = timeToMin(startTime), eMin = timeToMin(endTime)||sMin+60;
   const hasConflict = useMemo(() => {
-    if (!pairId || !date || !startTime) return false;
-    return meetings.filter(m => m.date === date && m.id !== editing?.id && m.status !== 'cancelled')
-      .some(m => { const ms = timeToMin(m.time), me = m.end_time ? timeToMin(m.end_time) : ms + 60; return sMin < me && eMin > ms; });
+    if (!pairId||!date||!startTime) return false;
+    return meetings.filter(m=>m.date===date&&m.id!==editing?.id&&m.status!=='cancelled')
+      .some(m=>{ const ms=timeToMin(m.time),me=m.end_time?timeToMin(m.end_time):ms+60; return sMin<me&&eMin>ms; });
   }, [meetings, pairId, date, sMin, eMin, editing]);
 
   const handleSave = () => {
@@ -422,7 +475,7 @@ export default function EventModal({ initial, pairs, meetings, onSave, onClose, 
       end_time:        endTime   || null,
       description,
       meet_link:       meetLink.trim(),
-      recurrence:      recurrence === 'custom' ? JSON.stringify(customRec) : recurrence,
+      recurrence:      recurrence==='custom' ? JSON.stringify(customRec) : recurrence,
       mtype,
       location:        location.trim(),
       notify_unit_ids: notify.map(Number),
@@ -434,117 +487,74 @@ export default function EventModal({ initial, pairs, meetings, onSave, onClose, 
   const canSave = !!pairId && !!date && !saving;
 
   useEffect(() => {
-    const h = e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && canSave) handleSave(); };
+    const h = e => { if ((e.ctrlKey||e.metaKey)&&e.key==='Enter'&&canSave) handleSave(); };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   }, [canSave]); // eslint-disable-line
 
-  const statusColor = STATUS_OPTIONS.find(s => s.v === meetStatus)?.color || BLUE;
+  const statusColor = STATUS_OPTIONS.find(s=>s.v===meetStatus)?.color || BLUE;
 
-  // ── Shared select style ───────────────────────────────────────────────────
-  const selStyle = {
-    border: `1px solid ${LINE}`, borderRadius: 8, padding: '7px 10px',
-    fontSize: 13, fontFamily: RI, color: INK, background: '#fff',
-    outline: 'none', cursor: 'pointer', width: '100%',
+  const selSty = {
+    border:`1px solid ${LINE}`, borderRadius:8, padding:'8px 12px',
+    fontSize:14, fontFamily:GS, color:INK, background:'#fff',
+    outline:'none', cursor:'pointer', width:'100%',
   };
 
   return (
     <>
-      {/* No dark backdrop — modal floats GCal-style */}
-
+      {/* No backdrop — GCal-style floating modal */}
       <div style={{
-        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-        zIndex: 1050,
-        width: 'min(600px, 97vw)',
-        background: '#fff',
-        borderRadius: 14,
-        boxShadow: '0 8px 40px rgba(60,64,67,.30), 0 2px 10px rgba(60,64,67,.18)',
-        display: 'flex', flexDirection: 'column',
-        maxHeight: '92vh',
-        overflow: 'hidden',
-        fontFamily: GS,
+        position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
+        zIndex:1050, width:'min(600px,97vw)',
+        background:'#fff', borderRadius:14,
+        boxShadow:'0 8px 40px rgba(60,64,67,.30), 0 2px 10px rgba(60,64,67,.18)',
+        display:'flex', flexDirection:'column',
+        maxHeight:'92vh', overflow:'hidden',
+        fontFamily:GS,
       }}>
+        {/* Color bar */}
+        <div style={{ height:6, background:editing?statusColor:BLUE, flexShrink:0, borderRadius:'14px 14px 0 0' }} />
 
-        {/* ── Color bar ── */}
-        <div style={{ height: 6, background: editing ? statusColor : BLUE, flexShrink: 0, borderRadius: '14px 14px 0 0' }} />
-
-        {/* ── Title row ── */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 20px 10px', flexShrink: 0, borderBottom: `1px solid #f1f3f4` }}>
-          <input
-            ref={titleRef}
-            type="text"
-            value={title}
-            onChange={e => setTitle(e.target.value)}
+        {/* Title row */}
+        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'14px 20px 10px', flexShrink:0, borderBottom:`1px solid #f1f3f4` }}>
+          <input ref={titleRef} type="text" value={title} onChange={e=>setTitle(e.target.value)}
             placeholder="Add title"
-            style={{
-              flex: 1, border: 'none', borderBottom: `2px solid #e8eaed`,
-              borderRadius: 0, padding: '6px 0 10px',
-              fontSize: 22, fontFamily: GS, fontWeight: 400, color: INK,
-              background: 'transparent', outline: 'none', minWidth: 0,
-              transition: 'border-color .15s',
-            }}
-            onFocus={e => e.target.style.borderBottomColor = BLUE}
-            onBlur={e  => e.target.style.borderBottomColor = '#e8eaed'}
-          />
+            style={{ flex:1, border:'none', borderBottom:`2px solid #e8eaed`, borderRadius:0, padding:'6px 0 10px', fontSize:22, fontFamily:GS, fontWeight:400, color:INK, background:'transparent', outline:'none', minWidth:0, transition:'border-color .15s' }}
+            onFocus={e=>e.target.style.borderBottomColor=BLUE}
+            onBlur={e =>e.target.style.borderBottomColor='#e8eaed'} />
           <button type="button" onClick={onClose}
-            style={{ border: 'none', background: 'none', cursor: 'pointer', width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: INK2, flexShrink: 0 }}
-            onMouseEnter={e => e.currentTarget.style.background = '#f1f3f4'}
-            onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+            style={{ border:'none', background:'none', cursor:'pointer', width:36, height:36, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', color:INK2, flexShrink:0 }}
+            onMouseEnter={e=>e.currentTarget.style.background='#f1f3f4'}
+            onMouseLeave={e=>e.currentTarget.style.background='none'}>
             <IcX />
           </button>
         </div>
 
-        {/* ── Body ── */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 20px 20px', display: 'flex', flexDirection: 'column' }}>
+        {/* Scrollable body */}
+        <div style={{ flex:1, overflowY:'auto', padding:'4px 20px 20px', display:'flex', flexDirection:'column' }}>
 
-          {/* ── DATE + TIME sandwich ── */}
+          {/* ── DATE & TIME sandwich ── */}
           <FR icon={<IcClock />}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 4 }}>
-              {/* Sandwich row: date pill · start – end  dur */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <DateField
-                  value={date}
-                  onChange={setDate}
-                  placeholder="Pick a date"
-                  style={{ display: 'inline-block' }}
-                />
-                <span style={{ color: '#bdc1c6', fontSize: 16, lineHeight: 1 }}>·</span>
-                <TimeChip value={startTime} onChange={setStartTime} />
-                <span style={{ color: INK2, fontSize: 14, fontFamily: RI }}>–</span>
-                <TimeChip value={endTime} onChange={setEndTime} />
-                {durStr && (
-                  <span style={{ fontFamily: RI, fontSize: 12, color: INK3, background: '#f1f3f4', borderRadius: 10, padding: '3px 9px', flexShrink: 0 }}>
-                    {durStr}
-                  </span>
-                )}
-              </div>
-              {/* Timezone label */}
-              <div style={{ fontFamily: RI, fontSize: 11, color: INK3, paddingLeft: 2 }}>
-                {tzLabel()}
-              </div>
-            </div>
+            <DateTimeSandwich
+              date={date}
+              startTime={startTime}
+              endTime={endTime}
+              onDateChange={setDate}
+              onStartChange={setStartTime}
+              onEndChange={setEndTime}
+              durStr={durStr}
+            />
           </FR>
 
           <HR />
 
-          {/* ── RECURRENCE (own row, properly visible) ── */}
+          {/* ── RECURRENCE — full-width select, clearly visible ── */}
           <FR icon={<IcRepeat />}>
-            <div style={{ paddingTop: 4, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <select
-                value={recurrence}
-                onChange={e => setRecurrence(e.target.value)}
-                style={{
-                  ...selStyle,
-                  fontFamily: GS,
-                  borderRadius: 8,
-                  padding: '8px 12px',
-                  fontSize: 14,
-                  color: INK,
-                  fontWeight: 400,
-                }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              <select value={recurrence} onChange={e=>setRecurrence(e.target.value)} style={selSty}>
                 {RECURRENCE.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
               </select>
-              {recurrence === 'custom' && (
+              {recurrence==='custom' && (
                 <CustomRecurrencePanel value={customRec} onChange={setCustomRec} />
               )}
             </div>
@@ -553,57 +563,41 @@ export default function EventModal({ initial, pairs, meetings, onSave, onClose, 
           <HR />
 
           {/* ── LOCATION / TYPE ── */}
-          <FR icon={mtype === 'Online' ? <IcVideo /> : <IcMapPin />}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4 }}>
-              {/* Type toggle */}
-              <div style={{ display: 'flex', gap: 6 }}>
-                {[['In-person', '📍'], ['Online', '💻']].map(([v, ic]) => (
+          <FR icon={mtype==='Online' ? <IcVideo/> : <IcMapPin/>}>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={{ display:'flex', gap:6 }}>
+                {[['In-person','📍'],['Online','💻']].map(([v,ic]) => (
                   <button key={v} type="button"
-                    onClick={() => { setMtype(v); if (v === 'In-person') setMeetLink(''); }}
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 5,
-                      border: `1.5px solid ${mtype === v ? BLUE : LINE}`,
-                      borderRadius: 20, padding: '7px 16px', fontSize: 13, fontFamily: GS,
-                      cursor: 'pointer', transition: 'all .12s',
-                      background: mtype === v ? BLUE_BG : '#fff',
-                      color: mtype === v ? BLUE : INK2,
-                      fontWeight: mtype === v ? 500 : 400,
-                    }}>
+                    onClick={() => { setMtype(v); if(v==='In-person') setMeetLink(''); }}
+                    style={{ display:'inline-flex', alignItems:'center', gap:5, border:`1.5px solid ${mtype===v?BLUE:LINE}`, borderRadius:20, padding:'7px 16px', fontSize:13, fontFamily:GS, cursor:'pointer', transition:'all .12s', background:mtype===v?BBGF:'#fff', color:mtype===v?BLUE:INK2, fontWeight:mtype===v?500:400 }}>
                     <span>{ic}</span>{v}
                   </button>
                 ))}
               </div>
-
-              {mtype === 'In-person' && (
-                <input type="text" value={location} onChange={e => setLocation(e.target.value)}
+              {mtype==='In-person' && (
+                <input type="text" value={location} onChange={e=>setLocation(e.target.value)}
                   placeholder="Add location (optional)"
-                  style={{ ...selStyle }}
-                  onFocus={e => { e.target.style.borderColor = BLUE; e.target.style.boxShadow = `0 0 0 2px ${BLUE}22`; }}
-                  onBlur={e  => { e.target.style.borderColor = LINE;  e.target.style.boxShadow = 'none'; }} />
+                  style={{ ...selSty, fontSize:13 }}
+                  onFocus={e=>{e.target.style.borderColor=BLUE;e.target.style.boxShadow=`0 0 0 2px ${BLUE}22`;}}
+                  onBlur={e =>{e.target.style.borderColor=LINE; e.target.style.boxShadow='none';}} />
               )}
-
-              {mtype === 'Online' && (
+              {mtype==='Online' && (
                 meetLink ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', background: BLUE_BG, borderRadius: 8, border: `1px solid ${BLUE_BD}` }}>
-                    <span style={{ fontSize: 16 }}>📹</span>
+                  <div style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', background:BBGF, borderRadius:8, border:`1px solid #c5d9f1` }}>
+                    <span style={{ fontSize:16 }}>📹</span>
                     <a href={meetLink} target="_blank" rel="noreferrer"
-                      style={{ flex: 1, fontSize: 12, color: BLUE, wordBreak: 'break-all', fontFamily: RI, textDecoration: 'none' }}>
+                      style={{ flex:1, fontSize:12, color:BLUE, wordBreak:'break-all', fontFamily:RI, textDecoration:'none' }}>
                       {meetLink}
                     </a>
-                    <button type="button" onClick={() => setMeetLink('')}
-                      style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 11, color: INK2, fontFamily: RI, padding: '2px 6px', borderRadius: 4 }}
-                      onMouseEnter={e => e.currentTarget.style.background = BLUE_BD}
-                      onMouseLeave={e => e.currentTarget.style.background = 'none'}>
-                      Remove
-                    </button>
+                    <button type="button" onClick={()=>setMeetLink('')}
+                      style={{ border:'none', background:'none', cursor:'pointer', fontSize:11, color:INK2, fontFamily:RI, padding:'2px 6px', borderRadius:4 }}>Remove</button>
                   </div>
                 ) : (
-                  <button type="button" onClick={() => setMeetLink(generateMeet())}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 10, border: `1px solid ${LINE}`, borderRadius: 8, padding: '9px 14px', fontSize: 13, fontFamily: GS, cursor: 'pointer', background: '#fff', color: BLUE, fontWeight: 500, width: '100%', boxSizing: 'border-box', transition: 'background .12s' }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#f8f9fa'}
-                    onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
-                    <span style={{ fontSize: 18 }}>📹</span>
-                    Add Google Meet video conferencing
+                  <button type="button" onClick={()=>setMeetLink(generateMeet())}
+                    style={{ display:'inline-flex', alignItems:'center', gap:10, border:`1px solid ${LINE}`, borderRadius:8, padding:'9px 14px', fontSize:13, fontFamily:GS, cursor:'pointer', background:'#fff', color:BLUE, fontWeight:500, width:'100%', boxSizing:'border-box', transition:'background .12s' }}
+                    onMouseEnter={e=>e.currentTarget.style.background='#f8f9fa'}
+                    onMouseLeave={e=>e.currentTarget.style.background='#fff'}>
+                    <span style={{ fontSize:18 }}>📹</span>Add Google Meet video conferencing
                   </button>
                 )
               )}
@@ -612,35 +606,26 @@ export default function EventModal({ initial, pairs, meetings, onSave, onClose, 
 
           <HR />
 
-          {/* ── CONVERGENCE UNIT PICKER ── */}
+          {/* ── UNIT PICKER ── */}
           <FR icon={<IcUsers />}>
-            <div style={{ paddingTop: 4 }}>
-              <UnitPicker
-                pairs={pairs}
-                pairId={pairId}
-                onPairChange={id => setPairId(id)}
-                notify={notify}
-                onNotifyChange={setNotify}
-              />
-            </div>
+            <UnitPicker
+              pairs={pairs}
+              pairId={pairId}
+              onPairChange={id => setPairId(id)}
+              notify={notify}
+              onNotifyChange={setNotify}
+            />
           </FR>
 
-          {/* ── STATUS pills (edit only) ── */}
+          {/* ── STATUS (edit only) ── */}
           {editing && (
             <>
               <HR />
               <FR icon={<IcStatus color={statusColor} />}>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingTop: 4 }}>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                   {STATUS_OPTIONS.map(s => (
-                    <button key={s.v} type="button" onClick={() => setMeetStatus(s.v)}
-                      style={{
-                        border: `1.5px solid ${meetStatus === s.v ? s.color : LINE}`,
-                        borderRadius: 20, padding: '5px 14px', fontSize: 12, fontFamily: GS,
-                        cursor: 'pointer', transition: 'all .12s',
-                        background: meetStatus === s.v ? s.color + '18' : '#fff',
-                        color: meetStatus === s.v ? s.color : INK2,
-                        fontWeight: meetStatus === s.v ? 600 : 400,
-                      }}>
+                    <button key={s.v} type="button" onClick={()=>setMeetStatus(s.v)}
+                      style={{ border:`1.5px solid ${meetStatus===s.v?s.color:LINE}`, borderRadius:20, padding:'5px 14px', fontSize:12, fontFamily:GS, cursor:'pointer', transition:'all .12s', background:meetStatus===s.v?s.color+'18':'#fff', color:meetStatus===s.v?s.color:INK2, fontWeight:meetStatus===s.v?600:400 }}>
                       {s.l}
                     </button>
                   ))}
@@ -652,37 +637,35 @@ export default function EventModal({ initial, pairs, meetings, onSave, onClose, 
           <HR />
 
           {/* ── DESCRIPTION ── */}
-          <FR icon={<IcText />} alignTop>
-            <div style={{ paddingTop: 4 }}>
-              <WysiwygEditor
-                value={description}
-                onChange={setDescription}
-                placeholder="Add meeting agenda or description…"
-              />
-            </div>
+          <FR icon={<IcText />}>
+            <WysiwygEditor
+              value={description}
+              onChange={setDescription}
+              placeholder="Add meeting agenda or description…"
+            />
           </FR>
 
-          {/* ── Conflict warning ── */}
+          {/* Conflict warning */}
           {hasConflict && (
-            <div style={{ margin: '8px 0 2px', padding: '10px 14px', background: '#fef7e0', border: '1px solid #f9ab00', borderRadius: 8, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <span style={{ fontSize: 15, flexShrink: 0 }}>⚠️</span>
-              <div style={{ fontFamily: RI, fontSize: 12, color: '#b05e00', lineHeight: 1.5 }}>
+            <div style={{ margin:'6px 0 2px', padding:'10px 14px', background:'#fef7e0', border:'1px solid #f9ab00', borderRadius:8, display:'flex', gap:10 }}>
+              <span style={{ fontSize:15, flexShrink:0 }}>⚠️</span>
+              <div style={{ fontFamily:RI, fontSize:12, color:'#b05e00', lineHeight:1.5 }}>
                 <strong>Scheduling conflict</strong> — another meeting overlaps this slot. Still saveable.
               </div>
             </div>
           )}
 
-          {/* ── History (edit mode) ── */}
+          {/* History */}
           {editing?.history?.length > 0 && (
-            <div style={{ margin: '8px 0 0', padding: '12px 14px', background: '#f8f9fa', borderRadius: 8, border: `1px solid ${LINE}` }}>
-              <div style={{ fontFamily: RI, fontSize: 11, color: INK3, textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 8 }}>History</div>
-              {editing.history.slice(0, 5).map((h, i) => (
-                <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '6px 0', borderTop: i > 0 ? `1px solid ${LINE}` : 'none' }}>
-                  <span style={{ fontFamily: RI, fontSize: 11, fontWeight: 600, color: INK, textTransform: 'capitalize', minWidth: 76, flexShrink: 0 }}>{h.action}</span>
-                  <div style={{ fontFamily: RI, fontSize: 11, color: INK2, lineHeight: 1.5 }}>
-                    {h.old_date && h.new_date && <div>{h.old_date} → {h.new_date}</div>}
-                    {h.reason && <div style={{ fontStyle: 'italic' }}>{h.reason}</div>}
-                    <div style={{ color: INK3 }}>{h.changed_at?.slice(0, 16).replace('T', ' ')} · {h.changed_by_name}</div>
+            <div style={{ margin:'8px 0 0', padding:'12px 14px', background:'#f8f9fa', borderRadius:8, border:`1px solid ${LINE}` }}>
+              <div style={{ fontFamily:RI, fontSize:11, color:INK3, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:8 }}>History</div>
+              {editing.history.slice(0,5).map((h,i) => (
+                <div key={i} style={{ display:'flex', gap:10, padding:'6px 0', borderTop:i>0?`1px solid ${LINE}`:'none' }}>
+                  <span style={{ fontFamily:RI, fontSize:11, fontWeight:600, color:INK, textTransform:'capitalize', minWidth:76, flexShrink:0 }}>{h.action}</span>
+                  <div style={{ fontFamily:RI, fontSize:11, color:INK2, lineHeight:1.5 }}>
+                    {h.old_date&&h.new_date&&<div>{h.old_date} → {h.new_date}</div>}
+                    {h.reason&&<div style={{ fontStyle:'italic' }}>{h.reason}</div>}
+                    <div style={{ color:INK3 }}>{h.changed_at?.slice(0,16).replace('T',' ')} · {h.changed_by_name}</div>
                   </div>
                 </div>
               ))}
@@ -690,22 +673,22 @@ export default function EventModal({ initial, pairs, meetings, onSave, onClose, 
           )}
         </div>
 
-        {/* ── Footer ── */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderTop: `1px solid ${LINE}`, flexShrink: 0, background: '#fff' }}>
-          <span style={{ fontFamily: RI, fontSize: 11, color: hasConflict ? '#b05e00' : INK3 }}>
+        {/* Footer */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 20px', borderTop:`1px solid ${LINE}`, flexShrink:0, background:'#fff' }}>
+          <span style={{ fontFamily:RI, fontSize:11, color:hasConflict?'#b05e00':INK3 }}>
             {hasConflict ? '⚠️ Conflict detected' : 'Ctrl+Enter to save'}
           </span>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display:'flex', gap:8 }}>
             <button type="button" onClick={onClose}
-              style={{ border: `1px solid ${LINE}`, borderRadius: 20, padding: '8px 22px', fontSize: 14, fontFamily: GS, cursor: 'pointer', background: '#fff', color: BLUE, fontWeight: 500 }}
-              onMouseEnter={e => e.currentTarget.style.background = '#f8f9fa'}
-              onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+              style={{ border:`1px solid ${LINE}`, borderRadius:20, padding:'8px 22px', fontSize:14, fontFamily:GS, cursor:'pointer', background:'#fff', color:BLUE, fontWeight:500 }}
+              onMouseEnter={e=>e.currentTarget.style.background='#f8f9fa'}
+              onMouseLeave={e=>e.currentTarget.style.background='#fff'}>
               Cancel
             </button>
             <button type="button" onClick={handleSave} disabled={!canSave}
-              style={{ border: 'none', borderRadius: 20, padding: '8px 28px', fontSize: 14, fontFamily: GS, fontWeight: 500, cursor: canSave ? 'pointer' : 'not-allowed', background: canSave ? BLUE : '#c2d6f5', color: '#fff', transition: 'background .12s', minWidth: 90 }}
-              onMouseEnter={e => { if (canSave) e.currentTarget.style.background = '#1765cc'; }}
-              onMouseLeave={e => { if (canSave) e.currentTarget.style.background = BLUE; }}>
+              style={{ border:'none', borderRadius:20, padding:'8px 28px', fontSize:14, fontFamily:GS, fontWeight:500, cursor:canSave?'pointer':'not-allowed', background:canSave?BLUE:'#c2d6f5', color:'#fff', transition:'background .12s', minWidth:90 }}
+              onMouseEnter={e=>{ if(canSave) e.currentTarget.style.background='#1765cc'; }}
+              onMouseLeave={e=>{ if(canSave) e.currentTarget.style.background=BLUE; }}>
               {saving ? 'Saving…' : editing ? 'Save changes' : 'Save'}
             </button>
           </div>
