@@ -3,11 +3,15 @@ from rest_framework.permissions import BasePermission
 
 logger = logging.getLogger('cms')
 
-VALID_ROLES = {'admin', 'poc'}
+VALID_ROLES = {'super_admin', 'admin', 'poc', 'team'}
+
+# Roles with admin-level privileges
+ADMIN_ROLES     = {'super_admin', 'admin'}
+# Roles that can access daily work / team activity
+TEAM_ROLES      = {'super_admin', 'poc', 'team'}
 
 
 def _check_role(user):
-    """EC-06: log and fall back to restricted access if role is unknown."""
     role = getattr(user, 'role', None)
     if role not in VALID_ROLES:
         logger.error(
@@ -18,8 +22,18 @@ def _check_role(user):
     return True
 
 
+class IsSuperAdmin(BasePermission):
+    """Allow access only to super_admin."""
+    message = 'Super admin access required.'
+
+    def has_permission(self, request, view):
+        if not (request.user and request.user.is_authenticated):
+            return False
+        return _check_role(request.user) and request.user.role == 'super_admin'
+
+
 class IsAdmin(BasePermission):
-    """Allow access only to users with role='admin'."""
+    """Allow access to super_admin and admin."""
     message = 'Admin access required.'
 
     def has_permission(self, request, view):
@@ -27,7 +41,7 @@ class IsAdmin(BasePermission):
             return False
         if not _check_role(request.user):
             return False
-        if request.user.role != 'admin':
+        if request.user.role not in ADMIN_ROLES:
             logger.warning(
                 'EC-01 unauthorized access attempt: user=%s role=%s path=%s',
                 request.user.username, request.user.role, request.path,
@@ -37,7 +51,7 @@ class IsAdmin(BasePermission):
 
 
 class IsAdminOrReadOnly(BasePermission):
-    """Read access for any authenticated user; write access only for admins."""
+    """Read access for any authenticated user; write access only for admin roles."""
     message = 'Admin access required for write operations.'
 
     def has_permission(self, request, view):
@@ -47,7 +61,7 @@ class IsAdminOrReadOnly(BasePermission):
             return False
         if request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
-        if request.user.role != 'admin':
+        if request.user.role not in ADMIN_ROLES:
             logger.warning(
                 'EC-01 unauthorized write attempt: user=%s role=%s path=%s method=%s',
                 request.user.username, request.user.role, request.path, request.method,
@@ -58,10 +72,10 @@ class IsAdminOrReadOnly(BasePermission):
 
 class IsPOCUploadAdminView(BasePermission):
     """
-    D.O. Letters access model:
-      - GET/HEAD/OPTIONS  → any authenticated user (admin + all POC)
-      - POST (upload)     → admin or POC
-      - DELETE            → admin or the uploader (object level)
+    D.O. Letters access:
+      - GET  → any authenticated user
+      - POST → admin roles or POC
+      - DELETE → admin roles or the uploader
     """
     message = 'Only unit reps or admins can upload letters.'
 
@@ -71,14 +85,14 @@ class IsPOCUploadAdminView(BasePermission):
         if request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
         if request.method == 'POST':
-            return request.user.role in ('poc', 'admin')
+            return request.user.role in ('super_admin', 'admin', 'poc')
         if request.method == 'DELETE':
-            return True  # narrowed further in has_object_permission
+            return True
         return False
 
     def has_object_permission(self, request, view, obj):
         if request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
         if request.method == 'DELETE':
-            return request.user.role == 'admin' or obj.uploaded_by_id == request.user.id
+            return request.user.role in ADMIN_ROLES or obj.uploaded_by_id == request.user.id
         return False

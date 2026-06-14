@@ -36,7 +36,7 @@ function NotifIcon({ type }) {
 }
 
 export default function AppHeader() {
-  const { user, logout } = useAuth();
+  const { user, logout, switchDevRole, IS_DEV } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const qc = useQueryClient();
@@ -120,6 +120,29 @@ export default function AppHeader() {
 
   return (
     <CHeader style={{ position: 'fixed', top: 0, left: 240, right: 0, background: '#fff', borderBottom: '1px solid rgba(15,23,42,.08)', boxShadow: '0 1px 3px rgba(15,23,42,.06)', zIndex: 1031, display: 'flex', alignItems: 'center', padding: '0 20px', gap: 12 }}>
+
+      {/* ── Dev view switcher (only in development) ── */}
+      {IS_DEV && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#fefce8', border: '1px solid #fde047', borderRadius: 8, padding: '4px 8px', flexShrink: 0 }}>
+          <span style={{ fontFamily: 'var(--fm)', fontSize: 10, fontWeight: 700, color: '#854d0e', letterSpacing: '.06em', textTransform: 'uppercase', marginRight: 2 }}>DEV</span>
+          {[
+            { key: 'super_admin', label: 'S.Admin' },
+            { key: 'admin',       label: 'Admin'   },
+            { key: 'poc',         label: 'POC'     },
+            { key: 'team',        label: 'Team'    },
+          ].map(({ key, label }) => (
+            <button key={key} onClick={() => switchDevRole(key)}
+              style={{
+                border: 'none', borderRadius: 6, padding: '3px 8px',
+                fontFamily: 'var(--fb)', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                background: user?.role === key ? '#854d0e' : 'transparent',
+                color: user?.role === key ? '#fff' : '#92400e',
+                transition: '.13s',
+              }}
+            >{label}</button>
+          ))}
+        </div>
+      )}
 
       {/* Page title */}
       <div style={{ flex: 1, minWidth: 0 }}>

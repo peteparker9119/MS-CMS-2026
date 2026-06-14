@@ -1,5 +1,4 @@
 from rest_framework import serializers
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import User
 from apps.units.models import ConvergenceUnit
 
@@ -17,13 +16,6 @@ class UserSerializer(serializers.ModelSerializer):
             'unit_slug', 'unit_name', 'unit_color',
         ]
         read_only_fields = ['id']
-
-
-class CMSTokenObtainPairSerializer(TokenObtainPairSerializer):
-    def validate(self, attrs):
-        data = super().validate(attrs)
-        data['user'] = UserSerializer(self.user).data
-        return data
 
 
 class AdminUserSerializer(serializers.ModelSerializer):

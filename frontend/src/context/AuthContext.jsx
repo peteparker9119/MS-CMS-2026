@@ -1,46 +1,93 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { login as apiLogin, getMe, logoutApi } from '../api/auth';
+import { createContext, useContext, useState, useEffect } from 'react';
+import { getMe } from '../api/auth';
 
 const AuthContext = createContext(null);
 
+// ── Dev mode mock users ───────────────────────────────────────────────────────
+const IS_DEV = import.meta.env.DEV;
+
+const DEV_USERS = {
+  super_admin: {
+    id: 1, username: 'dev_super_admin', role: 'super_admin',
+    first_name: 'Super', last_name: 'Admin',
+    unit_slug: null, unit_name: null, unit_color: null,
+    menu_permissions: [],
+  },
+  admin: {
+    id: 2, username: 'dev_admin', role: 'admin',
+    first_name: 'Admin', last_name: '',
+    unit_slug: null, unit_name: null, unit_color: null,
+    menu_permissions: [],
+  },
+  poc: {
+    id: 3, username: 'dev_poc', role: 'poc',
+    first_name: 'VP', last_name: 'POC',
+    unit_slug: 'vp', unit_name: 'VETRI Palligal', unit_color: '#6366f1',
+    menu_permissions: [],
+  },
+  team: {
+    id: 4, username: 'dev_team', role: 'team',
+    first_name: 'Team', last_name: 'Member',
+    unit_slug: 'smc', unit_name: 'SMC', unit_color: '#8b5cf6',
+    menu_permissions: [],
+  },
+};
+
 export function AuthProvider({ children }) {
-  const [user, setUser]       = useState(null);
+  const [user,    setUser]    = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Restore session on mount; in dev mode auto-login as admin if no token
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
+    if (IS_DEV) {
+      // In dev mode: load role from localStorage, default to admin
+      const role = localStorage.getItem('cms_dev_role') || 'admin';
+      setUser(DEV_USERS[role] ?? DEV_USERS.admin);
+      setLoading(false);
+      return;
+    }
+
+    // Production: read token from URL params or localStorage
+    const params   = new URLSearchParams(window.location.search);
+    const urlToken = params.get('token');
+    if (urlToken) {
+      localStorage.setItem('tnemis_token', urlToken);
+      params.delete('token');
+      const clean = params.toString()
+        ? `${window.location.pathname}?${params}`
+        : window.location.pathname;
+      window.history.replaceState({}, '', clean);
+    }
+
+    const token = urlToken || localStorage.getItem('tnemis_token');
     if (token) {
       getMe()
         .then(setUser)
-        .catch(() => {
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-        })
+        .catch(() => localStorage.removeItem('tnemis_token'))
         .finally(() => setLoading(false));
     } else {
-      setLoading(false); // eslint-disable-line react-hooks/set-state-in-effect
+      setLoading(false);
     }
   }, []);
 
-  const login = useCallback(async (username, password) => {
-    const data = await apiLogin(username, password);
-    localStorage.setItem('access_token', data.access);
-    localStorage.setItem('refresh_token', data.refresh);
-    setUser(data.user);
-    return data.user;
-  }, []);
+  // Switch between admin and POC in dev mode
+  const switchDevRole = (role) => {
+    localStorage.setItem('cms_dev_role', role);
+    setUser(DEV_USERS[role]);
+  };
 
-  const logout = useCallback(async () => {
-    await logoutApi();
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    setUser(null);
-  }, []);
+  const logout = () => {
+    if (IS_DEV) {
+      localStorage.setItem('cms_dev_role', 'admin');
+      setUser(DEV_USERS.admin);
+    } else {
+      localStorage.removeItem('tnemis_token');
+      setUser(null);
+    }
+  };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, logout, switchDevRole, IS_DEV }}>
       {children}
     </AuthContext.Provider>
   );

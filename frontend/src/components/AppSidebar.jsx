@@ -16,27 +16,24 @@ const Icon = ({ name, active }) => {
     case 'minutes':   return <svg viewBox="0 0 16 16" style={s} fill="none" stroke={c} strokeWidth="1.5"><rect x="2.5" y="1" width="11" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>;
     case 'items':     return <svg viewBox="0 0 16 16" style={s} fill="none" stroke={c} strokeWidth="1.5"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3.5L10.5 10"/></svg>;
     case 'documents': return <svg viewBox="0 0 16 16" style={s} fill="none" stroke={c} strokeWidth="1.5"><path d="M9.5 1H3.5A1.5 1.5 0 0 0 2 2.5v11A1.5 1.5 0 0 0 3.5 15h9A1.5 1.5 0 0 0 14 13.5V5.5L9.5 1z"/><path d="M9 1v5h5M5 9h6M5 12h4"/></svg>;
+    case 'worklog':   return <svg viewBox="0 0 16 16" style={s} fill="none" stroke={c} strokeWidth="1.5"><rect x="1.5" y="1.5" width="13" height="13" rx="2"/><path d="M5 8h6M5 5h6M5 11h3"/></svg>;
+    case 'activity':  return <svg viewBox="0 0 16 16" style={s} fill="none" stroke={c} strokeWidth="1.5"><polyline points="1,10 4,6 7,9 10,4 15,7"/></svg>;
     case 'admin':     return <svg viewBox="0 0 16 16" style={s} fill="none" stroke={c} strokeWidth="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M2.93 2.93l1.41 1.41M11.66 11.66l1.41 1.41M2.93 13.07l1.41-1.41M11.66 4.34l1.41-1.41"/></svg>;
-    case 'grid':      return <svg viewBox="0 0 16 16" style={s} fill="none" stroke={c} strokeWidth="1.5"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>;
     case 'list':      return <svg viewBox="0 0 16 16" style={s} fill="none" stroke={c} strokeWidth="1.5"><line x1="1" y1="4" x2="15" y2="4"/><line x1="1" y1="8" x2="15" y2="8"/><line x1="1" y1="12" x2="15" y2="12"/></svg>;
     default:          return <svg viewBox="0 0 16 16" style={s} fill="none" stroke={c} strokeWidth="1.5"><circle cx="8" cy="8" r="6.5"/></svg>;
   }
 };
 
-const NAV_ADMIN = [
-  { path: 'dashboard',   label: 'Dashboard',    icon: 'dashboard'  },
-  { path: 'meetings',    label: 'Meetings',     icon: 'meetings'   },
-  { path: 'planner',     label: 'Planner',      icon: 'planner'    },
-  { path: 'minutes',     label: 'Minutes',      icon: 'minutes'    },
-  { path: 'items',       label: 'Item Tracker', icon: 'items'      },
-  { path: 'documents',   label: 'D.O. Letters', icon: 'documents'  },
-  { path: 'admin-panel', label: 'Admin Panel',  icon: 'admin'      },
-];
-const NAV_POC = [
-  { path: 'dashboard', label: 'Dashboard',    icon: 'dashboard' },
-  { path: 'meetings',  label: 'Meetings',     icon: 'meetings'  },
-  { path: 'items',     label: 'Create Item',  icon: 'items'     },
-  { path: 'documents', label: 'D.O. Letters', icon: 'documents' },
+// Access matrix — which roles see each menu item
+const NAV_ITEMS = [
+  { path: 'dashboard',   label: 'Dashboard',      icon: 'dashboard', roles: ['super_admin','admin','poc','team'] },
+  { path: 'planner',     label: 'Planner',        icon: 'planner',   roles: ['super_admin','admin'] },
+  { path: 'meetings',    label: 'Meetings',        icon: 'meetings',  roles: ['super_admin','admin','poc','team'] },
+  { path: 'items',       label: 'Item Tracker',   icon: 'items',     roles: ['super_admin','admin','poc','team'] },
+  { path: 'documents',   label: 'D.O. Letters',   icon: 'documents', roles: ['super_admin','admin','poc','team'] },
+  { path: 'worklog',     label: 'Daily Work',     icon: 'worklog',   roles: ['super_admin','poc','team'] },
+  { path: 'reviews',     label: 'Team Activity',  icon: 'activity',  roles: ['super_admin','poc','team'] },
+  { path: 'admin-panel', label: 'Admin Panel',    icon: 'admin',     roles: ['super_admin','admin'] },
 ];
 
 export default function AppSidebar() {
@@ -50,18 +47,19 @@ export default function AppSidebar() {
     staleTime: 60_000,
   });
 
-  const navItems = user?.role === 'admin' ? NAV_ADMIN : NAV_POC;
+  const role     = user?.role ?? '';
+  const navItems = NAV_ITEMS.filter(item => item.roles.includes(role));
   const cur      = location.pathname.replace(/^\//, '');
 
   const visibleCustomMenus = customMenus.filter(m => {
     if (!m.is_active) return false;
-    if (m.access === 'admin' && user?.role !== 'admin') return false;
-    if (m.access === 'poc'   && !['admin','poc'].includes(user?.role)) return false;
+    if (m.access === 'admin'       && !['super_admin','admin'].includes(role)) return false;
+    if (m.access === 'poc'         && !['super_admin','admin','poc'].includes(role)) return false;
     return true;
   });
 
   const NavBtn = ({ path, label, icon }) => {
-    const isActive = cur === path;
+    const isActive = cur === path || cur.startsWith(path + '/');
     return (
       <button
         onClick={() => navigate(`/${path}`)}
@@ -90,23 +88,22 @@ export default function AppSidebar() {
     );
   };
 
+  const unitColor = user?.unit_color ?? '#6366f1';
+
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, bottom: 0,
-      width: W,
-      background: '#1e2333',
-      zIndex: 1029,
-      display: 'flex', flexDirection: 'column',
+      width: W, background: '#1e2333',
+      zIndex: 1029, display: 'flex', flexDirection: 'column',
       userSelect: 'none',
     }}>
 
-      {/* ── Brand zone ── */}
+      {/* ── Brand ── */}
       <div style={{
         height: 57, flexShrink: 0,
         display: 'flex', alignItems: 'center',
-        padding: '0 16px',
+        padding: '0 16px', gap: 10,
         borderBottom: '1px solid rgba(255,255,255,.08)',
-        gap: 10,
       }}>
         <div style={{
           width: 32, height: 32, borderRadius: 9, flexShrink: 0,
@@ -121,10 +118,7 @@ export default function AppSidebar() {
       </div>
 
       {/* ── Nav ── */}
-      <nav style={{
-        flex: 1, display: 'flex', flexDirection: 'column',
-        padding: '12px 0', overflowY: 'auto',
-      }}>
+      <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px 0', overflowY: 'auto' }}>
         <div style={{
           padding: '4px 16px 6px',
           fontFamily: 'var(--fm)', fontSize: 10, fontWeight: 700,
@@ -153,14 +147,14 @@ export default function AppSidebar() {
         )}
       </nav>
 
-      {/* ── POC unit badge ── */}
-      {user?.role === 'poc' && user?.unit_name && (
+      {/* ── Unit badge (POC / Team) ── */}
+      {user?.unit_name && (
         <div style={{
           padding: '10px 16px 14px',
           borderTop: '1px solid rgba(255,255,255,.08)',
           display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
         }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: user.unit_color ?? '#fff', flexShrink: 0 }} />
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: unitColor, flexShrink: 0 }} />
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{user.unit_name}</div>
             <div style={{ fontFamily: 'var(--fm)', fontSize: 11, color: 'rgba(255,255,255,.45)' }}>workspace</div>

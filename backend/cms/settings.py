@@ -1,6 +1,5 @@
 from pathlib import Path
 from decouple import config
-from datetime import timedelta
 import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -24,8 +23,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # third-party
     'rest_framework',
-    'rest_framework_simplejwt',
-    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     # local
     'apps.accounts',
@@ -74,10 +71,9 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'cms.wsgi.application'
 
-if VERCEL:
-    # Vercel filesystem is read-only; api/index.py copies db.sqlite3 → /tmp/cms_db.sqlite3
-    # so Django can write (JWT token issuance, etc.) within each request.
-    # Writes reset on next cold-start — connect a hosted DB for full persistence.
+USE_SQLITE = config('USE_SQLITE', default=False, cast=bool)
+
+if VERCEL or USE_SQLITE:
     _sqlite_path = os.environ.get('DJANGO_SQLITE_PATH', str(BASE_DIR / 'db.sqlite3'))
     DATABASES = {
         'default': {
@@ -119,7 +115,6 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -139,7 +134,7 @@ if not DEBUG:
 # ── DRF ──────────────────────────────────────────────────────────────────────
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'cms.authentication.TNEmisAuth',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -147,21 +142,20 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 200,
     'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '20/minute',   # login attempts
-        'user': '300/minute',  # normal API usage
+        'user': '300/minute',
     },
 }
 
-# ── JWT ───────────────────────────────────────────────────────────────────────
-SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=8),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'AUTH_HEADER_TYPES': ('Bearer',),
-}
+# ── TNEMIS Auth ───────────────────────────────────────────────────────────────
+# Static API key that TNEMIS sends in the Authorization header for this app.
+TNEMIS_API_KEY    = config('TNEMIS_API_KEY', default='test@123')
+# JWT secret used by TNEMIS platform to sign tokens.
+TNEMIS_JWT_SECRET = config('TNEMIS_JWT_SECRET', default='ingDLMRuGe9UKHRNjs7cYckS2yul4lc3')
+# URL path segments that don't require the Token header (only the API key).
+EXEMPT_TOKEN: list = config('EXEMPT_TOKEN', default='health', cast=lambda v: [s.strip() for s in v.split(',')])
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = config(
@@ -170,8 +164,39 @@ CORS_ALLOWED_ORIGINS = config(
 ).split(',')
 CORS_ALLOW_CREDENTIALS = True
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+# ── File Storage (S3 or local fallback) ───────────────────────────────────────
+AWS_ACCESS_KEY_ID     = config('AWS_ACCESS_KEY_ID', default='')
+AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY', default='')
+AWS_STORAGE_BUCKET_NAME = config('AWS_S3_BUCKET_NAME', default='')
+AWS_S3_REGION_NAME    = config('AWS_S3_REGION', default='ap-south-1')
+AWS_S3_FILE_OVERWRITE = False
+AWS_DEFAULT_ACL       = 'private'
+AWS_QUERYSTRING_AUTH  = True   # signed URLs for private files
+AWS_S3_SIGNATURE_VERSION = 's3v4'
+
+if AWS_STORAGE_BUCKET_NAME:
+    # Production: store uploads in S3
+    STORAGES = {
+        'default': {
+            'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage',
+        },
+        'staticfiles': {
+            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+        },
+    }
+    MEDIA_URL = f'https://{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/'
+else:
+    # Development: local filesystem
+    STORAGES = {
+        'default': {
+            'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+        },
+    }
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = BASE_DIR / 'media'
 
 # ── Email ─────────────────────────────────────────────────────────────────────
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

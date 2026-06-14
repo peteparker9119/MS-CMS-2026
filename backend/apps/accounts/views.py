@@ -1,19 +1,13 @@
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.views import APIView
-from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework_simplejwt.views import TokenObtainPairView
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 
-from .serializers import CMSTokenObtainPairSerializer, UserSerializer
+from .serializers import UserSerializer
 
 User = get_user_model()
-
-
-class CMSTokenObtainPairView(TokenObtainPairView):
-    serializer_class = CMSTokenObtainPairSerializer
 
 
 class MeView(APIView):
@@ -95,17 +89,3 @@ def users_by_units(request):
         for u in users
     ]
     return Response(data)
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def logout_view(request):
-    """Blacklist the refresh token so it can no longer be used."""
-    try:
-        refresh_token = request.data.get('refresh')
-        if refresh_token:
-            token = RefreshToken(refresh_token)
-            token.blacklist()
-    except Exception:
-        pass  # token already invalid or blacklist not enabled — that's fine
-    return Response({'detail': 'Logged out.'}, status=200)
