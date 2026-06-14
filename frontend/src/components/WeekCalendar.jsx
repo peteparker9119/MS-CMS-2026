@@ -181,6 +181,7 @@ export default function WeekCalendar({
   onEventCancel,   // (meeting)
   onEventMove,     // (meeting, newDateIso, newStartTime, newEndTime)
   onEventResize,   // (meeting, newEndTime)
+  height,          // optional override, default calc(100vh - 148px)
 }) {
   const days     = getWeekDays(weekStart);
   const now      = new Date();
@@ -349,7 +350,7 @@ export default function WeekCalendar({
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ display:'flex', flexDirection:'column', height:'calc(100vh - 210px)', background:C.bodyBg, borderRadius:8, boxShadow:'0 1px 2px rgba(60,64,67,.3),0 2px 6px rgba(60,64,67,.15)', overflow:'hidden', userSelect:'none' }}>
+    <div style={{ display:'flex', flexDirection:'column', height: height || 'calc(100vh - 148px)', background:C.bodyBg, borderRadius:8, boxShadow:'0 1px 2px rgba(60,64,67,.3),0 2px 6px rgba(60,64,67,.15)', overflow:'hidden', userSelect:'none' }}>
 
       {/* ── Day header ── */}
       <div style={{ display:'grid', gridTemplateColumns:`${GUTTER_W}px repeat(7,1fr)`, background:C.headerBg, borderBottom:`1px solid ${C.hourLine}`, flexShrink:0, boxShadow:'0 2px 3px rgba(0,0,0,.1)', zIndex:10 }}>
@@ -378,7 +379,7 @@ export default function WeekCalendar({
       </div>
 
       {/* ── Scrollable time grid ── */}
-      <div ref={scrollEl} style={{ flex:1, overflowY:'auto', position:'relative', overscrollBehavior:'contain' }}>
+      <div ref={scrollEl} style={{ flex:1, overflowY:'scroll', position:'relative', overscrollBehavior:'contain' }}>
         <div style={{ display:'grid', gridTemplateColumns:`${GUTTER_W}px repeat(7,1fr)`, position:'relative', minHeight:TOTAL_H }}>
 
           {/* ── Time gutter ── */}
