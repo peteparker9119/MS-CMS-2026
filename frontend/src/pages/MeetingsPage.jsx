@@ -4,6 +4,8 @@ import { getMeetings, submitMinutes, recordNotHeld, updateMeeting } from '../api
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../api/client';
+import { getUsersByUnits } from '../api/items';
+import DateField from '../components/DateField';
 
 const ERR = { fontSize: 11, color: '#dc2626', marginTop: 4 };
 import Badge from '../components/Badge';
@@ -192,6 +194,59 @@ function MomContent({ meeting }) {
   );
 }
 
+/* ── Cascading action point row ─────────────────────────── */
+function ActionPointRow({ ap, index, unitA, unitB, usersByUnit, onUpdate, onRemove, showRemove }) {
+  const INP = { border:'1px solid var(--line)', borderRadius:8, padding:'8px 12px', fontSize:14, fontFamily:'var(--fm)', color:'var(--ink)', width:'100%', boxSizing:'border-box', outline:'none', background:'#fff' };
+  const showUnit     = ap.text.trim().length > 0;
+  const showUser     = showUnit && ap.unitId !== null;
+  const showDeadline = showUser && ap.userId !== null;
+  const users        = usersByUnit[ap.unitId] ?? [];
+  return (
+    <div style={{ border:'1px solid var(--line)', borderRadius:10, padding:'12px 14px', marginBottom:10, background:'#fafbfc', display:'flex', flexDirection:'column', gap:10 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+        <span style={{ fontFamily:'var(--fm)', fontSize:11, fontWeight:700, color:'var(--ink3)', minWidth:20 }}>{index+1}</span>
+        <input style={{ ...INP, flex:1 }} value={ap.text} onChange={e => onUpdate(index,'text',e.target.value)}
+          placeholder="What needs to be done…"
+          onFocus={e=>e.target.style.borderColor='var(--accent)'} onBlur={e=>e.target.style.borderColor='var(--line)'} />
+        {showRemove && <button type="button" onClick={()=>onRemove(index)} style={{ border:'1px solid #fca5a5', borderRadius:8, background:'#fff5f5', color:'#dc2626', width:32, height:36, fontSize:18, cursor:'pointer', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>}
+      </div>
+      {showUnit && (
+        <div style={{ display:'flex', alignItems:'center', gap:10, paddingLeft:30 }}>
+          <span style={{ fontFamily:'var(--fm)', fontSize:12, color:'var(--ink3)', fontWeight:600, whiteSpace:'nowrap' }}>Assign to</span>
+          <div style={{ display:'flex', gap:8 }}>
+            {[unitA, unitB].filter(Boolean).map(unit => {
+              const on = ap.unitId === unit.id;
+              return (
+                <button key={unit.id} type="button" onClick={()=>onUpdate(index,'unitId', on ? null : unit.id)}
+                  style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'5px 14px', border:`1.5px solid ${on?unit.color:'var(--line)'}`, borderRadius:20, cursor:'pointer', background:on?unit.color:'#fff', color:on?'#fff':'var(--ink)', fontFamily:'var(--fb)', fontSize:13, fontWeight:on?700:500, transition:'all .12s' }}>
+                  <span style={{ width:7, height:7, borderRadius:'50%', background:on?'rgba(255,255,255,.7)':unit.color, flexShrink:0 }} />{unit.abbr}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {showUser && (
+        <div style={{ display:'flex', alignItems:'center', gap:10, paddingLeft:30 }}>
+          <span style={{ fontFamily:'var(--fm)', fontSize:12, color:'var(--ink3)', fontWeight:600, whiteSpace:'nowrap' }}>Person</span>
+          <select value={ap.userId??''} onChange={e=>onUpdate(index,'userId',e.target.value?Number(e.target.value):null)}
+            style={{ ...INP, flex:1, maxWidth:300, fontSize:13, cursor:'pointer' }}
+            onFocus={e=>e.target.style.borderColor='var(--accent)'} onBlur={e=>e.target.style.borderColor='var(--line)'}>
+            <option value="">— Select person —</option>
+            {users.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
+        </div>
+      )}
+      {showDeadline && (
+        <div style={{ display:'flex', alignItems:'center', gap:10, paddingLeft:30 }}>
+          <span style={{ fontFamily:'var(--fm)', fontSize:12, color:'var(--ink3)', fontWeight:600, whiteSpace:'nowrap' }}>Deadline</span>
+          <DateField value={ap.deadline} onChange={v=>onUpdate(index,'deadline',v)} placeholder="Pick a deadline" style={{ display:'inline-block' }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Main component ─────────────────────────────────────── */
 const TABS = [
   { key: 'all',       label: 'All'        },
@@ -227,10 +282,27 @@ export default function MeetingsPage() {
   const [momMode,    setMomMode]    = useState(null);
   const [attendees,  setAttendees]  = useState('');
   const [summary,    setSummary]    = useState('');
-  const [actions,    setActions]    = useState('');
+  const [aps,        setAps]        = useState([{ id:null, text:'', unitId:null, userId:null, deadline:'' }]);
   const [nhStatus,   setNhStatus]   = useState('postponed');
   const [reason,     setReason]     = useState('');
   const [momFe,      setMomFe]      = useState({});
+
+  const momUnitA = momMeeting?.pair?.unit_a;
+  const momUnitB = momMeeting?.pair?.unit_b;
+  const { data: momUsersA = [] } = useQuery({ queryKey:['users-by-unit', momUnitA?.id], queryFn:()=>getUsersByUnits([momUnitA.id]), enabled:!!momUnitA, staleTime:5*60*1000 });
+  const { data: momUsersB = [] } = useQuery({ queryKey:['users-by-unit', momUnitB?.id], queryFn:()=>getUsersByUnits([momUnitB.id]), enabled:!!momUnitB, staleTime:5*60*1000 });
+  const momUsersByUnit = momUnitA && momUnitB ? { [momUnitA.id]: momUsersA, [momUnitB.id]: momUsersB } : {};
+
+  const addAP    = () => setAps(p=>[...p,{ id:null, text:'', unitId:null, userId:null, deadline:'' }]);
+  const removeAP = i  => setAps(p=>p.filter((_,idx)=>idx!==i));
+  const updateAP = (i,field,value) => setAps(prev=>prev.map((ap,idx)=>{
+    if(idx!==i) return ap;
+    const u={...ap,[field]:value};
+    if(field==='text')  { u.unitId=null; u.userId=null; u.deadline=''; }
+    if(field==='unitId'){ u.userId=null; u.deadline=''; }
+    if(field==='userId'){ u.deadline=''; }
+    return u;
+  }));
 
   const { data: meetings = [], isLoading } = useQuery({
     queryKey: ['meetings'],
@@ -310,7 +382,7 @@ export default function MeetingsPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['meetings'] });
       setMomOpen(false); setMomMeeting(null); setMomMode(null);
-      setAttendees(''); setSummary(''); setActions(''); setReason('');
+      setAttendees(''); setSummary(''); setAps([{ id:null,text:'',unitId:null,userId:null,deadline:'' }]); setReason('');
       toast(momMode === 'conduct' ? 'Minutes filed' : 'Recorded');
     },
     onError: (err) => toast(getErrorMessage(err)),
@@ -345,10 +417,10 @@ export default function MeetingsPage() {
 
   const handleMomSubmit = () => {
     if (momMode === 'conduct') {
-      const apLines = actions.split('\n').map(s => s.replace(/^[-•*\d.)\s]+/, '').trim()).filter(Boolean);
-      if (!summary && !apLines.length) { setMomFe({ summary: 'Add a summary or at least one action point' }); return; }
+      const cleanAps = aps.filter(ap=>ap.text.trim()).map(ap=>({ text:ap.text.trim(), responsible_unit:ap.unitId??null, assigned_to:ap.userId??null, deadline:ap.deadline||null }));
+      if (!summary && !cleanAps.length) { setMomFe({ summary: 'Add a summary or at least one action point' }); return; }
       setMomFe({});
-      momMutation.mutate({ meetingId: momMeeting.id, data: { attendees, summary, action_points: apLines, source: 'written' }, type: 'minutes' });
+      momMutation.mutate({ meetingId: momMeeting.id, data: { attendees, summary, action_points: cleanAps, source: 'written' }, type: 'minutes' });
     } else {
       if (!reason) { setMomFe({ reason: 'Provide a reason for not holding the meeting' }); return; }
       setMomFe({});
@@ -359,14 +431,16 @@ export default function MeetingsPage() {
   const openMom = (m, editExisting = false) => {
     setMomMeeting(m);
     if (editExisting && m.minutes) {
-      // Pre-fill existing MoM data for re-edit
       setMomMode('conduct');
       setAttendees(m.minutes.attendees ?? '');
       setSummary(m.minutes.summary ?? '');
-      setActions((m.minutes.action_points ?? []).map(ap => ap.text).join('\n'));
+      setAps((m.minutes.action_points ?? []).length
+        ? m.minutes.action_points.map(ap=>({ id:ap.id??null, text:ap.text??'', unitId:ap.responsible_unit??null, userId:ap.assigned_to??null, deadline:ap.deadline??'' }))
+        : [{ id:null, text:'', unitId:null, userId:null, deadline:'' }]);
     } else {
       setMomMode(null);
-      setAttendees(''); setSummary(''); setActions('');
+      setAttendees(''); setSummary('');
+      setAps([{ id:null, text:'', unitId:null, userId:null, deadline:'' }]);
     }
     setReason(''); setNhStatus('postponed');
     setMomOpen(true);
@@ -699,10 +773,13 @@ export default function MeetingsPage() {
                   {momFe.summary && <div style={ERR}>⚠ {momFe.summary}</div>}
                 </div>
                 <div className="mb-3">
-                  <CFormLabel style={LBL}>Action points — one per line</CFormLabel>
-                  <CFormTextarea value={actions}
-                    onChange={e => { setActions(e.target.value); setMomFe({}); }}
-                    placeholder={'VP to share beneficiary list\nSMC to map overlapping schools'} rows={4} />
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                    <CFormLabel style={{ ...LBL, marginBottom:0 }}>Action Points</CFormLabel>
+                    <button type="button" onClick={addAP} style={{ border:'1.5px solid var(--accent)', borderRadius:16, padding:'4px 14px', background:'var(--accent-light)', color:'var(--accent)', fontFamily:'var(--fb)', fontSize:12, fontWeight:700, cursor:'pointer' }}>+ Add</button>
+                  </div>
+                  {aps.map((ap,i)=>(
+                    <ActionPointRow key={i} ap={ap} index={i} unitA={momUnitA} unitB={momUnitB} usersByUnit={momUsersByUnit} onUpdate={updateAP} onRemove={removeAP} showRemove={aps.length>1} />
+                  ))}
                 </div>
               </>
             )}
