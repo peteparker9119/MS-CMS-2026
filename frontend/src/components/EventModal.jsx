@@ -293,16 +293,22 @@ function UnitPicker({ pairs, pairId, onPairChange, notify, onNotifyChange }) {
     return Object.values(map).sort((a,b) => a.abbr.localeCompare(b.abbr));
   }, [pairs]);
 
+  // null = no filter chosen yet (show prompt), [] = All, [ids...] = filtered
   const [filter, setFilter] = useState(() => {
-    if (!pairId) return [];
+    if (!pairId) return null;
     const p = pairs.find(p => p.id === parseInt(pairId));
-    return p ? [p.unit_a.id, p.unit_b.id] : [];
+    return p ? [p.unit_a.id, p.unit_b.id] : null;
   });
 
-  const toggleFilter = uid => setFilter(f => f.includes(uid) ? f.filter(id=>id!==uid) : [...f,uid]);
+  const toggleFilter = uid => setFilter(f => {
+    const arr = f ?? [];
+    return arr.includes(uid) ? arr.filter(id=>id!==uid) : [...arr, uid];
+  });
 
   const visiblePairs = useMemo(() =>
-    filter.length===0 ? pairs : pairs.filter(p => filter.some(uid => p.unit_a.id===uid || p.unit_b.id===uid)),
+    filter === null ? [] :
+    filter.length === 0 ? pairs :
+    pairs.filter(p => filter.some(uid => p.unit_a.id===uid || p.unit_b.id===uid)),
     [pairs, filter]
   );
 
@@ -319,11 +325,11 @@ function UnitPicker({ pairs, pairId, onPairChange, notify, onNotifyChange }) {
       <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
         {/* All */}
         <button type="button" onClick={() => setFilter([])}
-          style={{ padding:'4px 13px', border:`1.5px solid ${filter.length===0?BLUE:LINE}`, borderRadius:20, cursor:'pointer', transition:'all .12s', background:filter.length===0?BBGF:'#fff', fontFamily:GS, fontSize:12, color:filter.length===0?BLUE:INK2, fontWeight:filter.length===0?600:400 }}>
+          style={{ padding:'4px 13px', border:`1.5px solid ${filter !== null && filter.length===0?BLUE:LINE}`, borderRadius:20, cursor:'pointer', transition:'all .12s', background:filter !== null && filter.length===0?BBGF:'#fff', fontFamily:GS, fontSize:12, color:filter !== null && filter.length===0?BLUE:INK2, fontWeight:filter !== null && filter.length===0?600:400 }}>
           All
         </button>
         {units.map(u => {
-          const on = filter.includes(u.id);
+          const on = filter !== null && filter.includes(u.id);
           const c  = u.color || BLUE;
           return (
             <button key={u.id} type="button" onClick={() => toggleFilter(u.id)}
@@ -337,7 +343,11 @@ function UnitPicker({ pairs, pairId, onPairChange, notify, onNotifyChange }) {
 
       {/* Pair cards */}
       <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-        {visiblePairs.length===0 ? (
+        {filter === null ? (
+          <div style={{ padding:'10px 4px', fontFamily:RI, fontSize:13, color:INK3, display:'flex', alignItems:'center', gap:6 }}>
+            <span style={{ fontSize:15 }}>↑</span> Select a team above to see convergence pairs
+          </div>
+        ) : visiblePairs.length===0 ? (
           <div style={{ padding:'8px 2px', fontFamily:RI, fontSize:13, color:INK3 }}>
             No pairs match the selected teams.
           </div>
@@ -407,10 +417,25 @@ const RECURRENCE = [
   { v:'custom',  l:'Custom…'         },
 ];
 
+// ── Popup position: appear near the click point, clamped to viewport ──────────
+function popupStyle(pos) {
+  if (!pos) return { top:'50%', left:'50%', transform:'translate(-50%,-50%)' };
+  const W = 500, H = Math.min(680, window.innerHeight * 0.9);
+  let left = pos.x + 14;
+  let top  = pos.y - 30;
+  if (left + W > window.innerWidth  - 16) left = pos.x - W - 14;
+  if (left < 16) left = Math.max(16, (window.innerWidth - W) / 2);
+  if (top  + H > window.innerHeight - 16) top  = window.innerHeight - H - 16;
+  if (top  < 60) top = 60;
+  return { top, left, transform: 'none' };
+}
+
 // ── Main modal ────────────────────────────────────────────────────────────────
 export default function EventModal({ initial, pairs, meetings, onSave, onClose, saving=false }) {
   const editing  = initial?.meeting ?? null;
   const titleRef = useRef(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const posStyle = useMemo(() => popupStyle(initial?.pos), []);
 
   const toIso = d => d instanceof Date
     ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
@@ -502,10 +527,11 @@ export default function EventModal({ initial, pairs, meetings, onSave, onClose, 
 
   return (
     <>
-      {/* No backdrop — GCal-style floating modal */}
+      {/* No backdrop — popup appears near click point */}
       <div style={{
-        position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
-        zIndex:1050, width:'min(600px,97vw)',
+        position:'fixed', zIndex:1050,
+        width:'min(500px,97vw)',
+        ...posStyle,
         background:'#fff', borderRadius:14,
         boxShadow:'0 8px 40px rgba(60,64,67,.30), 0 2px 10px rgba(60,64,67,.18)',
         display:'flex', flexDirection:'column',

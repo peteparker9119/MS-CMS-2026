@@ -186,8 +186,9 @@ export default function WeekCalendar({
   const days     = getWeekDays(weekStart);
   const now      = new Date();
   const todayIso = isoDate(now);
-  const scrollEl = useRef(null);
-  const colRef   = useRef({});
+  const scrollEl  = useRef(null);
+  const colRef    = useRef({});
+  const lastPosRef = useRef({ x: 0, y: 0 });
 
   // Drag state (ref, no re-renders during drag)
   const dragRef = useRef(null);
@@ -272,6 +273,7 @@ export default function WeekCalendar({
 
   // ── global move ───────────────────────────────────────────────────────────
   const onMove = useCallback((e) => {
+    lastPosRef.current = { x: e.clientX, y: e.clientY };
     const dr = dragRef.current;
     if (!dr) return;
     if (!dr.moved) dr.moved = true;
@@ -308,12 +310,13 @@ export default function WeekCalendar({
 
     if (dr.type === 'create') {
       const g = ghost;
+      const pos = lastPosRef.current;
       setGhost(null);
       if (!g) return;
       if (!dr.moved || Math.abs(g.e - g.s) < SNAP) {
-        onSlotClick?.(g.day, g.s, g.s + 60);
+        onSlotClick?.(g.day, g.s, g.s + 60, pos);
       } else {
-        onDragCreate?.(g.day, Math.min(g.s,g.e), Math.max(g.s,g.e));
+        onDragCreate?.(g.day, Math.min(g.s,g.e), Math.max(g.s,g.e), pos);
       }
 
     } else if (dr.type === 'move') {

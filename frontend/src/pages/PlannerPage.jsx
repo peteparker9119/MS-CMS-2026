@@ -276,14 +276,14 @@ export default function PlannerPage() {
   });
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
-  // startMin/endMin only provided by slot-clicks; FAB button omits them → no pre-fill
-  const openNewMeeting = (date, startMin, endMin) =>
-    setEventModal({ date: date instanceof Date ? toIso(date) : date, startMin, endMin });
+  // pos = { x, y } click coords so modal appears near the interaction point
+  const openNewMeeting = (date, startMin, endMin, pos) =>
+    setEventModal({ date: date instanceof Date ? toIso(date) : (date || ''), startMin, endMin, pos });
 
   const openEditMeeting = (meeting) => setEventModal({
     date:     meeting.date,
-    startMin: meeting.time     ? timeToMin(meeting.time)     : 9*60,
-    endMin:   meeting.end_time ? timeToMin(meeting.end_time) : (meeting.time ? timeToMin(meeting.time)+60 : 10*60),
+    startMin: meeting.time     ? timeToMin(meeting.time)     : undefined,
+    endMin:   meeting.end_time ? timeToMin(meeting.end_time) : undefined,
     meeting,
   });
 
@@ -359,7 +359,8 @@ export default function PlannerPage() {
 
           {/* New meeting FAB */}
           {canCreate && (
-            <button type="button" onClick={() => openNewMeeting(todayIso)}
+            <button type="button"
+              onClick={e => { const r = e.currentTarget.getBoundingClientRect(); openNewMeeting('', undefined, undefined, { x: r.left, y: r.bottom + 8 }); }}
               style={{ border:'none', borderRadius:20, padding:'8px 20px', fontSize:14, fontFamily:GS, fontWeight:500, cursor:'pointer', background:'#1a73e8', color:'#fff', display:'flex', alignItems:'center', gap:7, flexShrink:0, boxShadow:'0 1px 3px rgba(0,0,0,.2)' }}
               onMouseEnter={e => { e.currentTarget.style.background='#1765cc'; e.currentTarget.style.boxShadow='0 2px 6px rgba(0,0,0,.25)'; }}
               onMouseLeave={e => { e.currentTarget.style.background='#1a73e8'; e.currentTarget.style.boxShadow='0 1px 3px rgba(0,0,0,.2)'; }}>
@@ -396,8 +397,8 @@ export default function PlannerPage() {
               weekStart={weekStart}
               meetings={meetings}
               height="100%"
-              onSlotClick={(date, startMin, endMin)   => openNewMeeting(date, startMin, endMin)}
-              onDragCreate={(date, startMin, endMin)  => openNewMeeting(date, startMin, endMin)}
+              onSlotClick={(date, startMin, endMin, pos)  => openNewMeeting(date, startMin, endMin, pos)}
+              onDragCreate={(date, startMin, endMin, pos) => openNewMeeting(date, startMin, endMin, pos)}
               onEventEdit={openEditMeeting}
               onEventCancel={openCancel}
               onEventMove={(m, dateIso, time, end_time) =>
