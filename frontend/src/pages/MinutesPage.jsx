@@ -459,7 +459,7 @@ function MomEntryModal({ meeting, onClose, onSave, saving }) {
 }
 
 // ── Meeting row ───────────────────────────────────────────────────────────────
-function MeetingRow({ meeting, onEnterMoM }) {
+function MeetingRow({ meeting, onEnterMoM, isAdmin }) {
   const [tip, setTip] = useState(false);
   const A = meeting.pair?.unit_a, B = meeting.pair?.unit_b;
   const d = new Date(meeting.date + 'T00:00:00');
@@ -492,8 +492,8 @@ function MeetingRow({ meeting, onEnterMoM }) {
         </div>
       </div>
 
-      {/* Action button */}
-      <div style={{ flexShrink:0, position:'relative' }}
+      {/* Action button — admin only */}
+      {!isAdmin ? null : <div style={{ flexShrink:0, position:'relative' }}
         onMouseEnter={() => { if (!allowed) setTip(true); }}
         onMouseLeave={() => setTip(false)}>
         <button type="button"
@@ -530,7 +530,7 @@ function MeetingRow({ meeting, onEnterMoM }) {
             <div style={{ position:'absolute', bottom:-5, right:20, width:10, height:10, background:'#3c4043', transform:'rotate(45deg)' }} />
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }
@@ -730,7 +730,7 @@ export default function MinutesPage() {
       ) : (
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
           {visible.map(m => (
-            <MeetingRow key={m.id} meeting={m} onEnterMoM={setMomMeeting} />
+            <MeetingRow key={m.id} meeting={m} onEnterMoM={setMomMeeting} isAdmin={user?.role === 'admin'} />
           ))}
         </div>
       )}
