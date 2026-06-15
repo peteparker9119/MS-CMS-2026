@@ -286,40 +286,93 @@ function CustomRecurrencePanel({ value, onChange }) {
   );
 }
 
-// ── Pair dropdown ─────────────────────────────────────────────────────────────
+// ── Team filter chips + flat pair list ───────────────────────────────────────
 function PairSelect({ pairs, pairId, onPairChange, onNotifyChange }) {
+  const units = useMemo(() => {
+    const map = {};
+    pairs.forEach(p => { map[p.unit_a.id]=p.unit_a; map[p.unit_b.id]=p.unit_b; });
+    return Object.values(map).sort((a,b) => a.abbr.localeCompare(b.abbr));
+  }, [pairs]);
+
+  // null = untouched, [] = All, [ids] = filtered
+  const [filter, setFilter] = useState(() => {
+    if (!pairId) return null;
+    const p = pairs.find(p => p.id === parseInt(pairId));
+    return p ? [p.unit_a.id, p.unit_b.id] : null;
+  });
+
+  const toggleUnit = uid => setFilter(f => {
+    const arr = f ?? [];
+    return arr.includes(uid) ? arr.filter(x => x !== uid) : [...arr, uid];
+  });
+
+  const visible = useMemo(() =>
+    filter === null ? [] :
+    filter.length === 0 ? pairs :
+    pairs.filter(p => filter.some(uid => p.unit_a.id===uid || p.unit_b.id===uid)),
+    [pairs, filter]
+  );
+
   const selPair = pairId ? pairs.find(p => p.id === parseInt(pairId)) : null;
+
+  const pick = p => {
+    onPairChange(String(p.id));
+    onNotifyChange(() => [p.unit_a.id, p.unit_b.id]);
+  };
+
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-      <select
-        value={pairId}
-        onChange={e => {
-          const id = e.target.value;
-          onPairChange(id);
-          if (id) {
-            const p = pairs.find(p => p.id === parseInt(id));
-            if (p) onNotifyChange(() => [p.unit_a.id, p.unit_b.id]);
-          }
-        }}
-        style={{ border:`1px solid ${LINE}`, borderRadius:8, padding:'9px 12px', fontSize:13, fontFamily:GS, color:pairId?INK:INK3, background:'#fff', outline:'none', cursor:'pointer', width:'100%' }}
-        onFocus={e => { e.target.style.borderColor=BLUE; e.target.style.boxShadow=`0 0 0 2px ${BLUE}22`; }}
-        onBlur={e  => { e.target.style.borderColor=LINE; e.target.style.boxShadow='none'; }}
-      >
-        <option value="">Select convergence pair</option>
-        {pairs.map(p => (
-          <option key={p.id} value={String(p.id)}>{p.unit_a.abbr} × {p.unit_b.abbr}</option>
-        ))}
-      </select>
+      {/* Team filter chips */}
+      <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+        <button type="button" onClick={() => setFilter([])}
+          style={{ padding:'4px 13px', border:`1.5px solid ${filter!==null&&filter.length===0?BLUE:LINE}`, borderRadius:20, cursor:'pointer', background:filter!==null&&filter.length===0?BBGF:'#fff', fontFamily:GS, fontSize:12, color:filter!==null&&filter.length===0?BLUE:INK2, fontWeight:filter!==null&&filter.length===0?600:400 }}>
+          All
+        </button>
+        {units.map(u => {
+          const on = filter!==null && filter.includes(u.id);
+          return (
+            <button key={u.id} type="button" onClick={() => toggleUnit(u.id)}
+              style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'4px 12px', border:`1.5px solid ${on?u.color||BLUE:LINE}`, borderRadius:20, cursor:'pointer', background:on?(u.color||BLUE)+'18':'#fff', fontFamily:GS, fontSize:12, color:on?u.color||BLUE:INK2, fontWeight:on?600:400 }}>
+              <span style={{ width:7, height:7, borderRadius:'50%', background:u.color||BLUE, display:'inline-block' }} />
+              {u.abbr}
+            </button>
+          );
+        })}
+      </div>
 
-      {/* Notify chips — shown once a pair is selected */}
+      {/* Pair list */}
+      {filter === null ? (
+        <div style={{ fontFamily:RI, fontSize:13, color:INK3, padding:'4px 2px', display:'flex', alignItems:'center', gap:6 }}>
+          <span>↑</span> Select a team to see pairs
+        </div>
+      ) : visible.length === 0 ? (
+        <div style={{ fontFamily:RI, fontSize:13, color:INK3, padding:'4px 2px' }}>No pairs match.</div>
+      ) : (
+        <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+          {visible.map(p => {
+            const sel = pairId === String(p.id);
+            return (
+              <button key={p.id} type="button" onClick={() => pick(p)}
+                style={{ padding:'5px 14px', border:`1.5px solid ${sel?BLUE:LINE}`, borderRadius:20, cursor:'pointer', background:sel?BBGF:'#fff', fontFamily:GS, fontSize:13, color:sel?BLUE:INK, fontWeight:sel?600:400, display:'inline-flex', alignItems:'center', gap:6 }}>
+                <span style={{ width:7, height:7, borderRadius:'50%', background:p.unit_a.color||BLUE, display:'inline-block' }} />
+                {p.unit_a.abbr} × {p.unit_b.abbr}
+                <span style={{ width:7, height:7, borderRadius:'50%', background:p.unit_b.color||'#34a853', display:'inline-block' }} />
+                {sel && <IcCheck />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Notify row */}
       {selPair && (
         <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
           <span style={{ fontFamily:RI, fontSize:11, color:INK3, textTransform:'uppercase', letterSpacing:'.5px' }}>Notify</span>
           {[selPair.unit_a, selPair.unit_b].map(u => (
-            <label key={u.id} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 11px', border:`1.5px solid ${LINE}`, borderRadius:20, background:'#f8f9fa', cursor:'pointer', userSelect:'none' }}>
-              <span style={{ width:7, height:7, borderRadius:'50%', background:u.color, display:'inline-block', flexShrink:0 }} />
-              <span style={{ fontFamily:GS, fontSize:12, color:INK2 }}>{u.abbr}</span>
-            </label>
+            <span key={u.id} style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'4px 11px', border:`1.5px solid ${LINE}`, borderRadius:20, background:'#f8f9fa', fontFamily:GS, fontSize:12, color:INK2 }}>
+              <span style={{ width:7, height:7, borderRadius:'50%', background:u.color, display:'inline-block' }} />
+              {u.abbr}
+            </span>
           ))}
         </div>
       )}
@@ -576,7 +629,7 @@ export default function EventModal({ initial, pairs, meetings, onSave, onClose, 
 
           <HR />
 
-          {/* ── PAIR SELECT ── */}
+          {/* ── PAIR / TEAM PICKER ── */}
           <FR icon={<IcUsers />}>
             <PairSelect
               pairs={pairs}

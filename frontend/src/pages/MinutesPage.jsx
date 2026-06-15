@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getMeetings, createMeeting, submitMinutes, recordNotHeld } from '../api/meetings';
 import { getUnits, getPairs } from '../api/units';
@@ -43,6 +44,220 @@ function shareWhatsApp(meeting) {
   window.open('https://wa.me/?text=' + encodeURIComponent(formatMoM(meeting)), '_blank');
 }
 
+// ── Record MoM modal ─────────────────────────────────────────────────────────
+function RecordModal({ pairs, meetings, formPairs, pocUnit, pairMembers, onClose, onSubmit, saving }) {
+  const [selPair,     setSelPair]     = useState('');
+  const [mDate,       setMDate]       = useState('');
+  const [outcome,     setOutcome]     = useState('held');
+  const [attendees,   setAttendees]   = useState('');
+  const [summary,     setSummary]     = useState('');
+  const [actionItems, setActionItems] = useState([{ text: '', assigned_to: null, deadline: '' }]);
+  const [nhStatus,    setNhStatus]    = useState('postponed');
+  const [reason,      setReason]      = useState('');
+  const [fe,          setFe]          = useState({});
+
+  const clearFe = f => setFe(p => ({ ...p, [f]: '' }));
+  const addAP    = () => setActionItems(p => [...p, { text:'', assigned_to:null, deadline:'' }]);
+  const removeAP = i  => setActionItems(p => p.filter((_,idx) => idx!==i));
+  const updateAP = (i, f, v) => setActionItems(p => p.map((it,idx) => idx===i ? {...it,[f]:v} : it));
+
+  useEffect(() => {
+    const h = e => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [onClose]);
+
+  const LBL = { fontFamily:'var(--fm)', fontSize:12, fontWeight:600, letterSpacing:'.05em', textTransform:'uppercase', color:'var(--ink3)', display:'block', marginBottom:6 };
+  const INP = { border:'1px solid var(--line)', borderRadius:8, padding:'9px 12px', fontSize:14, fontFamily:'var(--fm)', color:'var(--ink)', width:'100%', boxSizing:'border-box', outline:'none', background:'#fff' };
+
+  const handleSubmit = () => {
+    const errors = {};
+    if (!selPair) errors.selPair = 'Select a convergence unit pair';
+    if (!mDate)   errors.mDate   = 'Pick a meeting date';
+    const apItems = outcome === 'held'
+      ? actionItems.filter(a => a.text.trim()).map(a => ({ text:a.text.trim(), assigned_to:a.assigned_to||null, deadline:a.deadline||null }))
+      : [];
+    if (outcome==='held' && !summary && !apItems.length) errors.summary = 'Add a summary or at least one action point';
+    if (outcome==='notheld' && !reason) errors.reason = 'Provide a reason';
+    if (Object.keys(errors).length) { setFe(errors); return; }
+    setFe({});
+    onSubmit({ selPair, mDate, outcome, attendees, summary, apItems, nhStatus, reason });
+  };
+
+  return createPortal(
+    <>
+      <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.45)', zIndex:1100 }} />
+      <div style={{
+        position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
+        zIndex:1101, width:'min(760px,96vw)', maxHeight:'92vh',
+        background:'#fff', borderRadius:16,
+        boxShadow:'0 24px 64px rgba(0,0,0,.28)',
+        display:'flex', flexDirection:'column', overflow:'hidden',
+        fontFamily:'var(--fm)',
+      }}>
+        {/* Header */}
+        <div style={{ padding:'20px 28px 16px', borderBottom:'1px solid var(--line)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
+          <div>
+            <div style={{ fontFamily:'var(--fd)', fontWeight:700, fontSize:22, color:'var(--ink)' }}>Record meeting</div>
+            <div style={{ fontFamily:'var(--fm)', fontSize:13, color:'var(--ink3)', marginTop:3 }}>held → file minutes · not held → record reason</div>
+          </div>
+          <button type="button" onClick={onClose}
+            style={{ border:'none', background:'none', cursor:'pointer', width:38, height:38, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--ink2)', fontSize:22, lineHeight:1 }}
+            onMouseEnter={e => e.currentTarget.style.background='#f1f3f4'}
+            onMouseLeave={e => e.currentTarget.style.background='none'}>
+            ✕
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex:1, overflowY:'auto', padding:'24px 28px' }}>
+          {/* Pair + Date row */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
+            <div>
+              <label style={LBL}>Convergence unit pair</label>
+              {pocUnit ? (
+                <select value={selPair} onChange={e => { setSelPair(e.target.value); clearFe('selPair'); }}
+                  style={{ ...INP, cursor:'pointer' }}
+                  onFocus={e => e.target.style.borderColor='var(--accent)'}
+                  onBlur={e  => e.target.style.borderColor='var(--line)'}>
+                  <option value="">— Select pair —</option>
+                  {formPairs.map(p => (
+                    <option key={p.id} value={String(p.id)}>
+                      {p.unit_a.slug===pocUnit.slug ? p.unit_b.name : p.unit_a.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <select value={selPair} onChange={e => { setSelPair(e.target.value); clearFe('selPair'); }}
+                  style={{ ...INP, cursor:'pointer' }}
+                  onFocus={e => e.target.style.borderColor='var(--accent)'}
+                  onBlur={e  => e.target.style.borderColor='var(--line)'}>
+                  <option value="">— Select pair —</option>
+                  {formPairs.map(p => (
+                    <option key={p.id} value={String(p.id)}>{p.unit_a.abbr} × {p.unit_b.abbr}</option>
+                  ))}
+                </select>
+              )}
+              {fe.selPair && <div style={{ fontSize:12, color:'#dc2626', marginTop:5 }}>⚠ {fe.selPair}</div>}
+            </div>
+            <div>
+              <label style={LBL}>Meeting date</label>
+              <DateField value={mDate} onChange={v => { setMDate(v); clearFe('mDate'); }} />
+              {fe.mDate && <div style={{ fontSize:12, color:'#dc2626', marginTop:5 }}>⚠ {fe.mDate}</div>}
+            </div>
+          </div>
+
+          {/* Outcome toggle */}
+          <div style={{ marginBottom:20 }}>
+            <label style={LBL}>Outcome</label>
+            <div style={{ display:'flex', gap:10 }}>
+              {[['held','✅ Meeting held'],['notheld','⚠ Not held']].map(([v,l]) => (
+                <label key={v} style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:8, height:44, border:`1.5px solid ${outcome===v?'var(--accent)':'var(--line)'}`, borderRadius:10, fontSize:14, cursor:'pointer', background:outcome===v?'var(--accent-light)':'#fff', fontWeight:outcome===v?700:500, color:outcome===v?'var(--accent)':'var(--ink2)', transition:'.13s' }}>
+                  <input type="radio" style={{ display:'none' }} checked={outcome===v} onChange={() => setOutcome(v)} />{l}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {outcome === 'held' ? (
+            <>
+              {/* Attendees */}
+              <div style={{ marginBottom:20 }}>
+                <label style={LBL}>Attendees present</label>
+                <input style={INP} value={attendees} onChange={e => setAttendees(e.target.value)} placeholder="e.g. 6 of 8 members"
+                  onFocus={e => e.target.style.borderColor='var(--accent)'}
+                  onBlur={e  => e.target.style.borderColor='var(--line)'} />
+              </div>
+
+              {/* Summary */}
+              <div style={{ marginBottom:20 }}>
+                <label style={LBL}>Summary / discussion</label>
+                <textarea style={{ ...INP, resize:'vertical', minHeight:120, lineHeight:1.6 }}
+                  value={summary} onChange={e => { setSummary(e.target.value); clearFe('summary'); }}
+                  placeholder="What was discussed and decided…"
+                  onFocus={e => e.target.style.borderColor='var(--accent)'}
+                  onBlur={e  => e.target.style.borderColor='var(--line)'} />
+                {fe.summary && <div style={{ fontSize:12, color:'#dc2626', marginTop:5 }}>⚠ {fe.summary}</div>}
+              </div>
+
+              {/* Action points */}
+              <div>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                  <label style={{ ...LBL, margin:0 }}>Action points</label>
+                  <button type="button" onClick={addAP}
+                    style={{ border:'1.5px solid var(--accent)', borderRadius:8, padding:'5px 14px', background:'var(--accent-light)', color:'var(--accent)', fontFamily:'var(--fb)', fontSize:13, fontWeight:700, cursor:'pointer' }}>
+                    + Add item
+                  </button>
+                </div>
+                {actionItems.map((item, i) => (
+                  <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 180px 140px 34px', gap:8, marginBottom:10, alignItems:'start' }}>
+                    <input style={{ ...INP, fontSize:14 }} value={item.text}
+                      onChange={e => updateAP(i,'text',e.target.value)}
+                      placeholder={`Action item ${i+1}…`}
+                      onFocus={e => e.target.style.borderColor='var(--accent)'}
+                      onBlur={e  => e.target.style.borderColor='var(--line)'} />
+                    <select style={{ ...INP, cursor:'pointer', fontSize:13 }} value={item.assigned_to??''}
+                      onChange={e => updateAP(i,'assigned_to',e.target.value?Number(e.target.value):null)}>
+                      <option value="">— Assign to —</option>
+                      {pairMembers.map(m => <option key={m.id} value={m.id}>{m.name} ({m.unit_abbr})</option>)}
+                    </select>
+                    <input type="date" value={item.deadline}
+                      onChange={e => updateAP(i,'deadline',e.target.value)}
+                      style={{ ...INP, fontSize:13, cursor:'pointer' }} />
+                    {actionItems.length > 1 ? (
+                      <button type="button" onClick={() => removeAP(i)}
+                        style={{ height:42, width:34, border:'1px solid #fca5a5', borderRadius:8, background:'#fff5f5', color:'#dc2626', fontSize:18, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        ×
+                      </button>
+                    ) : <span />}
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ marginBottom:20 }}>
+                <label style={LBL}>What happened</label>
+                <div style={{ display:'flex', gap:10 }}>
+                  {[['postponed','🕘 Postponed'],['missed','✕ Missed']].map(([v,l]) => (
+                    <label key={v} style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:8, height:44, border:`1.5px solid ${nhStatus===v?'#f59e0b':'var(--line)'}`, borderRadius:10, fontSize:14, cursor:'pointer', background:nhStatus===v?'#fef9ec':'#fff', fontWeight:nhStatus===v?700:500, color:nhStatus===v?'#92600a':'var(--ink2)', transition:'.13s' }}>
+                      <input type="radio" style={{ display:'none' }} checked={nhStatus===v} onChange={() => setNhStatus(v)} />{l}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label style={LBL}>Reason — why it didn't happen</label>
+                <textarea style={{ ...INP, resize:'vertical', minHeight:120, lineHeight:1.6 }}
+                  value={reason} onChange={e => { setReason(e.target.value); clearFe('reason'); }}
+                  placeholder="e.g. Key members on field duty; clashed with district review…"
+                  onFocus={e => e.target.style.borderColor='var(--accent)'}
+                  onBlur={e  => e.target.style.borderColor='var(--line)'} />
+                {fe.reason && <div style={{ fontSize:12, color:'#dc2626', marginTop:5 }}>⚠ {fe.reason}</div>}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding:'16px 28px', borderTop:'1px solid var(--line)', display:'flex', justifyContent:'flex-end', gap:10, flexShrink:0, background:'#fff' }}>
+          <button type="button" onClick={onClose}
+            style={{ border:'1px solid var(--line)', borderRadius:20, padding:'10px 24px', fontSize:14, fontFamily:'var(--fb)', cursor:'pointer', background:'#fff', color:'var(--accent)', fontWeight:500 }}
+            onMouseEnter={e => e.currentTarget.style.background='#f8f9fa'}
+            onMouseLeave={e => e.currentTarget.style.background='#fff'}>
+            Cancel
+          </button>
+          <button type="button" onClick={handleSubmit} disabled={saving}
+            style={{ border:'none', borderRadius:20, padding:'10px 32px', fontSize:14, fontFamily:'var(--fb)', fontWeight:600, cursor:saving?'not-allowed':'pointer', background:'var(--accent)', color:'#fff', opacity:saving?.7:1 }}>
+            {saving ? 'Saving…' : outcome==='held' ? 'Submit minutes' : 'Record reason'}
+          </button>
+        </div>
+      </div>
+    </>,
+    document.body
+  );
+}
+
 export default function MinutesPage() {
   const { user } = useAuth();
   const toast    = useToast();
@@ -79,70 +294,47 @@ export default function MinutesPage() {
   const totalActions = conductedMeetings.reduce((s,m) => s + (m.minutes?.action_points?.length ?? 0), 0);
   const lastFiled    = [...conductedMeetings].sort((a,b) => new Date(b.date)-new Date(a.date))[0];
 
-  const [selPair,     setSelPair]     = useState('');
-  const [mDate,       setMDate]       = useState('');
-  const [outcome,     setOutcome]     = useState('held');
-  const [attendees,   setAttendees]   = useState('');
-  const [summary,     setSummary]     = useState('');
-  const [actionItems, setActionItems] = useState([{ text: '', assigned_to: null, deadline: '' }]);
-  const [nhStatus,    setNhStatus]    = useState('postponed');
-  const [reason,      setReason]      = useState('');
-  const [fe,          setFe]          = useState({});
+  const [showModal, setShowModal] = useState(false);
+  const [modalPair, setModalPair] = useState('');
 
-  const selectedPair = pairs.find(p => String(p.id) === selPair);
+  const selectedPair = pairs.find(p => String(p.id) === modalPair);
   const { data: pairMembers = [] } = useQuery({
-    queryKey: ['pair-members', selPair],
+    queryKey: ['pair-members', modalPair],
     queryFn: () => getUsersByUnits([selectedPair.unit_a.id, selectedPair.unit_b.id]),
     enabled: !!selectedPair,
   });
 
-  const addActionItem    = () => setActionItems(prev => [...prev, { text: '', assigned_to: null, deadline: '' }]);
-  const removeActionItem = (i) => setActionItems(prev => prev.filter((_, idx) => idx !== i));
-  const updateActionItem = (i, field, value) => setActionItems(prev => prev.map((it, idx) => idx === i ? { ...it, [field]: value } : it));
-
-  const clearFe = (field) => setFe(p => ({ ...p, [field]: '' }));
-
   const submitMutation = useMutation({
-    mutationFn: ({ meetingId, data }) => outcome === 'held' ? submitMinutes(meetingId, data) : recordNotHeld(meetingId, data),
+    mutationFn: ({ meetingId, data, outcome }) => outcome === 'held' ? submitMinutes(meetingId, data) : recordNotHeld(meetingId, data),
     onSuccess: () => {
       qc.invalidateQueries(['meetings']);
-      setSummary(''); setActionItems([{ text: '', assigned_to: null, deadline: '' }]); setAttendees(''); setReason(''); setFe({});
-      toast(outcome === 'held' ? 'Minutes filed' : 'Recorded');
+      setShowModal(false);
+      toast('Saved');
     },
     onError: (err) => toast(getErrorMessage(err)),
   });
 
-  const handleSubmit = async () => {
-    const errors = {};
-    if (!selPair) errors.selPair = 'Select a convergence unit pair';
-    if (!mDate)   errors.mDate   = 'Pick a meeting date';
-    const apItems = outcome === 'held'
-      ? actionItems.filter(a => a.text.trim()).map(a => ({ text: a.text.trim(), assigned_to: a.assigned_to || null, deadline: a.deadline || null }))
-      : [];
-    if (outcome === 'held' && !summary && !apItems.length) errors.summary = 'Add a summary or at least one action point';
-    if (outcome === 'notheld' && !reason) errors.reason = 'Provide a reason for not holding the meeting';
-    if (Object.keys(errors).length) { setFe(errors); return; }
-    setFe({});
-
+  const handleSubmit = async ({ selPair, mDate, outcome, attendees, summary, apItems, nhStatus, reason }) => {
     const pair = pairs.find(p => String(p.id) === selPair);
     if (!pair) return;
+    setModalPair(selPair);
     const existing = meetings.find(m =>
       (m.pair.unit_a.slug === pair.unit_a.slug && m.pair.unit_b.slug === pair.unit_b.slug) ||
       (m.pair.unit_a.slug === pair.unit_b.slug && m.pair.unit_b.slug === pair.unit_a.slug)
     );
     if (outcome === 'held') {
       if (existing) {
-        submitMutation.mutate({ meetingId: existing.id, data: { attendees, summary, action_points: apItems, source:'written' } });
+        submitMutation.mutate({ meetingId: existing.id, data: { attendees, summary, action_points: apItems, source:'written' }, outcome });
       } else {
         const m = await createMeeting({ pair_id: pair.id, date: mDate, status:'conducted', mtype:'In-person' });
-        submitMutation.mutate({ meetingId: m.id, data: { attendees, summary, action_points: apItems, source:'written' } });
+        submitMutation.mutate({ meetingId: m.id, data: { attendees, summary, action_points: apItems, source:'written' }, outcome });
       }
     } else {
       if (existing) {
-        submitMutation.mutate({ meetingId: existing.id, data: { status: nhStatus, reason } });
+        submitMutation.mutate({ meetingId: existing.id, data: { status: nhStatus, reason }, outcome });
       } else {
         const m = await createMeeting({ pair_id: pair.id, date: mDate, status: nhStatus, mtype:'In-person' });
-        submitMutation.mutate({ meetingId: m.id, data: { status: nhStatus, reason } });
+        submitMutation.mutate({ meetingId: m.id, data: { status: nhStatus, reason }, outcome });
       }
     }
   };
@@ -186,166 +378,33 @@ export default function MinutesPage() {
         ))}
       </CRow>
 
+      {/* Record modal */}
+      {showModal && (
+        <RecordModal
+          pairs={pairs}
+          meetings={meetings}
+          formPairs={formPairs}
+          pocUnit={pocUnit}
+          pairMembers={pairMembers}
+          onClose={() => setShowModal(false)}
+          onSubmit={handleSubmit}
+          saving={submitMutation.isPending}
+        />
+      )}
+
       <CRow className="g-3">
-        {/* Record form */}
-        <CCol lg={6}>
-          <CCard>
-            <CCardBody>
-              <div className="d-flex align-items-center justify-content-between mb-3">
-                <h5 style={{ fontFamily:'var(--fd)', fontWeight:600, fontSize:18, margin:0 }}>Record meeting</h5>
-                <span style={{ fontFamily:'var(--fm)', fontSize:11, color:'var(--ink3)' }}>held → minutes · not held → reason</span>
-              </div>
-
-              <div className="mb-3">
-                <CFormLabel style={{ fontFamily:'var(--fm)', fontSize:11, fontWeight:600, letterSpacing:'.05em', textTransform:'uppercase', color:'var(--ink3)' }}>Convergence unit</CFormLabel>
-                {pocUnit ? (
-                  <SearchableSelect
-                    value={selPair}
-                    onChange={v => { setSelPair(v); clearFe('selPair'); }}
-                    placeholder="— Select unit pair —"
-                    hasError={!!fe.selPair}
-                    options={formPairs.map(p => ({
-                      value: String(p.id),
-                      label: p.unit_a.slug === pocUnit.slug ? p.unit_b.name : p.unit_a.name,
-                    }))}
-                  />
-                ) : (
-                  <SearchableSelect
-                    value={selPair}
-                    onChange={v => { setSelPair(v); clearFe('selPair'); }}
-                    placeholder="— Select unit pair —"
-                    hasError={!!fe.selPair}
-                    groups={units.map(u => {
-                      const uPairs = formPairs.filter(p => p.unit_a.slug === u.slug || p.unit_b.slug === u.slug);
-                      return {
-                        label: u.name,
-                        options: uPairs.map(p => ({
-                          value: String(p.id),
-                          label: p.unit_a.slug === u.slug ? p.unit_b.name : p.unit_a.name,
-                        })),
-                      };
-                    }).filter(g => g.options.length > 0)}
-                  />
-                )}
-                {fe.selPair && <div style={ERR}>⚠ {fe.selPair}</div>}
-              </div>
-
-              <CRow className="g-2 mb-3">
-                <CCol>
-                  <CFormLabel style={{ fontFamily:'var(--fm)', fontSize:11, fontWeight:600, letterSpacing:'.05em', textTransform:'uppercase', color:'var(--ink3)' }}>Meeting date</CFormLabel>
-                  <DateField value={mDate} onChange={v => { setMDate(v); clearFe('mDate'); }}
-                    style={fe.mDate ? { borderColor:'#dc2626' } : {}} />
-                  {fe.mDate && <div style={ERR}>⚠ {fe.mDate}</div>}
-                </CCol>
-                <CCol>
-                  <CFormLabel style={{ fontFamily:'var(--fm)', fontSize:11, fontWeight:600, letterSpacing:'.05em', textTransform:'uppercase', color:'var(--ink3)' }}>Outcome</CFormLabel>
-                  <div className="d-flex gap-2">
-                    {[['held','✅ Held'],['notheld','⚠ Not held']].map(([v,l]) => (
-                      <label key={v} style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, height:38, border:`1.5px solid ${outcome===v?'var(--accent)':'var(--line)'}`, borderRadius:9, padding:'0 8px', fontSize:13, cursor:'pointer', background:outcome===v?'var(--accent-light)':'#fff', fontWeight:outcome===v?700:500, color:outcome===v?'var(--accent)':'var(--ink2)', transition:'.13s' }}>
-                        <input type="radio" name="outcome" style={{ display:'none' }} checked={outcome===v} onChange={() => setOutcome(v)} />{l}
-                      </label>
-                    ))}
-                  </div>
-                </CCol>
-              </CRow>
-
-              {outcome === 'held' ? (
-                <>
-                  <div className="mb-3">
-                    <CFormLabel style={{ fontFamily:'var(--fm)', fontSize:11, fontWeight:600, letterSpacing:'.05em', textTransform:'uppercase', color:'var(--ink3)' }}>Attendees present</CFormLabel>
-                    <CFormInput value={attendees} onChange={e => setAttendees(e.target.value)} placeholder="e.g. 6 of 8" />
-                  </div>
-                  <div className="mb-3">
-                    <CFormLabel style={{ fontFamily:'var(--fm)', fontSize:11, fontWeight:600, letterSpacing:'.05em', textTransform:'uppercase', color:'var(--ink3)' }}>Summary / discussion</CFormLabel>
-                    <CFormTextarea value={summary} onChange={e => { setSummary(e.target.value); clearFe('summary'); }}
-                      placeholder="What was discussed and decided…" rows={3}
-                      style={fe.summary ? { borderColor:'#dc2626' } : {}} />
-                    {fe.summary && <div style={ERR}>⚠ {fe.summary}</div>}
-                  </div>
-                  <div className="mb-3">
-                    <div className="d-flex align-items-center justify-content-between mb-2">
-                      <CFormLabel style={{ fontFamily:'var(--fm)', fontSize:11, fontWeight:600, letterSpacing:'.05em', textTransform:'uppercase', color:'var(--ink3)', margin:0 }}>
-                        Action points
-                      </CFormLabel>
-                      <button type="button" onClick={addActionItem}
-                        style={{ border:'1.5px solid var(--accent)', borderRadius:7, padding:'3px 10px', background:'var(--accent-light)', color:'var(--accent)', fontFamily:'var(--fb)', fontSize:12, fontWeight:700, cursor:'pointer' }}>
-                        + Add item
-                      </button>
-                    </div>
-                    {actionItems.map((item, i) => (
-                      <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 160px 130px 28px', gap:6, marginBottom:8, alignItems:'start' }}>
-                        <CFormInput
-                          value={item.text}
-                          onChange={e => updateActionItem(i, 'text', e.target.value)}
-                          placeholder={`Action item ${i + 1}…`}
-                          style={{ fontSize:13 }}
-                        />
-                        <CFormSelect
-                          value={item.assigned_to ?? ''}
-                          onChange={e => updateActionItem(i, 'assigned_to', e.target.value ? Number(e.target.value) : null)}
-                          style={{ fontSize:12 }}
-                        >
-                          <option value="">— Assign to —</option>
-                          {pairMembers.map(m => (
-                            <option key={m.id} value={m.id}>{m.name} ({m.unit_abbr})</option>
-                          ))}
-                        </CFormSelect>
-                        <input
-                          type="date"
-                          value={item.deadline}
-                          onChange={e => updateActionItem(i, 'deadline', e.target.value)}
-                          title="Deadline"
-                          style={{ height:38, border:'1px solid var(--line)', borderRadius:7, padding:'0 8px', fontSize:12, fontFamily:'var(--fm)', color:'var(--ink)', background:'#fff', width:'100%' }}
-                        />
-                        {actionItems.length > 1 ? (
-                          <button type="button" onClick={() => removeActionItem(i)}
-                            style={{ height:38, width:28, border:'1px solid #fca5a5', borderRadius:7, background:'#fff5f5', color:'#dc2626', fontWeight:700, fontSize:15, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                            ×
-                          </button>
-                        ) : <span />}
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="mb-3">
-                    <CFormLabel style={{ fontFamily:'var(--fm)', fontSize:11, fontWeight:600, letterSpacing:'.05em', textTransform:'uppercase', color:'var(--ink3)' }}>What happened</CFormLabel>
-                    <div className="d-flex gap-2">
-                      {[['postponed','🕘 Postponed'],['missed','✕ Missed']].map(([v,l]) => (
-                        <label key={v} style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, height:38, border:`1.5px solid ${nhStatus===v?'var(--warn)':'var(--line)'}`, borderRadius:9, padding:'0 8px', fontSize:13, cursor:'pointer', background:nhStatus===v?'#fef9ec':'#fff', fontWeight:nhStatus===v?700:500, color:nhStatus===v?'#92600a':'var(--ink2)', transition:'.13s' }}>
-                          <input type="radio" name="nhstatus" style={{ display:'none' }} checked={nhStatus===v} onChange={() => setNhStatus(v)} />{l}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="mb-3">
-                    <CFormLabel style={{ fontFamily:'var(--fm)', fontSize:11, fontWeight:600, letterSpacing:'.05em', textTransform:'uppercase', color:'var(--ink3)' }}>
-                      Reason <span style={{ textTransform:'none' }}>— why it didn't happen</span>
-                    </CFormLabel>
-                    <CFormTextarea value={reason} onChange={e => { setReason(e.target.value); clearFe('reason'); }}
-                      placeholder="e.g. Key members on field duty; clashed with district review…" rows={3}
-                      style={fe.reason ? { borderColor:'#dc2626' } : {}} />
-                    {fe.reason && <div style={ERR}>⚠ {fe.reason}</div>}
-                  </div>
-                </>
-              )}
-
-              <CButton color="dark" className="w-100" onClick={handleSubmit} disabled={submitMutation.isPending}
-                style={{ background:'#3b5bdb', borderColor:'#3b5bdb', fontFamily:'var(--fb)', fontWeight:600, fontSize:15, padding:'10px' }}>
-                {submitMutation.isPending ? 'Saving…' : outcome === 'held' ? 'Submit minutes' : 'Record reason'}
-              </CButton>
-            </CCardBody>
-          </CCard>
-        </CCol>
-
         {/* Filed minutes */}
-        <CCol lg={6}>
+        <CCol lg={12}>
           <CCard>
             <CCardBody>
               <div className="d-flex align-items-center justify-content-between mb-3">
                 <h5 style={{ fontFamily:'var(--fd)', fontWeight:600, fontSize:18, margin:0 }}>Filed minutes</h5>
-                <span style={{ fontFamily:'var(--fm)', fontSize:11, color:'var(--ink3)' }}>most recent first</span>
+                <button type="button" onClick={() => setShowModal(true)}
+                  style={{ border:'none', borderRadius:20, padding:'9px 22px', fontSize:14, fontFamily:'var(--fb)', fontWeight:600, cursor:'pointer', background:'var(--accent)', color:'#fff', display:'flex', alignItems:'center', gap:8, boxShadow:'0 1px 4px rgba(0,0,0,.18)' }}
+                  onMouseEnter={e => e.currentTarget.style.background='#1557b0'}
+                  onMouseLeave={e => e.currentTarget.style.background='var(--accent)'}>
+                  + Record meeting
+                </button>
               </div>
               {conductedMeetings.length === 0
                 ? <div style={{ fontSize:13, color:'var(--ink3)' }}>No minutes filed yet for this workspace.</div>
