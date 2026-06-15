@@ -730,7 +730,7 @@ export default function MinutesPage() {
       ) : (
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
           {visible.map(m => (
-            <MeetingRow key={m.id} meeting={m} onEnterMoM={setMomMeeting} isAdmin={user?.role === 'admin'} />
+            <MeetingRow key={m.id} meeting={m} onEnterMoM={setMomMeeting} isAdmin={['admin','super_admin'].includes(user?.role)} />
           ))}
         </div>
       )}
