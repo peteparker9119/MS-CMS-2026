@@ -281,14 +281,21 @@ function ActionPointRow({ ap, index, unitA, unitB, usersByUnit, onUpdate, onRemo
         </div>
       )}
 
-      {/* Step 4 — Deadline */}
+      {/* Step 4 — Start date + Deadline (end date) */}
       {showDeadline && (
-        <div style={{ display:'flex', alignItems:'center', gap:10, paddingLeft:34 }}>
-          <span style={{ fontFamily:'var(--fm)', fontSize:12, color:'var(--ink3)', fontWeight:600, whiteSpace:'nowrap' }}>Deadline</span>
+        <div style={{ display:'flex', alignItems:'center', gap:12, paddingLeft:34, flexWrap:'wrap' }}>
+          <span style={{ fontFamily:'var(--fm)', fontSize:12, color:'var(--ink3)', fontWeight:600, whiteSpace:'nowrap' }}>From</span>
+          <DateField
+            value={ap.startDate}
+            onChange={v => onUpdate(index, 'startDate', v)}
+            placeholder="Start date"
+            style={{ display:'inline-block' }}
+          />
+          <span style={{ fontFamily:'var(--fm)', fontSize:12, color:'var(--ink3)', fontWeight:600, whiteSpace:'nowrap' }}>To</span>
           <DateField
             value={ap.deadline}
             onChange={v => onUpdate(index, 'deadline', v)}
-            placeholder="Pick a deadline"
+            placeholder="Deadline"
             style={{ display:'inline-block' }}
           />
         </div>
@@ -320,14 +327,15 @@ function MomEntryModal({ meeting, onClose, onSave, saving }) {
   const [aps, setAps] = useState(() => {
     if (existingMins?.action_points?.length) {
       return existingMins.action_points.map(ap => ({
-        id:       ap.id ?? null,
-        text:     ap.text ?? '',
-        unitId:   ap.responsible_unit ?? null,
-        userId:   ap.assigned_to ?? null,
-        deadline: ap.deadline ?? '',
+        id:        ap.id ?? null,
+        text:      ap.text ?? '',
+        unitId:    ap.responsible_unit ?? null,
+        userId:    ap.assigned_to ?? null,
+        startDate: ap.start_date ?? '',
+        deadline:  ap.deadline ?? '',
       }));
     }
-    return [{ id:null, text:'', unitId:null, userId:null, deadline:'' }];
+    return [{ id:null, text:'', unitId:null, userId:null, startDate:'', deadline:'' }];
   });
   const [fe, setFe] = useState({});
 
@@ -337,14 +345,14 @@ function MomEntryModal({ meeting, onClose, onSave, saving }) {
     return () => window.removeEventListener('keydown', h);
   }, [onClose]);
 
-  const addAP = () => setAps(p => [...p, { id:null, text:'', unitId:null, userId:null, deadline:'' }]);
+  const addAP = () => setAps(p => [...p, { id:null, text:'', unitId:null, userId:null, startDate:'', deadline:'' }]);
 
   const updateAP = (i, field, value) => setAps(prev => prev.map((ap, idx) => {
     if (idx !== i) return ap;
     const u = { ...ap, [field]: value };
-    if (field === 'text')   { u.unitId = null; u.userId = null; u.deadline = ''; }
-    if (field === 'unitId') { u.userId = null; u.deadline = ''; }
-    if (field === 'userId') { u.deadline = ''; }
+    if (field === 'text')   { u.unitId = null; u.userId = null; u.startDate = ''; u.deadline = ''; }
+    if (field === 'unitId') { u.userId = null; u.startDate = ''; u.deadline = ''; }
+    if (field === 'userId') { u.startDate = ''; u.deadline = ''; }
     return u;
   }));
 
@@ -352,9 +360,10 @@ function MomEntryModal({ meeting, onClose, onSave, saving }) {
 
   const handleSave = () => {
     const cleanAps = aps.filter(ap => ap.text.trim()).map(ap => ({
-      text:     ap.text.trim(),
+      text:             ap.text.trim(),
       responsible_unit: ap.unitId ?? null,
       assigned_to:      ap.userId ?? null,
+      start_date:       ap.startDate || null,
       deadline:         ap.deadline || null,
     }));
     if (!summary.trim() && !cleanAps.length) {
@@ -772,15 +781,25 @@ export default function MinutesPage() {
                 {m.minutes?.action_points?.length > 0 && (
                   <div style={{ paddingTop:10, borderTop:'1px solid var(--line2)' }}>
                     {m.minutes.action_points.map((ap, ai) => {
-                      const d = ap.deadline ? new Date(ap.deadline) : null;
-                      const diff = d ? (d - new Date()) / (1000*60*60*24) : null;
+                      const d = ap.deadline ? new Date(ap.deadline + 'T00:00:00') : null;
+                      const diff = d ? Math.floor((d - new Date()) / (1000*60*60*24)) : null;
+                      const isOverdue = diff !== null && diff < 0 && !ap.done;
                       const dColor = diff === null ? null : diff < 0 ? '#dc2626' : diff <= 3 ? '#f59e0b' : '#059669';
                       return (
-                        <div key={ap.id??ai} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 0', fontSize:13 }}>
+                        <div key={ap.id??ai} style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 6px', fontSize:13, borderRadius:6, background: isOverdue ? '#fff1f1' : 'transparent' }}>
                           <span style={{ width:14, height:14, borderRadius:4, border:`1.5px solid ${ap.done?'var(--ok)':'var(--ink3)'}`, background:ap.done?'var(--ok)':'transparent', flexShrink:0 }} />
                           <span style={{ flex:1, color:ap.done?'var(--ink3)':'var(--ink)', textDecoration:ap.done?'line-through':'none' }}>{ap.text}</span>
                           {ap.assigned_to_name && <span style={{ fontSize:11, color:'var(--ink3)' }}>→ {ap.assigned_to_name}</span>}
-                          {d && <span style={{ fontSize:10, fontWeight:700, color:'#fff', background:dColor, borderRadius:4, padding:'1px 6px' }}>{ap.deadline}</span>}
+                          {(ap.start_date || d) && (
+                            <span style={{ fontSize:10, fontWeight:600, color: isOverdue ? '#dc2626' : 'var(--ink3)', whiteSpace:'nowrap' }}>
+                              {ap.start_date ? `${ap.start_date} → ` : ''}{ap.deadline ?? ''}
+                            </span>
+                          )}
+                          {isOverdue && (
+                            <span style={{ fontSize:10, fontWeight:700, color:'#fff', background:'#dc2626', borderRadius:4, padding:'2px 7px', whiteSpace:'nowrap' }}>
+                              ⚠ OVERDUE
+                            </span>
+                          )}
                         </div>
                       );
                     })}

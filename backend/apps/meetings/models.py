@@ -101,7 +101,8 @@ class ActionPoint(models.Model):
         on_delete=models.SET_NULL,
         related_name='assigned_action_points',
     )
-    deadline = models.DateField(null=True, blank=True)
+    start_date = models.DateField(null=True, blank=True)
+    deadline   = models.DateField(null=True, blank=True)   # end date / due date
 
     class Meta:
         db_table = 'meetings_actionpoint'

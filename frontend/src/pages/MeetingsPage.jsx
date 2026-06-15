@@ -238,9 +238,11 @@ function ActionPointRow({ ap, index, unitA, unitB, usersByUnit, onUpdate, onRemo
         </div>
       )}
       {showDeadline && (
-        <div style={{ display:'flex', alignItems:'center', gap:10, paddingLeft:30 }}>
-          <span style={{ fontFamily:'var(--fm)', fontSize:12, color:'var(--ink3)', fontWeight:600, whiteSpace:'nowrap' }}>Deadline</span>
-          <DateField value={ap.deadline} onChange={v=>onUpdate(index,'deadline',v)} placeholder="Pick a deadline" style={{ display:'inline-block' }} />
+        <div style={{ display:'flex', alignItems:'center', gap:12, paddingLeft:30, flexWrap:'wrap' }}>
+          <span style={{ fontFamily:'var(--fm)', fontSize:12, color:'var(--ink3)', fontWeight:600, whiteSpace:'nowrap' }}>From</span>
+          <DateField value={ap.startDate} onChange={v=>onUpdate(index,'startDate',v)} placeholder="Start date" style={{ display:'inline-block' }} />
+          <span style={{ fontFamily:'var(--fm)', fontSize:12, color:'var(--ink3)', fontWeight:600, whiteSpace:'nowrap' }}>To</span>
+          <DateField value={ap.deadline} onChange={v=>onUpdate(index,'deadline',v)} placeholder="Deadline" style={{ display:'inline-block' }} />
         </div>
       )}
     </div>
@@ -282,7 +284,7 @@ export default function MeetingsPage() {
   const [momMode,    setMomMode]    = useState(null);
   const [attendees,  setAttendees]  = useState('');
   const [summary,    setSummary]    = useState('');
-  const [aps,        setAps]        = useState([{ id:null, text:'', unitId:null, userId:null, deadline:'' }]);
+  const [aps,        setAps]        = useState([{ id:null, text:'', unitId:null, userId:null, startDate:'', deadline:'' }]);
   const [nhStatus,   setNhStatus]   = useState('postponed');
   const [reason,     setReason]     = useState('');
   const [momFe,      setMomFe]      = useState({});
@@ -293,14 +295,14 @@ export default function MeetingsPage() {
   const { data: momUsersB = [] } = useQuery({ queryKey:['users-by-unit', momUnitB?.id], queryFn:()=>getUsersByUnits([momUnitB.id]), enabled:!!momUnitB, staleTime:5*60*1000 });
   const momUsersByUnit = momUnitA && momUnitB ? { [momUnitA.id]: momUsersA, [momUnitB.id]: momUsersB } : {};
 
-  const addAP    = () => setAps(p=>[...p,{ id:null, text:'', unitId:null, userId:null, deadline:'' }]);
+  const addAP    = () => setAps(p=>[...p,{ id:null, text:'', unitId:null, userId:null, startDate:'', deadline:'' }]);
   const removeAP = i  => setAps(p=>p.filter((_,idx)=>idx!==i));
   const updateAP = (i,field,value) => setAps(prev=>prev.map((ap,idx)=>{
     if(idx!==i) return ap;
     const u={...ap,[field]:value};
-    if(field==='text')  { u.unitId=null; u.userId=null; u.deadline=''; }
-    if(field==='unitId'){ u.userId=null; u.deadline=''; }
-    if(field==='userId'){ u.deadline=''; }
+    if(field==='text')   { u.unitId=null; u.userId=null; u.startDate=''; u.deadline=''; }
+    if(field==='unitId') { u.userId=null; u.startDate=''; u.deadline=''; }
+    if(field==='userId') { u.startDate=''; u.deadline=''; }
     return u;
   }));
 
@@ -382,7 +384,7 @@ export default function MeetingsPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['meetings'] });
       setMomOpen(false); setMomMeeting(null); setMomMode(null);
-      setAttendees(''); setSummary(''); setAps([{ id:null,text:'',unitId:null,userId:null,deadline:'' }]); setReason('');
+      setAttendees(''); setSummary(''); setAps([{ id:null,text:'',unitId:null,userId:null,startDate:'',deadline:'' }]); setReason('');
       toast(momMode === 'conduct' ? 'Minutes filed' : 'Recorded');
     },
     onError: (err) => toast(getErrorMessage(err)),
@@ -417,7 +419,7 @@ export default function MeetingsPage() {
 
   const handleMomSubmit = () => {
     if (momMode === 'conduct') {
-      const cleanAps = aps.filter(ap=>ap.text.trim()).map(ap=>({ text:ap.text.trim(), responsible_unit:ap.unitId??null, assigned_to:ap.userId??null, deadline:ap.deadline||null }));
+      const cleanAps = aps.filter(ap=>ap.text.trim()).map(ap=>({ text:ap.text.trim(), responsible_unit:ap.unitId??null, assigned_to:ap.userId??null, start_date:ap.startDate||null, deadline:ap.deadline||null }));
       if (!summary && !cleanAps.length) { setMomFe({ summary: 'Add a summary or at least one action point' }); return; }
       setMomFe({});
       momMutation.mutate({ meetingId: momMeeting.id, data: { attendees, summary, action_points: cleanAps, source: 'written' }, type: 'minutes' });
@@ -435,12 +437,12 @@ export default function MeetingsPage() {
       setAttendees(m.minutes.attendees ?? '');
       setSummary(m.minutes.summary ?? '');
       setAps((m.minutes.action_points ?? []).length
-        ? m.minutes.action_points.map(ap=>({ id:ap.id??null, text:ap.text??'', unitId:ap.responsible_unit??null, userId:ap.assigned_to??null, deadline:ap.deadline??'' }))
-        : [{ id:null, text:'', unitId:null, userId:null, deadline:'' }]);
+        ? m.minutes.action_points.map(ap=>({ id:ap.id??null, text:ap.text??'', unitId:ap.responsible_unit??null, userId:ap.assigned_to??null, startDate:ap.start_date??'', deadline:ap.deadline??'' }))
+        : [{ id:null, text:'', unitId:null, userId:null, startDate:'', deadline:'' }]);
     } else {
       setMomMode(null);
       setAttendees(''); setSummary('');
-      setAps([{ id:null, text:'', unitId:null, userId:null, deadline:'' }]);
+      setAps([{ id:null, text:'', unitId:null, userId:null, startDate:'', deadline:'' }]);
     }
     setReason(''); setNhStatus('postponed');
     setMomOpen(true);

@@ -164,6 +164,7 @@ class MeetingViewSet(viewsets.ModelViewSet):
                     else:
                         text = (ap_data.get('text') or '').strip()
                         assigned_to_id = ap_data.get('assigned_to')
+                        start_date = ap_data.get('start_date') or None
                         deadline = ap_data.get('deadline') or None
                     if text:
                         assigned_to = User.objects.filter(pk=assigned_to_id).first() if assigned_to_id else None
@@ -173,6 +174,7 @@ class MeetingViewSet(viewsets.ModelViewSet):
                             text=text,
                             order=i,
                             assigned_to=assigned_to,
+                            start_date=start_date,
                             deadline=deadline,
                         )
 

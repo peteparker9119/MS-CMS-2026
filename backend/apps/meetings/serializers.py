@@ -40,7 +40,7 @@ class ActionPointSerializer(serializers.ModelSerializer):
         model = ActionPoint
         fields = [
             'id', 'aid', 'text', 'done', 'order',
-            'assigned_to', 'assigned_to_name', 'deadline',
+            'assigned_to', 'assigned_to_name', 'start_date', 'deadline',
             'deadline_history', 'comments',
         ]
 
