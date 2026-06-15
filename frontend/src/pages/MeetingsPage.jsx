@@ -205,7 +205,7 @@ export default function MeetingsPage() {
   const qc       = useQueryClient();
   const { user } = useAuth();
   const now      = new Date();
-  const isAdmin  = user?.role === 'admin';
+  const isAdmin  = ['admin', 'super_admin'].includes(user?.role);
 
   const [calMonth,    setCalMonth]    = useState(new Date(now.getFullYear(), now.getMonth(), 1));
   const [selDay,      setSelDay]      = useState(null);
@@ -571,11 +571,13 @@ export default function MeetingsPage() {
                           <div style={{ padding: '14px', background: '#fff', borderRadius: 10, border: '1px solid var(--line)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                               <div style={{ ...LBL, color: '#059669', marginBottom: 0 }}>Minutes of Meeting</div>
-                              <CButton size="sm" color="dark" variant="outline"
-                                onClick={(e) => { e.stopPropagation(); openMom(m, true); }}
-                                style={{ fontFamily: 'var(--fb)', fontSize: 11 }}>
-                                ✎ Edit MoM
-                              </CButton>
+                              {isAdmin && (
+                                <CButton size="sm" color="dark" variant="outline"
+                                  onClick={(e) => { e.stopPropagation(); openMom(m, true); }}
+                                  style={{ fontFamily: 'var(--fb)', fontSize: 11 }}>
+                                  ✎ Edit MoM
+                                </CButton>
+                              )}
                             </div>
                             <MomContent meeting={m} />
                           </div>
@@ -592,11 +594,13 @@ export default function MeetingsPage() {
                         {/* Scheduled → Enter MoM + admin Reschedule */}
                         {m.status === 'scheduled' && (
                           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                            <CButton size="sm" color="dark"
-                              onClick={(e) => { e.stopPropagation(); openMom(m); }}
-                              style={{ fontFamily: 'var(--fb)', fontSize: 15 }}>
-                              ✅ Enter MoM
-                            </CButton>
+                            {isAdmin && (
+                              <CButton size="sm" color="dark"
+                                onClick={(e) => { e.stopPropagation(); openMom(m); }}
+                                style={{ fontFamily: 'var(--fb)', fontSize: 15 }}>
+                                ✅ Enter MoM
+                              </CButton>
+                            )}
                             {isAdmin && (
                               <CButton size="sm" color="secondary" variant="outline"
                                 onClick={(e) => openReschedule(m, e)}
