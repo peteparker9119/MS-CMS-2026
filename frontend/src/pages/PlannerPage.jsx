@@ -154,21 +154,37 @@ function MiniCalendar({ meetings, onDateClick, weekStart }) {
           const isToday  = iso === todayIso;
           const inWeek   = weekDates.has(iso);
           const hasEvent = eventDays.has(iso);
-          // Week band: pill ends on col 0 (Sun) and col 6 (Sat), flat in between
+          // Band shape: cap based on whether neighbors in same row are also in-week
           const col = i % 7;
-          const weekBr = col === 0 ? '50% 0 0 50%' : col === 6 ? '0 50% 50% 0' : '0';
-          const bg = isToday ? '#1a73e8' : inWeek ? '#e8f0fe' : 'transparent';
-          const br = isToday ? '50%' : inWeek ? weekBr : '50%';
+          const prevInWeek = col > 0 && weekDates.has(toIso(days[i - 1]));
+          const nextInWeek = col < 6 && weekDates.has(toIso(days[i + 1]));
+          const bandBr = !inWeek ? '0'
+            : (!prevInWeek && !nextInWeek) ? '50%'
+            : (!prevInWeek) ? '50% 0 0 50%'
+            : (!nextInWeek) ? '0 50% 50% 0'
+            : '0';
+          const bandBg = inWeek ? '#e8f0fe' : 'transparent';
           return (
             <div key={i} onClick={() => onDateClick(new Date(d))}
               title={iso}
-              style={{ height:32, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', borderRadius: br, cursor:'pointer', position:'relative', background: bg, color: isToday ? '#fff' : isOther ? '#bdc1c6' : '#3c4043', transition:'background .12s' }}
-              onMouseEnter={e => { if (!isToday) e.currentTarget.style.background = inWeek ? '#d2e3fc' : '#f1f3f4'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = bg; }}>
-              <span style={{ fontFamily:RI, fontSize:12, fontWeight: isToday?700:400, lineHeight:1 }}>{d.getDate()}</span>
-              {hasEvent && !isToday && (
-                <span style={{ width:4, height:4, borderRadius:'50%', background: inWeek ? '#1a73e8' : '#70757a', position:'absolute', bottom:2, left:'50%', transform:'translateX(-50%)' }} />
-              )}
+              style={{ height:32, display:'flex', alignItems:'center', justifyContent:'center', borderRadius: inWeek ? bandBr : '0', background: bandBg, cursor:'pointer', position:'relative', transition:'background .12s' }}
+              onMouseEnter={e => { e.currentTarget.style.background = inWeek ? '#d2e3fc' : '#f1f3f4'; e.currentTarget.style.borderRadius = inWeek ? bandBr : '50%'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = bandBg; e.currentTarget.style.borderRadius = bandBr; }}>
+              {/* Inner circle — blue for today, transparent otherwise */}
+              <span style={{
+                width:28, height:28, borderRadius:'50%', flexShrink:0,
+                display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column',
+                background: isToday ? '#1a73e8' : 'transparent',
+                fontFamily:RI, fontSize:12, lineHeight:1,
+                fontWeight: isToday ? 700 : 400,
+                color: isToday ? '#fff' : isOther ? '#bdc1c6' : '#3c4043',
+                position:'relative',
+              }}>
+                {d.getDate()}
+                {hasEvent && !isToday && (
+                  <span style={{ width:4, height:4, borderRadius:'50%', background: inWeek ? '#1a73e8' : '#70757a', position:'absolute', bottom:1, left:'50%', transform:'translateX(-50%)' }} />
+                )}
+              </span>
             </div>
           );
         })}
