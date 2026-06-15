@@ -154,12 +154,17 @@ function MiniCalendar({ meetings, onDateClick, weekStart }) {
           const isToday  = iso === todayIso;
           const inWeek   = weekDates.has(iso);
           const hasEvent = eventDays.has(iso);
+          // Week band: pill ends on col 0 (Sun) and col 6 (Sat), flat in between
+          const col = i % 7;
+          const weekBr = col === 0 ? '50% 0 0 50%' : col === 6 ? '0 50% 50% 0' : '0';
+          const bg = isToday ? '#1a73e8' : inWeek ? '#e8f0fe' : 'transparent';
+          const br = isToday ? '50%' : inWeek ? weekBr : '50%';
           return (
             <div key={i} onClick={() => onDateClick(new Date(d))}
               title={iso}
-              style={{ height:32, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', borderRadius:'50%', cursor:'pointer', position:'relative', background: isToday ? '#1a73e8' : inWeek ? '#e8f0fe' : 'transparent', color: isToday ? '#fff' : isOther ? '#bdc1c6' : '#3c4043', transition:'background .12s' }}
+              style={{ height:32, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', borderRadius: br, cursor:'pointer', position:'relative', background: bg, color: isToday ? '#fff' : isOther ? '#bdc1c6' : '#3c4043', transition:'background .12s' }}
               onMouseEnter={e => { if (!isToday) e.currentTarget.style.background = inWeek ? '#d2e3fc' : '#f1f3f4'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = isToday ? '#1a73e8' : inWeek ? '#e8f0fe' : 'transparent'; }}>
+              onMouseLeave={e => { e.currentTarget.style.background = bg; }}>
               <span style={{ fontFamily:RI, fontSize:12, fontWeight: isToday?700:400, lineHeight:1 }}>{d.getDate()}</span>
               {hasEvent && !isToday && (
                 <span style={{ width:4, height:4, borderRadius:'50%', background: inWeek ? '#1a73e8' : '#70757a', position:'absolute', bottom:2, left:'50%', transform:'translateX(-50%)' }} />
@@ -360,7 +365,7 @@ export default function PlannerPage() {
           {/* New meeting FAB */}
           {canCreate && (
             <button type="button"
-              onClick={e => { const r = e.currentTarget.getBoundingClientRect(); openNewMeeting('', undefined, undefined, { x: r.right, y: r.bottom + 8 }); }}
+              onClick={e => { const r = e.currentTarget.getBoundingClientRect(); openNewMeeting('', undefined, undefined, { x: (r.left + r.right) / 2, y: r.bottom + 8 }); }}
               style={{ border:'none', borderRadius:20, padding:'8px 20px', fontSize:14, fontFamily:GS, fontWeight:500, cursor:'pointer', background:'#1a73e8', color:'#fff', display:'flex', alignItems:'center', gap:7, flexShrink:0, boxShadow:'0 1px 3px rgba(0,0,0,.2)' }}
               onMouseEnter={e => { e.currentTarget.style.background='#1765cc'; e.currentTarget.style.boxShadow='0 2px 6px rgba(0,0,0,.25)'; }}
               onMouseLeave={e => { e.currentTarget.style.background='#1a73e8'; e.currentTarget.style.boxShadow='0 1px 3px rgba(0,0,0,.2)'; }}>

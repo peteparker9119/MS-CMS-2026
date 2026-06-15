@@ -244,6 +244,8 @@ export default function WeekCalendar({
     if (e.button !== 0) return;
     if (e.target.closest('[data-ev]')) return;
     e.preventDefault();
+    // Capture position NOW so onUp has it even if mouse never moved
+    lastPosRef.current = { x: e.clientX, y: e.clientY };
     const colEl = colRef.current[isoDate(day)];
     if (!colEl) return;
     const startMin = minFromY(e.clientY, colEl);

@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import WysiwygEditor from './WysiwygEditor';
 import DateField from './DateField';
 
@@ -417,36 +418,41 @@ const RECURRENCE = [
   { v:'custom',  l:'Custom…'         },
 ];
 
-// ── Popup position: appear near the click point, never overflows viewport ─────
+// ── Popup position: centred on click, always within viewport ─────────────────
+// NOTE: EventModal is portalled to document.body so these coords are always
+//       true viewport coords, unaffected by any parent transform/animation.
+const NAV_W = 240; // left nav sidebar width (px)
+
 function popupStyle(pos) {
-  if (!pos) return { top:'50%', left:'50%', transform:'translate(-50%,-50%)' };
-  const W  = 500;
+  const W  = 560;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const H  = Math.min(680, vh * 0.9);
+  const H  = Math.min(700, vh * 0.92);
 
-  // Vertical: below trigger, pull up if it would overflow bottom
-  let top = pos.y;
-  if (top + H > vh - 12) top = vh - H - 12;
+  if (!pos) {
+    // No click position — centre in the content area (right of nav)
+    const cx = NAV_W + (vw - NAV_W) / 2;
+    return { top: '50%', left: Math.max(NAV_W + 8, cx - W / 2), transform: 'translateY(-50%)' };
+  }
+
+  // Centre popup horizontally on click x, clamped to content area
+  let left = pos.x - W / 2;
+  left = Math.min(left, vw - W - 12);               // don't overflow right
+  left = Math.max(left, NAV_W + 8);                 // don't hide behind nav
+
+  // Place below click; flip above if would overflow bottom
+  let top = pos.y + 10;
+  if (top + H > vh - 12) top = pos.y - H - 10;
   top = Math.max(60, top);
 
-  // Horizontal: use CSS `right` anchored to distance-from-right-edge of trigger.
-  // This is the most reliable way to prevent right-side overflow.
-  const distFromRight = vw - pos.x; // distance from trigger to right edge
-  let right = Math.max(12, distFromRight);
-  // If popup would overflow left side, clamp right so popup starts at x=12
-  if (vw - right - W < 12) right = vw - W - 12;
-  right = Math.max(12, right);
-
-  return { top, right, left: 'auto', transform: 'none' };
+  return { top, left, transform: 'none' };
 }
 
 // ── Main modal ────────────────────────────────────────────────────────────────
 export default function EventModal({ initial, pairs, meetings, onSave, onClose, saving=false }) {
   const editing  = initial?.meeting ?? null;
   const titleRef = useRef(null);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const posStyle = useMemo(() => popupStyle(initial?.pos), []);
+  const posStyle = useMemo(() => popupStyle(initial?.pos), []); // eslint-disable-line
 
   const toIso = d => d instanceof Date
     ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
@@ -536,12 +542,14 @@ export default function EventModal({ initial, pairs, meetings, onSave, onClose, 
     outline:'none', cursor:'pointer', width:'100%',
   };
 
-  return (
+  return createPortal(
     <>
-      {/* No backdrop — popup appears near click point */}
+      {/* Subtle click-away backdrop — no dark overlay, just dismiss on outside click */}
+      <div onClick={onClose} style={{ position:'fixed', inset:0, zIndex:1049 }} />
+      {/* Popup card — portalled to body so position:fixed is true viewport-relative */}
       <div style={{
         position:'fixed', zIndex:1050,
-        width:'min(500px,97vw)',
+        width:`min(${560}px,97vw)`,
         ...posStyle,
         background:'#fff', borderRadius:14,
         boxShadow:'0 8px 40px rgba(60,64,67,.30), 0 2px 10px rgba(60,64,67,.18)',
@@ -731,6 +739,7 @@ export default function EventModal({ initial, pairs, meetings, onSave, onClose, 
           </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }
