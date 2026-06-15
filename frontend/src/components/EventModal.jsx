@@ -286,7 +286,9 @@ function CustomRecurrencePanel({ value, onChange }) {
   );
 }
 
-// ── Team filter chips + flat pair list ───────────────────────────────────────
+// ── Team chips → auto-select pair ────────────────────────────────────────────
+// Clicking two unit chips that form a valid pair selects it silently.
+// No pair list shown below — chips ARE the selection.
 function PairSelect({ pairs, pairId, onPairChange, onNotifyChange }) {
   const units = useMemo(() => {
     const map = {};
@@ -294,75 +296,65 @@ function PairSelect({ pairs, pairId, onPairChange, onNotifyChange }) {
     return Object.values(map).sort((a,b) => a.abbr.localeCompare(b.abbr));
   }, [pairs]);
 
-  // null = untouched, [] = All, [ids] = filtered
-  const [filter, setFilter] = useState(() => {
-    if (!pairId) return null;
+  // selected unit ids (the chips that are active)
+  const [sel, setSel] = useState(() => {
+    if (!pairId) return [];
     const p = pairs.find(p => p.id === parseInt(pairId));
-    return p ? [p.unit_a.id, p.unit_b.id] : null;
+    return p ? [p.unit_a.id, p.unit_b.id] : [];
   });
 
-  const toggleUnit = uid => setFilter(f => {
-    const arr = f ?? [];
-    return arr.includes(uid) ? arr.filter(x => x !== uid) : [...arr, uid];
-  });
-
-  const visible = useMemo(() =>
-    filter === null ? [] :
-    filter.length === 0 ? pairs :
-    pairs.filter(p => filter.some(uid => p.unit_a.id===uid || p.unit_b.id===uid)),
-    [pairs, filter]
-  );
+  const toggle = uid => {
+    const next = sel.includes(uid) ? sel.filter(x => x !== uid) : [...sel, uid];
+    setSel(next);
+    // Auto-select pair when exactly two chips form a valid pair
+    const matched = pairs.find(p =>
+      next.length === 2 &&
+      ((p.unit_a.id === next[0] && p.unit_b.id === next[1]) ||
+       (p.unit_a.id === next[1] && p.unit_b.id === next[0]))
+    );
+    if (matched) {
+      onPairChange(String(matched.id));
+      onNotifyChange(() => [matched.unit_a.id, matched.unit_b.id]);
+    } else {
+      onPairChange('');
+    }
+  };
 
   const selPair = pairId ? pairs.find(p => p.id === parseInt(pairId)) : null;
 
-  const pick = p => {
-    onPairChange(String(p.id));
-    onNotifyChange(() => [p.unit_a.id, p.unit_b.id]);
-  };
+  // hint when 2 chips are active but don't form a pair
+  const noMatch = sel.length === 2 && !selPair;
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-      {/* Team filter chips */}
+    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+      {/* Unit chips */}
       <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-        <button type="button" onClick={() => setFilter([])}
-          style={{ padding:'4px 13px', border:`1.5px solid ${filter!==null&&filter.length===0?BLUE:LINE}`, borderRadius:20, cursor:'pointer', background:filter!==null&&filter.length===0?BBGF:'#fff', fontFamily:GS, fontSize:12, color:filter!==null&&filter.length===0?BLUE:INK2, fontWeight:filter!==null&&filter.length===0?600:400 }}>
-          All
-        </button>
         {units.map(u => {
-          const on = filter!==null && filter.includes(u.id);
+          const on = sel.includes(u.id);
           return (
-            <button key={u.id} type="button" onClick={() => toggleUnit(u.id)}
-              style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'4px 12px', border:`1.5px solid ${on?u.color||BLUE:LINE}`, borderRadius:20, cursor:'pointer', background:on?(u.color||BLUE)+'18':'#fff', fontFamily:GS, fontSize:12, color:on?u.color||BLUE:INK2, fontWeight:on?600:400 }}>
-              <span style={{ width:7, height:7, borderRadius:'50%', background:u.color||BLUE, display:'inline-block' }} />
+            <button key={u.id} type="button" onClick={() => toggle(u.id)}
+              style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'5px 13px', border:`1.5px solid ${on?u.color||BLUE:LINE}`, borderRadius:20, cursor:'pointer', background:on?(u.color||BLUE)+'1a':'#fff', fontFamily:GS, fontSize:12, color:on?u.color||BLUE:INK2, fontWeight:on?600:400, transition:'all .12s' }}>
+              <span style={{ width:7, height:7, borderRadius:'50%', background:u.color||BLUE, flexShrink:0, display:'inline-block' }} />
               {u.abbr}
+              {on && <IcCheck color={u.color||BLUE} />}
             </button>
           );
         })}
       </div>
 
-      {/* Pair list */}
-      {filter === null ? (
-        <div style={{ fontFamily:RI, fontSize:13, color:INK3, padding:'4px 2px', display:'flex', alignItems:'center', gap:6 }}>
-          <span>↑</span> Select a team to see pairs
+      {/* Status line */}
+      {selPair ? (
+        <div style={{ display:'flex', alignItems:'center', gap:8, fontFamily:RI, fontSize:12, color:'#0b8043' }}>
+          <IcCheck color="#0b8043" />
+          {selPair.unit_a.abbr} × {selPair.unit_b.abbr} selected
         </div>
-      ) : visible.length === 0 ? (
-        <div style={{ fontFamily:RI, fontSize:13, color:INK3, padding:'4px 2px' }}>No pairs match.</div>
-      ) : (
-        <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-          {visible.map(p => {
-            const sel = pairId === String(p.id);
-            return (
-              <button key={p.id} type="button" onClick={() => pick(p)}
-                style={{ padding:'5px 14px', border:`1.5px solid ${sel?BLUE:LINE}`, borderRadius:20, cursor:'pointer', background:sel?BBGF:'#fff', fontFamily:GS, fontSize:13, color:sel?BLUE:INK, fontWeight:sel?600:400, display:'inline-flex', alignItems:'center', gap:6 }}>
-                <span style={{ width:7, height:7, borderRadius:'50%', background:p.unit_a.color||BLUE, display:'inline-block' }} />
-                {p.unit_a.abbr} × {p.unit_b.abbr}
-                <span style={{ width:7, height:7, borderRadius:'50%', background:p.unit_b.color||'#34a853', display:'inline-block' }} />
-                {sel && <IcCheck />}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      ) : sel.length === 0 ? (
+        <div style={{ fontFamily:RI, fontSize:12, color:INK3 }}>Select two teams that form a convergence pair</div>
+      ) : sel.length === 1 ? (
+        <div style={{ fontFamily:RI, fontSize:12, color:INK3 }}>Select one more team</div>
+      ) : noMatch ? (
+        <div style={{ fontFamily:RI, fontSize:12, color:'#d93025' }}>These two teams don't have a direct convergence pair</div>
+      ) : null}
 
       {/* Notify row */}
       {selPair && (
