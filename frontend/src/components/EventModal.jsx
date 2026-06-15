@@ -286,116 +286,41 @@ function CustomRecurrencePanel({ value, onChange }) {
   );
 }
 
-// ── Unit filter + pair picker ─────────────────────────────────────────────────
-function UnitPicker({ pairs, pairId, onPairChange, notify, onNotifyChange }) {
-  const units = useMemo(() => {
-    const map = {};
-    pairs.forEach(p => { map[p.unit_a.id]=p.unit_a; map[p.unit_b.id]=p.unit_b; });
-    return Object.values(map).sort((a,b) => a.abbr.localeCompare(b.abbr));
-  }, [pairs]);
-
-  // null = no filter chosen yet (show prompt), [] = All, [ids...] = filtered
-  const [filter, setFilter] = useState(() => {
-    if (!pairId) return null;
-    const p = pairs.find(p => p.id === parseInt(pairId));
-    return p ? [p.unit_a.id, p.unit_b.id] : null;
-  });
-
-  const toggleFilter = uid => setFilter(f => {
-    const arr = f ?? [];
-    return arr.includes(uid) ? arr.filter(id=>id!==uid) : [...arr, uid];
-  });
-
-  const visiblePairs = useMemo(() =>
-    filter === null ? [] :
-    filter.length === 0 ? pairs :
-    pairs.filter(p => filter.some(uid => p.unit_a.id===uid || p.unit_b.id===uid)),
-    [pairs, filter]
-  );
-
-  const selPair = pairId ? pairs.find(p=>p.id===parseInt(pairId)) : null;
-
-  const selectPair = p => {
-    onPairChange(String(p.id));
-    onNotifyChange(() => [p.unit_a.id, p.unit_b.id]);
-  };
-
+// ── Pair dropdown ─────────────────────────────────────────────────────────────
+function PairSelect({ pairs, pairId, onPairChange, onNotifyChange }) {
+  const selPair = pairId ? pairs.find(p => p.id === parseInt(pairId)) : null;
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-      {/* Filter chips */}
-      <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-        {/* All */}
-        <button type="button" onClick={() => setFilter([])}
-          style={{ padding:'4px 13px', border:`1.5px solid ${filter !== null && filter.length===0?BLUE:LINE}`, borderRadius:20, cursor:'pointer', transition:'all .12s', background:filter !== null && filter.length===0?BBGF:'#fff', fontFamily:GS, fontSize:12, color:filter !== null && filter.length===0?BLUE:INK2, fontWeight:filter !== null && filter.length===0?600:400 }}>
-          All
-        </button>
-        {units.map(u => {
-          const on = filter !== null && filter.includes(u.id);
-          const c  = u.color || BLUE;
-          return (
-            <button key={u.id} type="button" onClick={() => toggleFilter(u.id)}
-              style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'4px 12px', border:`1.5px solid ${on?c:LINE}`, borderRadius:20, cursor:'pointer', transition:'all .12s', background:on?c+'18':'#fff', fontFamily:GS, fontSize:12, color:on?c:INK2, fontWeight:on?600:400 }}>
-              <span style={{ width:7, height:7, borderRadius:'50%', background:c, display:'inline-block' }} />
-              {u.abbr}
-            </button>
-          );
-        })}
-      </div>
+      <select
+        value={pairId}
+        onChange={e => {
+          const id = e.target.value;
+          onPairChange(id);
+          if (id) {
+            const p = pairs.find(p => p.id === parseInt(id));
+            if (p) onNotifyChange(() => [p.unit_a.id, p.unit_b.id]);
+          }
+        }}
+        style={{ border:`1px solid ${LINE}`, borderRadius:8, padding:'9px 12px', fontSize:13, fontFamily:GS, color:pairId?INK:INK3, background:'#fff', outline:'none', cursor:'pointer', width:'100%' }}
+        onFocus={e => { e.target.style.borderColor=BLUE; e.target.style.boxShadow=`0 0 0 2px ${BLUE}22`; }}
+        onBlur={e  => { e.target.style.borderColor=LINE; e.target.style.boxShadow='none'; }}
+      >
+        <option value="">Select convergence pair</option>
+        {pairs.map(p => (
+          <option key={p.id} value={String(p.id)}>{p.unit_a.abbr} × {p.unit_b.abbr}</option>
+        ))}
+      </select>
 
-      {/* Pair cards */}
-      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-        {filter === null ? (
-          <div style={{ padding:'10px 4px', fontFamily:RI, fontSize:13, color:INK3, display:'flex', alignItems:'center', gap:6 }}>
-            <span style={{ fontSize:15 }}>↑</span> Select a team above to see convergence pairs
-          </div>
-        ) : visiblePairs.length===0 ? (
-          <div style={{ padding:'8px 2px', fontFamily:RI, fontSize:13, color:INK3 }}>
-            No pairs match the selected teams.
-          </div>
-        ) : visiblePairs.map(p => {
-          const sel = pairId===String(p.id);
-          const cA  = p.unit_a.color || BLUE;
-          const cB  = p.unit_b.color || '#34a853';
-          return (
-            <button key={p.id} type="button" onClick={() => selectPair(p)}
-              style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', border:`1.5px solid ${sel?BLUE:LINE}`, borderRadius:10, cursor:'pointer', background:sel?BBGF:'#fff', transition:'all .12s', textAlign:'left', width:'100%', boxSizing:'border-box' }}
-              onMouseEnter={e => { if(!sel){ e.currentTarget.style.background='#f8f9fa'; e.currentTarget.style.borderColor='#bdc1c6'; } }}
-              onMouseLeave={e => { if(!sel){ e.currentTarget.style.background='#fff'; e.currentTarget.style.borderColor=LINE; } }}>
-              <div style={{ display:'flex', alignItems:'center', gap:3, flexShrink:0 }}>
-                <span style={{ width:10, height:10, borderRadius:'50%', background:cA, display:'inline-block' }} />
-                <span style={{ fontSize:10, color:INK3 }}>×</span>
-                <span style={{ width:10, height:10, borderRadius:'50%', background:cB, display:'inline-block' }} />
-              </div>
-              <span style={{ fontFamily:GS, fontSize:13, fontWeight:sel?600:500, color:sel?BLUE:INK, flex:1, minWidth:0 }}>
-                {p.unit_a.abbr} × {p.unit_b.abbr}
-              </span>
-              <span style={{ fontFamily:RI, fontSize:11, color:INK3, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:180 }}>
-                {p.unit_a.name} × {p.unit_b.name}
-              </span>
-              {sel && <span style={{ flexShrink:0, marginLeft:4 }}><IcCheck /></span>}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Notify chips */}
+      {/* Notify chips — shown once a pair is selected */}
       {selPair && (
-        <div>
-          <div style={{ fontFamily:RI, fontSize:11, color:INK3, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6 }}>Notify teams</div>
-          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-            {[selPair.unit_a, selPair.unit_b].map(u => {
-              const checked = notify.includes(u.id);
-              return (
-                <label key={u.id} style={{ display:'flex', alignItems:'center', gap:7, padding:'6px 12px', border:`1.5px solid ${checked?BLUE:LINE}`, borderRadius:20, background:checked?BBGF:'#fff', cursor:'pointer', transition:'all .12s', userSelect:'none' }}>
-                  <input type="checkbox" checked={checked}
-                    onChange={() => onNotifyChange(n => checked ? n.filter(x=>x!==u.id) : [...n,u.id])}
-                    style={{ width:14, height:14, accentColor:BLUE, margin:0 }} />
-                  <span style={{ width:8, height:8, borderRadius:'50%', background:u.color, display:'inline-block', flexShrink:0 }} />
-                  <span style={{ fontFamily:GS, fontSize:13, color:checked?BLUE:INK, fontWeight:checked?500:400 }}>{u.abbr}</span>
-                </label>
-              );
-            })}
-          </div>
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
+          <span style={{ fontFamily:RI, fontSize:11, color:INK3, textTransform:'uppercase', letterSpacing:'.5px' }}>Notify</span>
+          {[selPair.unit_a, selPair.unit_b].map(u => (
+            <label key={u.id} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 11px', border:`1.5px solid ${LINE}`, borderRadius:20, background:'#f8f9fa', cursor:'pointer', userSelect:'none' }}>
+              <span style={{ width:7, height:7, borderRadius:'50%', background:u.color, display:'inline-block', flexShrink:0 }} />
+              <span style={{ fontFamily:GS, fontSize:12, color:INK2 }}>{u.abbr}</span>
+            </label>
+          ))}
         </div>
       )}
     </div>
@@ -651,13 +576,12 @@ export default function EventModal({ initial, pairs, meetings, onSave, onClose, 
 
           <HR />
 
-          {/* ── UNIT PICKER ── */}
+          {/* ── PAIR SELECT ── */}
           <FR icon={<IcUsers />}>
-            <UnitPicker
+            <PairSelect
               pairs={pairs}
               pairId={pairId}
               onPairChange={id => setPairId(id)}
-              notify={notify}
               onNotifyChange={setNotify}
             />
           </FR>
