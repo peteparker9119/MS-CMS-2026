@@ -417,17 +417,28 @@ const RECURRENCE = [
   { v:'custom',  l:'Custom…'         },
 ];
 
-// ── Popup position: appear near the click point, clamped to viewport ──────────
+// ── Popup position: appear near the click point, never overflows viewport ─────
 function popupStyle(pos) {
   if (!pos) return { top:'50%', left:'50%', transform:'translate(-50%,-50%)' };
-  const W = 500, H = Math.min(680, window.innerHeight * 0.9);
-  let left = pos.x + 14;
-  let top  = pos.y - 30;
-  if (left + W > window.innerWidth  - 16) left = pos.x - W - 14;
-  if (left < 16) left = Math.max(16, (window.innerWidth - W) / 2);
-  if (top  + H > window.innerHeight - 16) top  = window.innerHeight - H - 16;
-  if (top  < 60) top = 60;
-  return { top, left, transform: 'none' };
+  const W  = 500;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const H  = Math.min(680, vh * 0.9);
+
+  // Vertical: below trigger, pull up if it would overflow bottom
+  let top = pos.y;
+  if (top + H > vh - 12) top = vh - H - 12;
+  top = Math.max(60, top);
+
+  // Horizontal: use CSS `right` anchored to distance-from-right-edge of trigger.
+  // This is the most reliable way to prevent right-side overflow.
+  const distFromRight = vw - pos.x; // distance from trigger to right edge
+  let right = Math.max(12, distFromRight);
+  // If popup would overflow left side, clamp right so popup starts at x=12
+  if (vw - right - W < 12) right = vw - W - 12;
+  right = Math.max(12, right);
+
+  return { top, right, left: 'auto', transform: 'none' };
 }
 
 // ── Main modal ────────────────────────────────────────────────────────────────
