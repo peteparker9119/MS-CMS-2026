@@ -20,6 +20,7 @@ const Icon = ({ name, active }) => {
     case 'activity':  return <svg viewBox="0 0 16 16" style={s} fill="none" stroke={c} strokeWidth="1.5"><polyline points="1,10 4,6 7,9 10,4 15,7"/></svg>;
     case 'admin':     return <svg viewBox="0 0 16 16" style={s} fill="none" stroke={c} strokeWidth="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M2.93 2.93l1.41 1.41M11.66 11.66l1.41 1.41M2.93 13.07l1.41-1.41M11.66 4.34l1.41-1.41"/></svg>;
     case 'list':      return <svg viewBox="0 0 16 16" style={s} fill="none" stroke={c} strokeWidth="1.5"><line x1="1" y1="4" x2="15" y2="4"/><line x1="1" y1="8" x2="15" y2="8"/><line x1="1" y1="12" x2="15" y2="12"/></svg>;
+    case 'taskboard': return <svg viewBox="0 0 16 16" style={s} fill="none" stroke={c} strokeWidth="1.5"><rect x="1" y="1" width="14" height="14" rx="2"/><line x1="1" y1="6" x2="15" y2="6"/><line x1="6" y1="6" x2="6" y2="15"/></svg>;
     default:          return <svg viewBox="0 0 16 16" style={s} fill="none" stroke={c} strokeWidth="1.5"><circle cx="8" cy="8" r="6.5"/></svg>;
   }
 };
@@ -33,6 +34,7 @@ const NAV_ITEMS = [
   { path: 'documents',   label: 'D.O. Letters',   icon: 'documents', roles: ['super_admin','admin','poc','team'] },
   { path: 'worklog',     label: 'Daily Work',     icon: 'worklog',   roles: ['super_admin','poc','team'] },
   { path: 'reviews',     label: 'Team Activity',  icon: 'activity',  roles: ['super_admin','poc','team'] },
+  { path: 'task-board',  label: 'Task Board',     icon: 'taskboard', roles: ['super_admin','admin'] },
   { path: 'admin-panel', label: 'Admin Panel',    icon: 'admin',     roles: ['super_admin','admin'] },
 ];
 

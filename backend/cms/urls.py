@@ -33,6 +33,7 @@ urlpatterns = [
     path('api/', include('apps.documents.urls')),
     path('api/', include('apps.notifications.urls')),
     path('api/', include('apps.menus.urls')),
+    path('api/', include('apps.taskboard.urls')),
 ]
 
 # Serve media only in development — in production, delegate to nginx / object storage

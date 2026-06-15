@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getMeetings, submitMinutes, recordNotHeld, updateMeeting } from '../api/meetings';
 import { useAuth } from '../context/AuthContext';
@@ -160,13 +160,45 @@ function MomContent({ meeting }) {
       )}
       {mins.action_points?.length > 0 && (
         <div style={{ marginBottom: 10 }}>
-          <div style={LBL}>Action Points</div>
-          {mins.action_points.map((ap, i) => (
-            <div key={ap.id ?? i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--line2)', fontSize: 15 }}>
-              <span style={{ color: ap.done ? 'var(--ok)' : 'var(--ink3)', fontSize: 15, lineHeight: 1.4 }}>{ap.done ? '✓' : '○'}</span>
-              <span style={{ textDecoration: ap.done ? 'line-through' : 'none', color: ap.done ? 'var(--ink3)' : 'var(--ink)' }}>{ap.text ?? ap}</span>
-            </div>
-          ))}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={LBL}>Action Points</div>
+            <span style={{ fontSize: 11, color: 'var(--ink3)', fontWeight: 600 }}>
+              {mins.action_points.filter(a => a.done).length}/{mins.action_points.length} done
+            </span>
+          </div>
+          {/* Progress bar */}
+          <div style={{ height: 5, background: 'var(--line)', borderRadius: 99, overflow: 'hidden', marginBottom: 10 }}>
+            <div style={{ height: '100%', width: `${mins.action_points.length ? Math.round(mins.action_points.filter(a=>a.done).length / mins.action_points.length * 100) : 0}%`, background: 'var(--ok)', borderRadius: 99 }} />
+          </div>
+          {mins.action_points.map((ap, i) => {
+            const d = ap.deadline ? new Date(ap.deadline + 'T00:00:00') : null;
+            const diff = d ? Math.floor((d - new Date()) / (1000*60*60*24)) : null;
+            const isOverdue = diff !== null && diff < 0 && !ap.done;
+            const statusLabel = ap.done ? 'DONE' : isOverdue ? 'OVERDUE' : 'PENDING';
+            const statusBg    = ap.done ? '#dcfce7' : isOverdue ? '#fee2e2' : '#f1f5f9';
+            const statusColor = ap.done ? '#15803d' : isOverdue ? '#dc2626' : '#64748b';
+            return (
+              <div key={ap.id ?? i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '7px 10px', borderRadius: 8, marginBottom: 5, background: isOverdue ? '#fff8f8' : '#fafafa', border: `1px solid ${isOverdue ? '#fecaca' : 'var(--line2)'}` }}>
+                <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, color: statusColor, background: statusBg, borderRadius: 5, padding: '3px 7px', whiteSpace: 'nowrap', marginTop: 1, letterSpacing: '.03em' }}>
+                  {ap.done ? '✓' : isOverdue ? '⚠' : '○'} {statusLabel}
+                </span>
+                <span style={{ flex: 1, fontSize: 13, color: ap.done ? 'var(--ink3)' : 'var(--ink)', textDecoration: ap.done ? 'line-through' : 'none', lineHeight: 1.5 }}>{ap.text ?? ap}</span>
+                {ap.assigned_to_name && (
+                  <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--ink2)', background: '#f1f5f9', border: '1px solid var(--line)', borderRadius: 20, padding: '2px 10px', whiteSpace: 'nowrap' }}>
+                    <span style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--accent)', color: '#fff', fontSize: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {ap.assigned_to_name.charAt(0).toUpperCase()}
+                    </span>
+                    {ap.assigned_to_name}
+                  </span>
+                )}
+                {(ap.start_date || ap.deadline) && (
+                  <span style={{ flexShrink: 0, fontSize: 11, color: isOverdue ? '#dc2626' : 'var(--ink3)', whiteSpace: 'nowrap', fontWeight: isOverdue ? 700 : 500 }}>
+                    {ap.start_date ? `${ap.start_date} → ` : ''}{ap.deadline ?? ''}
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
       {/* Export row */}
@@ -294,6 +326,17 @@ export default function MeetingsPage() {
   const { data: momUsersA = [] } = useQuery({ queryKey:['users-by-unit', momUnitA?.id], queryFn:()=>getUsersByUnits([momUnitA.id]), enabled:!!momUnitA, staleTime:5*60*1000 });
   const { data: momUsersB = [] } = useQuery({ queryKey:['users-by-unit', momUnitB?.id], queryFn:()=>getUsersByUnits([momUnitB.id]), enabled:!!momUnitB, staleTime:5*60*1000 });
   const momUsersByUnit = momUnitA && momUnitB ? { [momUnitA.id]: momUsersA, [momUnitB.id]: momUsersB } : {};
+
+  // Once user queries load, derive which unit each assigned person belongs to
+  useEffect(() => {
+    if (!momUsersA.length && !momUsersB.length) return;
+    setAps(prev => prev.map(ap => {
+      if (ap.unitId !== null || !ap.userId) return ap;
+      if (momUsersA.some(u => u.id === ap.userId)) return { ...ap, unitId: momUnitA.id };
+      if (momUsersB.some(u => u.id === ap.userId)) return { ...ap, unitId: momUnitB.id };
+      return ap;
+    }));
+  }, [momUsersA, momUsersB]); // eslint-disable-line
 
   const addAP    = () => setAps(p=>[...p,{ id:null, text:'', unitId:null, userId:null, startDate:'', deadline:'' }]);
   const removeAP = i  => setAps(p=>p.filter((_,idx)=>idx!==i));
@@ -629,9 +672,6 @@ export default function MeetingsPage() {
                             <span style={{ fontSize: 15, color: 'var(--ink2)' }}>
                               {m.mtype === 'In-person' ? '📍' : '💻'} {m.mtype}
                             </span>
-                          )}
-                          {m.time && (
-                            <span style={{ fontSize: 15, color: 'var(--ink2)' }}>🕘 {m.time}</span>
                           )}
                         </div>
 

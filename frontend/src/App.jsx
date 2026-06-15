@@ -37,6 +37,7 @@ import DocumentsPage   from './pages/DocumentsPage';
 import WorkLogPage     from './pages/WorkLogPage';
 import ReviewsPage     from './pages/ReviewsPage';
 import AdminPage       from './pages/AdminPage';
+import TaskBoardPage   from './pages/TaskBoardPage';
 import CustomMenuPage  from './pages/CustomMenuPage';
 import AppSidebar      from './components/AppSidebar';
 import AppHeader       from './components/AppHeader';
@@ -92,6 +93,9 @@ function AppLayout() {
                 }/>
                 <Route path="/admin-panel" element={
                   <Guard roles={['super_admin','admin']}><AdminPage /></Guard>
+                }/>
+                <Route path="/task-board" element={
+                  <Guard roles={['super_admin','admin']}><TaskBoardPage /></Guard>
                 }/>
 
                 {/* super_admin + poc + team */}

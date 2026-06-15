@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'apps.documents',
     'apps.notifications',
     'apps.menus',
+    'apps.taskboard',
 ]
 
 MIDDLEWARE = [

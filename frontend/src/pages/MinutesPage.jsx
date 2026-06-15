@@ -329,7 +329,7 @@ function MomEntryModal({ meeting, onClose, onSave, saving }) {
       return existingMins.action_points.map(ap => ({
         id:        ap.id ?? null,
         text:      ap.text ?? '',
-        unitId:    ap.responsible_unit ?? null,
+        unitId:    null, // derived below once user lists load
         userId:    ap.assigned_to ?? null,
         startDate: ap.start_date ?? '',
         deadline:  ap.deadline ?? '',
@@ -338,6 +338,17 @@ function MomEntryModal({ meeting, onClose, onSave, saving }) {
     return [{ id:null, text:'', unitId:null, userId:null, startDate:'', deadline:'' }];
   });
   const [fe, setFe] = useState({});
+
+  // Once user queries load, derive which unit each assigned person belongs to
+  useEffect(() => {
+    if (!unitAUsers.length && !unitBUsers.length) return;
+    setAps(prev => prev.map(ap => {
+      if (ap.unitId !== null || !ap.userId) return ap;
+      if (unitAUsers.some(u => u.id === ap.userId)) return { ...ap, unitId: unitA.id };
+      if (unitBUsers.some(u => u.id === ap.userId)) return { ...ap, unitId: unitB.id };
+      return ap;
+    }));
+  }, [unitAUsers, unitBUsers]); // eslint-disable-line
 
   useEffect(() => {
     const h = e => { if (e.key === 'Escape') onClose(); };
@@ -780,24 +791,44 @@ export default function MinutesPage() {
                 </div>
                 {m.minutes?.action_points?.length > 0 && (
                   <div style={{ paddingTop:10, borderTop:'1px solid var(--line2)' }}>
+                    {/* Progress bar */}
+                    <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+                      <div style={{ flex:1, height:6, background:'var(--line)', borderRadius:99, overflow:'hidden' }}>
+                        <div style={{ height:'100%', width:`${apTotal ? Math.round(apDone/apTotal*100) : 0}%`, background:'var(--ok)', borderRadius:99, transition:'width .3s' }} />
+                      </div>
+                      <span style={{ fontFamily:'var(--fm)', fontSize:11, color:'var(--ink3)', whiteSpace:'nowrap', fontWeight:600 }}>
+                        {apDone}/{apTotal} done
+                      </span>
+                    </div>
+                    {/* Action point rows */}
                     {m.minutes.action_points.map((ap, ai) => {
                       const d = ap.deadline ? new Date(ap.deadline + 'T00:00:00') : null;
                       const diff = d ? Math.floor((d - new Date()) / (1000*60*60*24)) : null;
                       const isOverdue = diff !== null && diff < 0 && !ap.done;
-                      const dColor = diff === null ? null : diff < 0 ? '#dc2626' : diff <= 3 ? '#f59e0b' : '#059669';
+                      const statusLabel = ap.done ? 'DONE' : isOverdue ? 'OVERDUE' : 'PENDING';
+                      const statusBg    = ap.done ? '#dcfce7' : isOverdue ? '#fee2e2' : '#f1f5f9';
+                      const statusColor = ap.done ? '#15803d' : isOverdue ? '#dc2626' : '#64748b';
                       return (
-                        <div key={ap.id??ai} style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 6px', fontSize:13, borderRadius:6, background: isOverdue ? '#fff1f1' : 'transparent' }}>
-                          <span style={{ width:14, height:14, borderRadius:4, border:`1.5px solid ${ap.done?'var(--ok)':'var(--ink3)'}`, background:ap.done?'var(--ok)':'transparent', flexShrink:0 }} />
-                          <span style={{ flex:1, color:ap.done?'var(--ink3)':'var(--ink)', textDecoration:ap.done?'line-through':'none' }}>{ap.text}</span>
-                          {ap.assigned_to_name && <span style={{ fontSize:11, color:'var(--ink3)' }}>→ {ap.assigned_to_name}</span>}
-                          {(ap.start_date || d) && (
-                            <span style={{ fontSize:10, fontWeight:600, color: isOverdue ? '#dc2626' : 'var(--ink3)', whiteSpace:'nowrap' }}>
-                              {ap.start_date ? `${ap.start_date} → ` : ''}{ap.deadline ?? ''}
+                        <div key={ap.id??ai} style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'8px 10px', borderRadius:8, marginBottom:6, background: isOverdue ? '#fff8f8' : '#fafafa', border:`1px solid ${isOverdue?'#fecaca':'var(--line2)'}` }}>
+                          {/* Status badge */}
+                          <span style={{ flexShrink:0, fontSize:10, fontWeight:700, color:statusColor, background:statusBg, borderRadius:5, padding:'3px 8px', whiteSpace:'nowrap', marginTop:1, letterSpacing:'.03em' }}>
+                            {ap.done ? '✓' : isOverdue ? '⚠' : '○'} {statusLabel}
+                          </span>
+                          {/* Text */}
+                          <span style={{ flex:1, fontSize:13, color:ap.done?'var(--ink3)':'var(--ink)', textDecoration:ap.done?'line-through':'none', lineHeight:1.5 }}>{ap.text}</span>
+                          {/* Assignee */}
+                          {ap.assigned_to_name && (
+                            <span style={{ flexShrink:0, display:'inline-flex', alignItems:'center', gap:5, fontSize:12, fontWeight:600, color:'var(--ink2)', background:'#f1f5f9', border:'1px solid var(--line)', borderRadius:20, padding:'2px 10px', whiteSpace:'nowrap' }}>
+                              <span style={{ width:18, height:18, borderRadius:'50%', background:'var(--accent)', color:'#fff', fontSize:10, fontWeight:700, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                                {ap.assigned_to_name.charAt(0).toUpperCase()}
+                              </span>
+                              {ap.assigned_to_name}
                             </span>
                           )}
-                          {isOverdue && (
-                            <span style={{ fontSize:10, fontWeight:700, color:'#fff', background:'#dc2626', borderRadius:4, padding:'2px 7px', whiteSpace:'nowrap' }}>
-                              ⚠ OVERDUE
+                          {/* Date range */}
+                          {(ap.start_date || ap.deadline) && (
+                            <span style={{ flexShrink:0, fontSize:11, color: isOverdue ? '#dc2626' : 'var(--ink3)', whiteSpace:'nowrap', fontWeight: isOverdue ? 700 : 500 }}>
+                              {ap.start_date ? `${ap.start_date} → ` : ''}{ap.deadline ?? ''}
                             </span>
                           )}
                         </div>
