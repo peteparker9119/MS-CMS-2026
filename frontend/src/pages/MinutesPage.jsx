@@ -34,10 +34,17 @@ function canEnterMoM(m) {
   if (m.status === 'conducted') return true;
   if (m.status !== 'scheduled') return false;
   if (m.date !== todayISO()) return false;
-  if (!m.time) return true;
-  const [hh, mm] = m.time.split(':').map(Number);
   const now = new Date();
-  return now.getHours() * 60 + now.getMinutes() >= hh * 60 + mm;
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  if (!m.time) return false; // no time set — can't determine if in progress
+  const [sh, sm] = m.time.split(':').map(Number);
+  const startMins = sh * 60 + sm;
+  if (nowMins < startMins) return false; // meeting hasn't started yet
+  if (m.end_time) {
+    const [eh, em] = m.end_time.split(':').map(Number);
+    return nowMins <= eh * 60 + em; // allow only while still in progress
+  }
+  return nowMins <= startMins + 60; // no end_time: allow for 60 min after start
 }
 
 // ── Share / export helpers (kept from original) ───────────────────────────────
@@ -509,11 +516,17 @@ function MeetingRow({ meeting, onEnterMoM }) {
         </button>
         {tip && (
           <div style={{ position:'absolute', bottom:'calc(100% + 8px)', right:0, background:'#3c4043', color:'#fff', borderRadius:8, padding:'7px 12px', fontSize:12, fontFamily:'var(--fm)', whiteSpace:'nowrap', zIndex:10, boxShadow:'0 4px 12px rgba(0,0,0,.2)', pointerEvents:'none' }}>
-            {meeting.status === 'scheduled' && meeting.date !== todayISO()
-              ? `MoM can only be entered on the meeting day (${meeting.date})`
-              : meeting.status === 'scheduled'
-              ? 'MoM can be entered once the meeting starts'
-              : `Cannot enter MoM for ${meeting.status} meetings`}
+            {meeting.status === 'not_held'
+              ? 'Meeting was not held — mark as conducted to file MoM'
+              : meeting.date !== todayISO()
+              ? `Available only on the meeting day (${meeting.date})`
+              : (() => {
+                  if (!meeting.time) return 'Meeting time not set';
+                  const [sh, sm] = meeting.time.split(':').map(Number);
+                  const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+                  if (nowMins < sh * 60 + sm) return `Available once the meeting starts at ${fmtTime(meeting.time)}`;
+                  return 'Meeting has ended — change status to Conducted to file MoM';
+                })()}
             <div style={{ position:'absolute', bottom:-5, right:20, width:10, height:10, background:'#3c4043', transform:'rotate(45deg)' }} />
           </div>
         )}
