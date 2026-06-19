@@ -37,6 +37,8 @@ INSTALLED_APPS = [
     'apps.notifications',
     'apps.menus',
     'apps.taskboard',
+    # consolidated CMS surface (re-exports apps.* under api/cms/) — additive, no own models
+    'cms_app',
 ]
 
 MIDDLEWARE = [

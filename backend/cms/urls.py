@@ -34,6 +34,8 @@ urlpatterns = [
     path('api/', include('apps.notifications.urls')),
     path('api/', include('apps.menus.urls')),
     path('api/', include('apps.taskboard.urls')),
+    # consolidated CMS surface — mirrors all of the above under a single prefix
+    path('api/cms/', include('cms_app.urls')),
 ]
 
 # Serve media only in development — in production, delegate to nginx / object storage
