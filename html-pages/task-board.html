@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Task Board — MS-CMS</title>
+<link rel="stylesheet" href="_layout.css">
+<style>
+/* ── Matrix table ── */
+.matrix-wrap { background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden }
+.matrix-table { border-collapse:collapse;width:100% }
+.matrix-table th { padding:10px 14px;text-align:center;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;color:var(--ink);border-right:1px solid var(--line);vertical-align:middle }
+.matrix-table th.user-th { text-align:left;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);min-width:180px;position:sticky;left:0;background:#f8fafc;z-index:2;border-right:1px solid var(--line) }
+.matrix-table thead tr { background:#f8fafc;border-bottom:2px solid var(--line) }
+.matrix-table tbody td { border:1px solid var(--line);min-width:130px;height:52px;text-align:center;vertical-align:middle;cursor:pointer;transition:filter .12s }
+.matrix-table tbody td:hover { filter:brightness(.95) }
+.matrix-table tbody td.user-td { padding:10px 16px;border-right:1px solid var(--line);position:sticky;left:0;background:#fff;z-index:1;cursor:default }
+.matrix-table tbody td.user-td:hover { filter:none }
+.matrix-table tbody tr:nth-child(even) td.user-td { background:#fafbfc }
+.matrix-table tbody tr:nth-child(even) { background:#fafbfc }
+.task-th-inner { display:flex;flex-direction:column;align-items:center;gap:3px }
+.trash-btn { border:none;background:transparent;cursor:pointer;color:#94a3b8;padding:2px 3px;border-radius:4px;display:flex;align-items:center;line-height:1;flex-shrink:0 }
+.trash-btn:hover { color:#dc2626;background:#fee2e2 }
+
+/* ── Status cell content ── */
+.cell-inner { display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 8px }
+.cell-status { display:flex;align-items:center;gap:4px }
+.cell-dot { width:7px;height:7px;border-radius:50%;flex-shrink:0 }
+.cell-label { font-size:11px;font-weight:700 }
+.cell-deadline { font-size:10px }
+.cell-acts { font-size:9px;font-weight:500;color:var(--ink3) }
+.cell-empty { font-size:18px;color:var(--line);opacity:.4 }
+
+/* ── Modal overlay ── */
+.modal-overlay { display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1100;align-items:center;justify-content:center }
+.modal-overlay.open { display:flex }
+.modal-box { background:#fff;border-radius:16px;box-shadow:0 24px 64px rgba(0,0,0,.25);max-height:92vh;display:flex;flex-direction:column;overflow:hidden;font-family:'Inter',sans-serif }
+.modal-header { padding:18px 24px 14px;border-bottom:1px solid var(--line);flex-shrink:0 }
+.modal-body { flex:1;overflow-y:auto;padding:20px 24px }
+.modal-footer { padding:14px 24px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;flex-shrink:0;background:#fff }
+
+/* ── User cell ── */
+.user-info { display:flex;align-items:center;gap:9px }
+.u-circle { width:32px;height:32px;border-radius:50%;color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0 }
+.u-name { font-weight:600;font-size:13px;color:var(--ink) }
+.u-role { font-size:11px;color:var(--ink3) }
+.u-unit { border-radius:3px;padding:1px 5px;font-weight:700;font-size:9px;margin-right:4px }
+
+/* ── Activity log ── */
+.act-entry { display:flex;gap:10px;margin-bottom:10px }
+.act-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:6px }
+.act-body { flex:1;border-radius:8px;padding:8px 12px;margin-bottom:2px }
+.act-tag { font-size:10px;font-weight:700;border-radius:4px;padding:2px 7px;text-transform:uppercase;letter-spacing:.04em;border:1px solid;background:#fff }
+
+/* ── Search input ── */
+.search-wrap { position:relative;display:flex;align-items:center }
+.search-wrap svg { position:absolute;left:10px;pointer-events:none }
+.search-wrap input { border:1px solid var(--line);border-radius:20px;padding:6px 14px 6px 30px;font-size:13px;font-family:'Inter',sans-serif;outline:none;background:#fff;color:var(--ink);width:160px }
+.search-wrap input:focus { border-color:var(--accent) }
+
+/* ── Confirm modal ── */
+.confirm-overlay { display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1200;align-items:center;justify-content:center }
+.confirm-overlay.open { display:flex }
+.confirm-box { background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.25);width:min(420px,94vw);overflow:hidden;font-family:'Inter',sans-serif }
+</style>
+</head>
+<body>
+
+<!-- ══ SIDEBAR ══ -->
+<div class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-brand-icon">C</div>
+    <div class="sb-brand-text"><div class="title">CMS</div><div class="sub">Convergence</div></div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-section">Main</div>
+    <a href="dashboard.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg><span class="label">Dashboard</span></a>
+    <a href="planner.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="2.5" width="13" height="12" rx="2"/><path d="M5 1v3M11 1v3M1.5 6.5h13M5 10.5l2 2 4-4"/></svg><span class="label">Planner</span></a>
+    <a href="meetings.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="2.5" width="13" height="12" rx="2"/><path d="M5 1v3M11 1v3M1.5 6.5h13"/></svg><span class="label">Meetings</span></a>
+    <a href="items.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3.5L10.5 10"/></svg><span class="label">Item Tracker</span></a>
+    <a href="documents.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><path d="M9.5 1H3.5A1.5 1.5 0 0 0 2 2.5v11A1.5 1.5 0 0 0 3.5 15h9A1.5 1.5 0 0 0 14 13.5V5.5L9.5 1z"/><path d="M9 1v5h5M5 9h6M5 12h4"/></svg><span class="label">D.O. Letters</span></a>
+    <a href="worklog.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="1.5" width="13" height="13" rx="2"/><path d="M5 8h6M5 5h6M5 11h3"/></svg><span class="label">Daily Work</span></a>
+    <a href="reviews.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><polyline points="1,10 4,6 7,9 10,4 15,7"/></svg><span class="label">Team Activity</span></a>
+    <a href="task-board.html" class="sb-item active"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.5" style="flex-shrink:0"><rect x="1" y="1" width="14" height="14" rx="2"/><line x1="1" y1="6" x2="15" y2="6"/><line x1="6" y1="6" x2="6" y2="15"/></svg><span class="label">Task Board</span></a>
+    <a href="minutes.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="2.5" y="1" width="11" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg><span class="label">Minutes</span></a>
+    <a href="admin-panel.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M2.93 2.93l1.41 1.41M11.66 11.66l1.41 1.41M2.93 13.07l1.41-1.41M11.66 4.34l1.41-1.41"/></svg><span class="label">Admin Panel</span></a>
+  </nav>
+</div>
+
+<!-- ══ HEADER ══ -->
+<div class="header">
+  <div class="page-title">
+    <div class="name">Task Board</div>
+    <div class="sub">Team task matrix — assign &amp; track progress</div>
+  </div>
+  <div class="header-actions">
+    <button class="hbtn" style="position:relative" title="Notifications">🔔
+      <span style="position:absolute;top:4px;right:4px;background:var(--bad);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1">3</span>
+    </button>
+    <button class="user-btn"><span class="u-avatar" style="background:#1e2333">AD</span><span class="name">Admin</span><span class="caret">▾</span></button>
+  </div>
+</div>
+
+<div class="app"><div class="wrap">
+
+  <!-- Filter bar -->
+  <div class="filterbar">
+    <div class="period">
+      <div class="l">Task Board</div>
+      <div class="v">Team task matrix</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <!-- Search -->
+      <div class="search-wrap">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="var(--ink3)" stroke-width="1.6"><circle cx="6.5" cy="6.5" r="5"/><path d="M11 11l3 3" stroke-linecap="round"/></svg>
+        <input type="text" placeholder="Search columns…">
+      </div>
+      <!-- Unit filter -->
+      <div class="seg">
+        <button class="on">All units</button>
+        <button><span style="width:8px;height:8px;border-radius:50%;background:#6366f1;display:inline-block;margin-right:5px"></span>VP</button>
+        <button><span style="width:8px;height:8px;border-radius:50%;background:#ec4899;display:inline-block;margin-right:5px"></span>SMC</button>
+        <button><span style="width:8px;height:8px;border-radius:50%;background:#f97316;display:inline-block;margin-right:5px"></span>CG</button>
+        <button><span style="width:8px;height:8px;border-radius:50%;background:#14b8a6;display:inline-block;margin-right:5px"></span>ACIS</button>
+        <button><span style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;margin-right:5px"></span>NSNOP</button>
+      </div>
+      <!-- Status filter -->
+      <select style="border:1px solid var(--line);border-radius:20px;padding:6px 14px;font-size:13px;font-family:'Inter',sans-serif;cursor:pointer;outline:none;background:#fff;color:var(--ink)">
+        <option value="">All statuses</option>
+        <option>Pending</option>
+        <option>In Progress</option>
+        <option>Completed</option>
+        <option>Blocked</option>
+      </select>
+      <!-- Add column -->
+      <button onclick="openAddTask()" style="border:none;border-radius:20px;padding:7px 18px;font-size:13px;font-family:'Inter',sans-serif;font-weight:700;cursor:pointer;background:var(--accent);color:#fff;display:flex;align-items:center;gap:5px">
+        <span style="font-size:16px;line-height:1">+</span> Add column
+      </button>
+    </div>
+  </div>
+
+  <!-- Summary cards -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+    <div style="border:1px solid var(--line);border-radius:12px;padding:14px 18px;background:#fff">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px">Total tasks</div>
+      <div style="font-size:28px;font-weight:800;color:var(--ink);line-height:1">5</div>
+    </div>
+    <div style="border:1px solid var(--line);border-radius:12px;padding:14px 18px;background:#fff">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px">Assigned</div>
+      <div style="font-size:28px;font-weight:800;color:var(--ink);line-height:1">18</div>
+    </div>
+    <div style="border:1px solid var(--line);border-radius:12px;padding:14px 18px;background:#f0fdf4">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px">Completed</div>
+      <div style="font-size:28px;font-weight:800;color:#15803d;line-height:1">7</div>
+    </div>
+    <div style="border:1px solid var(--line);border-radius:12px;padding:14px 18px;background:#fff1f2">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px">Overdue</div>
+      <div style="font-size:28px;font-weight:800;color:#dc2626;line-height:1">3</div>
+    </div>
+  </div>
+
+  <!-- Matrix table -->
+  <div class="matrix-wrap" style="overflow-x:auto">
+    <table class="matrix-table">
+      <thead>
+        <tr>
+          <th class="user-th">Team member</th>
+          <!-- Task columns -->
+          <th>
+            <div class="task-th-inner">
+              <div style="display:flex;align-items:center;gap:5px">
+                <span style="font-size:13px;font-weight:700;color:var(--ink)">Data Migration</span>
+                <button class="trash-btn" title="Delete column" onclick="openConfirm('Data Migration')">
+                  <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 4h12M6 4V2h4v2M5 4l.5 9h5L11 4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+              </div>
+              <div style="font-size:10px;color:var(--ink3);font-weight:400;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Migrate legacy EMIS data</div>
+            </div>
+          </th>
+          <th>
+            <div class="task-th-inner">
+              <div style="display:flex;align-items:center;gap:5px">
+                <span style="font-size:13px;font-weight:700;color:var(--ink)">API Integration</span>
+                <button class="trash-btn" onclick="openConfirm('API Integration')"><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 4h12M6 4V2h4v2M5 4l.5 9h5L11 4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+              </div>
+              <div style="font-size:10px;color:var(--ink3);font-weight:400">Connect unit portals</div>
+            </div>
+          </th>
+          <th>
+            <div class="task-th-inner">
+              <div style="display:flex;align-items:center;gap:5px">
+                <span style="font-size:13px;font-weight:700;color:var(--ink)">Training</span>
+                <button class="trash-btn" onclick="openConfirm('Training')"><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 4h12M6 4V2h4v2M5 4l.5 9h5L11 4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+              </div>
+              <div style="font-size:10px;color:var(--ink3);font-weight:400">Staff capacity building</div>
+            </div>
+          </th>
+          <th>
+            <div class="task-th-inner">
+              <div style="display:flex;align-items:center;gap:5px">
+                <span style="font-size:13px;font-weight:700;color:var(--ink)">Reporting</span>
+                <button class="trash-btn" onclick="openConfirm('Reporting')"><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 4h12M6 4V2h4v2M5 4l.5 9h5L11 4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+              </div>
+              <div style="font-size:10px;color:var(--ink3);font-weight:400">Monthly status reports</div>
+            </div>
+          </th>
+          <th>
+            <div class="task-th-inner">
+              <div style="display:flex;align-items:center;gap:5px">
+                <span style="font-size:13px;font-weight:700;color:var(--ink)">Field Visits</span>
+                <button class="trash-btn" onclick="openConfirm('Field Visits')"><svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 4h12M6 4V2h4v2M5 4l.5 9h5L11 4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+              </div>
+              <div style="font-size:10px;color:var(--ink3);font-weight:400">School visits for Q2</div>
+            </div>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Row 1: VP member -->
+        <tr>
+          <td class="user-td">
+            <div class="user-info">
+              <div class="u-circle" style="background:#6366f1">R</div>
+              <div>
+                <div class="u-name">Rajan Kumar</div>
+                <div class="u-role"><span class="u-unit" style="background:#6366f122;color:#6366f1">VP</span>poc</div>
+              </div>
+            </div>
+          </td>
+          <td style="background:#f0fdf4" onclick="openDetail('Rajan Kumar','Data Migration','completed')">
+            <div class="cell-inner">
+              <div class="cell-status"><span class="cell-dot" style="background:#22c55e"></span><span class="cell-label" style="color:#15803d">Completed</span></div>
+              <span class="cell-deadline" style="color:var(--ink3)">2026-06-01</span>
+              <span class="cell-acts">3 items · Action: Updated schema</span>
+            </div>
+          </td>
+          <td style="background:#eff6ff" onclick="openDetail('Rajan Kumar','API Integration','in_progress')">
+            <div class="cell-inner">
+              <div class="cell-status"><span class="cell-dot" style="background:#3b82f6"></span><span class="cell-label" style="color:#1d4ed8">In Progress</span></div>
+              <span class="cell-deadline" style="color:var(--ink3)">2026-07-15</span>
+              <span class="cell-acts">1 item · Action: Testing endpoints</span>
+            </div>
+          </td>
+          <td style="background:#fafbfc" onclick="openDetail('Rajan Kumar','Training','pending')">
+            <div class="cell-inner"><span class="cell-empty">＋</span></div>
+          </td>
+          <td style="background:#f0fdf4" onclick="openDetail('Rajan Kumar','Reporting','completed')">
+            <div class="cell-inner">
+              <div class="cell-status"><span class="cell-dot" style="background:#22c55e"></span><span class="cell-label" style="color:#15803d">Completed</span></div>
+              <span class="cell-deadline" style="color:var(--ink3)">2026-06-10</span>
+            </div>
+          </td>
+          <td style="background:#fff1f2" onclick="openDetail('Rajan Kumar','Field Visits','blocked')">
+            <div class="cell-inner">
+              <div class="cell-status"><span class="cell-dot" style="background:#f43f5e"></span><span class="cell-label" style="color:#be123c">Blocked</span></div>
+              <span class="cell-deadline" style="color:var(--ink3)">2026-06-30</span>
+            </div>
+          </td>
+        </tr>
+        <!-- Row 2: SMC member -->
+        <tr>
+          <td class="user-td" style="background:#fafbfc">
+            <div class="user-info">
+              <div class="u-circle" style="background:#ec4899">P</div>
+              <div>
+                <div class="u-name">Priya Sundaram</div>
+                <div class="u-role"><span class="u-unit" style="background:#ec489922;color:#ec4899">SMC</span>team</div>
+              </div>
+            </div>
+          </td>
+          <td style="background:#fff1f2" onclick="openDetail('Priya Sundaram','Data Migration','overdue')">
+            <div class="cell-inner">
+              <div class="cell-status"><span class="cell-dot" style="background:#f43f5e"></span><span class="cell-label" style="color:#be123c">Overdue</span></div>
+              <span class="cell-deadline" style="color:#dc2626;font-weight:700">⚠ 2026-06-05</span>
+              <span class="cell-acts">2 items</span>
+            </div>
+          </td>
+          <td style="background:#fafbfc" onclick="openDetail('Priya Sundaram','API Integration','pending')">
+            <div class="cell-inner"><span class="cell-empty">＋</span></div>
+          </td>
+          <td style="background:#eff6ff" onclick="openDetail('Priya Sundaram','Training','in_progress')">
+            <div class="cell-inner">
+              <div class="cell-status"><span class="cell-dot" style="background:#3b82f6"></span><span class="cell-label" style="color:#1d4ed8">In Progress</span></div>
+              <span class="cell-deadline" style="color:var(--ink3)">2026-07-01</span>
+            </div>
+          </td>
+          <td style="background:#f1f5f9" onclick="openDetail('Priya Sundaram','Reporting','pending')">
+            <div class="cell-inner">
+              <div class="cell-status"><span class="cell-dot" style="background:#94a3b8"></span><span class="cell-label" style="color:#64748b">Pending</span></div>
+            </div>
+          </td>
+          <td style="background:#fafbfc" onclick="openDetail('Priya Sundaram','Field Visits','pending')">
+            <div class="cell-inner"><span class="cell-empty">＋</span></div>
+          </td>
+        </tr>
+        <!-- Row 3: CG member -->
+        <tr>
+          <td class="user-td">
+            <div class="user-info">
+              <div class="u-circle" style="background:#f97316">A</div>
+              <div>
+                <div class="u-name">Anand Selvam</div>
+                <div class="u-role"><span class="u-unit" style="background:#f9731622;color:#f97316">CG</span>poc</div>
+              </div>
+            </div>
+          </td>
+          <td style="background:#fafbfc" onclick="openDetail('Anand Selvam','Data Migration','pending')">
+            <div class="cell-inner"><span class="cell-empty">＋</span></div>
+          </td>
+          <td style="background:#fafbfc" onclick="openDetail('Anand Selvam','API Integration','pending')">
+            <div class="cell-inner"><span class="cell-empty">＋</span></div>
+          </td>
+          <td style="background:#f0fdf4" onclick="openDetail('Anand Selvam','Training','completed')">
+            <div class="cell-inner">
+              <div class="cell-status"><span class="cell-dot" style="background:#22c55e"></span><span class="cell-label" style="color:#15803d">Completed</span></div>
+              <span class="cell-deadline" style="color:var(--ink3)">2026-05-30</span>
+              <span class="cell-acts">4 items · Comment: Great participation</span>
+            </div>
+          </td>
+          <td style="background:#eff6ff" onclick="openDetail('Anand Selvam','Reporting','in_progress')">
+            <div class="cell-inner">
+              <div class="cell-status"><span class="cell-dot" style="background:#3b82f6"></span><span class="cell-label" style="color:#1d4ed8">In Progress</span></div>
+              <span class="cell-deadline" style="color:var(--ink3)">2026-06-25</span>
+            </div>
+          </td>
+          <td style="background:#fff1f2" onclick="openDetail('Anand Selvam','Field Visits','overdue')">
+            <div class="cell-inner">
+              <div class="cell-status"><span class="cell-dot" style="background:#f43f5e"></span><span class="cell-label" style="color:#be123c">Overdue</span></div>
+              <span class="cell-deadline" style="color:#dc2626;font-weight:700">⚠ 2026-06-10</span>
+            </div>
+          </td>
+        </tr>
+        <!-- Row 4: ACIS member -->
+        <tr>
+          <td class="user-td" style="background:#fafbfc">
+            <div class="user-info">
+              <div class="u-circle" style="background:#14b8a6">M</div>
+              <div>
+                <div class="u-name">Meera Krishnan</div>
+                <div class="u-role"><span class="u-unit" style="background:#14b8a622;color:#14b8a6">ACIS</span>team</div>
+              </div>
+            </div>
+          </td>
+          <td style="background:#f0fdf4" onclick="openDetail('Meera Krishnan','Data Migration','completed')">
+            <div class="cell-inner">
+              <div class="cell-status"><span class="cell-dot" style="background:#22c55e"></span><span class="cell-label" style="color:#15803d">Completed</span></div>
+              <span class="cell-deadline" style="color:var(--ink3)">2026-06-08</span>
+            </div>
+          </td>
+          <td style="background:#f1f5f9" onclick="openDetail('Meera Krishnan','API Integration','pending')">
+            <div class="cell-inner">
+              <div class="cell-status"><span class="cell-dot" style="background:#94a3b8"></span><span class="cell-label" style="color:#64748b">Pending</span></div>
+            </div>
+          </td>
+          <td style="background:#eff6ff" onclick="openDetail('Meera Krishnan','Training','in_progress')">
+            <div class="cell-inner">
+              <div class="cell-status"><span class="cell-dot" style="background:#3b82f6"></span><span class="cell-label" style="color:#1d4ed8">In Progress</span></div>
+              <span class="cell-deadline" style="color:var(--ink3)">2026-07-05</span>
+            </div>
+          </td>
+          <td style="background:#fafbfc" onclick="openDetail('Meera Krishnan','Reporting','pending')">
+            <div class="cell-inner"><span class="cell-empty">＋</span></div>
+          </td>
+          <td style="background:#fafbfc" onclick="openDetail('Meera Krishnan','Field Visits','pending')">
+            <div class="cell-inner"><span class="cell-empty">＋</span></div>
+          </td>
+        </tr>
+        <!-- Row 5: NSNOP member -->
+        <tr>
+          <td class="user-td">
+            <div class="user-info">
+              <div class="u-circle" style="background:#22c55e">S</div>
+              <div>
+                <div class="u-name">Sakthi Murugan</div>
+                <div class="u-role"><span class="u-unit" style="background:#22c55e22;color:#22c55e">NSNOP</span>poc</div>
+              </div>
+            </div>
+          </td>
+          <td style="background:#fafbfc" onclick="openDetail('Sakthi Murugan','Data Migration','pending')">
+            <div class="cell-inner"><span class="cell-empty">＋</span></div>
+          </td>
+          <td style="background:#fafbfc" onclick="openDetail('Sakthi Murugan','API Integration','pending')">
+            <div class="cell-inner"><span class="cell-empty">＋</span></div>
+          </td>
+          <td style="background:#f0fdf4" onclick="openDetail('Sakthi Murugan','Training','completed')">
+            <div class="cell-inner">
+              <div class="cell-status"><span class="cell-dot" style="background:#22c55e"></span><span class="cell-label" style="color:#15803d">Completed</span></div>
+              <span class="cell-deadline" style="color:var(--ink3)">2026-05-25</span>
+            </div>
+          </td>
+          <td style="background:#fff1f2" onclick="openDetail('Sakthi Murugan','Reporting','overdue')">
+            <div class="cell-inner">
+              <div class="cell-status"><span class="cell-dot" style="background:#f43f5e"></span><span class="cell-label" style="color:#be123c">Overdue</span></div>
+              <span class="cell-deadline" style="color:#dc2626;font-weight:700">⚠ 2026-06-12</span>
+            </div>
+          </td>
+          <td style="background:#eff6ff" onclick="openDetail('Sakthi Murugan','Field Visits','in_progress')">
+            <div class="cell-inner">
+              <div class="cell-status"><span class="cell-dot" style="background:#3b82f6"></span><span class="cell-label" style="color:#1d4ed8">In Progress</span></div>
+              <span class="cell-deadline" style="color:var(--ink3)">2026-06-28</span>
+              <span class="cell-acts">2 items</span>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div></div>
+
+<!-- ── Detail / Assignment Modal ── -->
+<div class="modal-overlay" id="detail-modal" onclick="if(event.target===this)closeDetail()">
+  <div class="modal-box" style="width:min(680px,96vw)">
+    <div class="modal-header">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+        <div>
+          <div style="font-weight:700;font-size:18px;color:var(--ink);margin-bottom:4px" id="detail-task">Data Migration</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:24px;height:24px;border-radius:50%;background:#6366f1;color:#fff;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">R</div>
+            <span style="font-weight:600;font-size:14px;color:var(--ink)" id="detail-user">Rajan Kumar</span>
+            <span style="font-size:11px;font-weight:700;color:#fff;background:#6366f1;border-radius:4px;padding:2px 7px">VP</span>
+          </div>
+        </div>
+        <button onclick="closeDetail()" style="border:none;background:rgba(0,0,0,.07);cursor:pointer;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink2);font-size:18px;flex-shrink:0">✕</button>
+      </div>
+      <div style="margin-top:8px;font-size:13px;color:var(--ink3)">Migrate legacy EMIS data to new convergence system</div>
+    </div>
+    <div class="modal-body">
+      <!-- Status + dates -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px">
+        <div>
+          <label style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);display:block;margin-bottom:6px">Status</label>
+          <select id="detail-status" style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;font-family:'Inter',sans-serif;width:100%;cursor:pointer;outline:none;font-weight:600;color:#15803d;background:#f0fdf4">
+            <option value="pending">Pending</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed" selected>Completed</option>
+            <option value="blocked">Blocked</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);display:block;margin-bottom:6px">Start date</label>
+          <input type="date" value="2026-05-01" style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;font-family:'Inter',sans-serif;width:100%;outline:none">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);display:block;margin-bottom:6px">Deadline</label>
+          <input type="date" value="2026-06-01" style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;font-family:'Inter',sans-serif;width:100%;outline:none">
+        </div>
+      </div>
+
+      <!-- Timeline bar -->
+      <div style="margin-bottom:20px;padding:12px 14px;background:#f8fafc;border-radius:10px;border:1px solid var(--line)">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:12px;color:var(--ink3);font-weight:600">
+          <span>📅 2026-05-01</span>
+          <span>🏁 2026-06-01</span>
+        </div>
+        <div style="height:6px;background:var(--line);border-radius:99px;overflow:hidden">
+          <div style="height:100%;width:100%;background:#22c55e;border-radius:99px;transition:width .3s"></div>
+        </div>
+      </div>
+
+      <!-- Activity log -->
+      <div style="margin-bottom:16px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px">Activity log</div>
+        <div class="act-entry">
+          <div style="flex-shrink:0;width:8px;margin-top:6px;display:flex;flex-direction:column;align-items:center">
+            <div class="act-dot" style="background:#1d4ed8"></div>
+            <div style="width:1px;flex:1;background:var(--line);margin-top:3px"></div>
+          </div>
+          <div class="act-body" style="background:#eff6ff">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+              <span class="act-tag" style="color:#1d4ed8;border-color:#1d4ed830">ACTION</span>
+              <span style="font-size:11px;color:var(--ink3);margin-left:auto">Rajan Kumar · Jun 1, 2026</span>
+            </div>
+            <div style="font-size:13px;color:var(--ink);line-height:1.5">Updated database schema and migrated 42,000 student records from legacy EMIS to new convergence system. Verified data integrity with checksums.</div>
+          </div>
+        </div>
+        <div class="act-entry">
+          <div style="flex-shrink:0;width:8px;margin-top:6px;display:flex;flex-direction:column;align-items:center">
+            <div class="act-dot" style="background:#15803d"></div>
+          </div>
+          <div class="act-body" style="background:#f0fdf4">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+              <span class="act-tag" style="color:#15803d;border-color:#15803d30">CLOSED</span>
+              <span style="font-size:11px;color:var(--ink3);margin-left:auto">Rajan Kumar · Jun 1, 2026</span>
+            </div>
+            <div style="font-size:13px;color:var(--ink);line-height:1.5">Task completed successfully. All records validated and system live.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add activity -->
+      <div style="border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:#fafbfc">
+        <div style="font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px">Add activity</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap" id="act-type-btns">
+          <button class="btn sm" style="border-color:#1d4ed8;background:#1d4ed8;color:#fff" onclick="selActType(this,'#1d4ed8')">⚡ Action Taken</button>
+          <button class="btn sm" onclick="selActType(this,'#7c3aed')">🤝 Support Given</button>
+          <button class="btn sm" onclick="selActType(this,'#374151')">💬 Comment</button>
+          <button class="btn sm" onclick="selActType(this,'#15803d')">✅ Close Task</button>
+        </div>
+        <textarea rows="3" placeholder="Describe the action taken…" style="border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:13px;font-family:'Inter',sans-serif;width:100%;box-sizing:border-box;outline:none;resize:vertical;margin-bottom:10px" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--line)'"></textarea>
+        <button style="border:none;border-radius:20px;padding:8px 22px;font-size:13px;font-family:'Inter',sans-serif;font-weight:700;cursor:pointer;background:var(--accent);color:#fff">Post activity</button>
+      </div>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between">
+      <button style="border:1px solid #fca5a5;border-radius:8px;padding:7px 14px;font-size:12px;font-family:'Inter',sans-serif;cursor:pointer;background:#fff5f5;color:#dc2626">Remove assignment</button>
+      <div style="display:flex;gap:10px">
+        <button class="btn" onclick="closeDetail()">Close</button>
+        <button class="btn primary">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Add Task Modal ── -->
+<div class="modal-overlay" id="add-task-modal" onclick="if(event.target===this)closeAddTask()">
+  <div class="modal-box" style="width:min(600px,96vw)">
+    <div class="modal-header">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:700;font-size:18px">New task column</div>
+        <button onclick="closeAddTask()" style="border:none;background:none;font-size:20px;cursor:pointer;color:var(--ink3);width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%">✕</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <label style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);display:block;margin-bottom:6px">Task title *</label>
+      <input type="text" placeholder="e.g. Data Migration, API Integration…" style="border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:14px;font-family:'Inter',sans-serif;width:100%;box-sizing:border-box;outline:none;margin-bottom:16px" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--line)'">
+      <label style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);display:block;margin-bottom:6px;margin-top:16px">Description</label>
+      <textarea rows="2" placeholder="What does this task involve…" style="border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:14px;font-family:'Inter',sans-serif;width:100%;box-sizing:border-box;outline:none;resize:none;margin-bottom:16px" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--line)'"></textarea>
+      <div style="border-top:1px solid var(--line);padding-top:18px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px">Assign to team members <span style="text-transform:none;letter-spacing:0;opacity:.65;font-weight:400">(optional)</span></div>
+        <!-- Unit filter chips -->
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+          <button class="btn sm" style="background:var(--accent);color:#fff;border-color:var(--accent)">All teams</button>
+          <button class="btn sm">● VP</button><button class="btn sm">● SMC</button>
+          <button class="btn sm">● CG</button><button class="btn sm">● ACIS</button><button class="btn sm">● NSNOP</button>
+        </div>
+        <!-- User list -->
+        <div style="border:1px solid var(--line);border-radius:10px;overflow:hidden;max-height:200px;overflow-y:auto">
+          <div style="padding:8px 14px 4px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6366f1;background:#f8fafc;display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:50%;background:#6366f1;display:inline-block"></span>VP</div>
+          <label style="display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;background:#fff;border-top:1px solid #f1f5f9">
+            <input type="checkbox" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)">
+            <div style="width:28px;height:28px;border-radius:50%;background:#6366f1;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">R</div>
+            <div><div style="font-weight:600;font-size:13px">Rajan Kumar</div><div style="font-size:10px;color:var(--ink3)"><span style="background:#6366f122;color:#6366f1;border-radius:3px;padding:1px 5px;font-weight:700;font-size:9px;margin-right:4px">VP</span>poc</div></div>
+          </label>
+          <div style="padding:8px 14px 4px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#ec4899;background:#f8fafc;display:flex;align-items:center;gap:5px;border-top:1px solid var(--line)"><span style="width:6px;height:6px;border-radius:50%;background:#ec4899;display:inline-block"></span>SMC</div>
+          <label style="display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;background:#fff;border-top:1px solid #f1f5f9">
+            <input type="checkbox" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)">
+            <div style="width:28px;height:28px;border-radius:50%;background:#ec4899;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">P</div>
+            <div><div style="font-weight:600;font-size:13px">Priya Sundaram</div><div style="font-size:10px;color:var(--ink3)"><span style="background:#ec489922;color:#ec4899;border-radius:3px;padding:1px 5px;font-weight:700;font-size:9px;margin-right:4px">SMC</span>team</div></div>
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between;align-items:center">
+      <span style="font-size:12px;color:var(--ink3)">No members selected</span>
+      <div style="display:flex;gap:10px">
+        <button class="btn" onclick="closeAddTask()">Cancel</button>
+        <button class="btn primary">Create column</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Confirm Delete Modal ── -->
+<div class="confirm-overlay" id="confirm-modal" onclick="if(event.target===this)closeConfirm()">
+  <div class="confirm-box">
+    <div style="padding:20px 24px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center">
+      <div style="font-weight:700;font-size:17px">Delete task column</div>
+      <button onclick="closeConfirm()" style="border:none;background:none;font-size:20px;cursor:pointer;color:var(--ink3);width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%">✕</button>
+    </div>
+    <div style="padding:18px 24px;font-size:14px;color:var(--ink2);line-height:1.6" id="confirm-msg">Are you sure you want to delete this column?</div>
+    <div style="padding:14px 24px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px">
+      <button class="btn" onclick="closeConfirm()">Cancel</button>
+      <button style="border:none;border-radius:20px;padding:8px 22px;font-size:13px;font-family:'Inter',sans-serif;font-weight:700;cursor:pointer;background:#dc2626;color:#fff">Delete column</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function openDetail(user, task, status) {
+  document.getElementById('detail-user').textContent = user;
+  document.getElementById('detail-task').textContent = task;
+  const s = document.getElementById('detail-status');
+  const statusMap = { completed:'completed', in_progress:'in_progress', pending:'pending', blocked:'blocked', overdue:'pending' };
+  s.value = statusMap[status] || 'pending';
+  const styles = {
+    pending:     { color:'#64748b', bg:'#f1f5f9' },
+    in_progress: { color:'#1d4ed8', bg:'#eff6ff' },
+    completed:   { color:'#15803d', bg:'#f0fdf4' },
+    blocked:     { color:'#be123c', bg:'#fff1f2' },
+  };
+  const st = styles[statusMap[status]] || styles.pending;
+  s.style.color = st.color; s.style.background = st.bg; s.style.fontWeight = '600';
+  document.getElementById('detail-modal').classList.add('open');
+}
+function closeDetail() { document.getElementById('detail-modal').classList.remove('open'); }
+function openAddTask() { document.getElementById('add-task-modal').classList.add('open'); }
+function closeAddTask() { document.getElementById('add-task-modal').classList.remove('open'); }
+function openConfirm(task) {
+  document.getElementById('confirm-msg').innerHTML = `Are you sure you want to delete the column <strong>"${task}"</strong>? This will permanently remove all assignments and activity logs associated with it.`;
+  document.getElementById('confirm-modal').classList.add('open');
+}
+function closeConfirm() { document.getElementById('confirm-modal').classList.remove('open'); }
+function selActType(btn, color) {
+  document.querySelectorAll('#act-type-btns .btn').forEach(b => {
+    b.style.background = '#fff'; b.style.color = 'var(--ink)'; b.style.borderColor = 'var(--line)';
+  });
+  btn.style.background = color; btn.style.color = '#fff'; btn.style.borderColor = color;
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeDetail(); closeAddTask(); closeConfirm(); }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!--
+  SHARED SHELL SNIPPET — copy the sidebar + header block below into each page.
+  Replace ACTIVE_PATH with the current page slug to highlight the correct nav item.
+  All nav items shown (role-gated in the real app; show all here for demo).
+-->
+
+<!-- ═══════════════════ SIDEBAR ═══════════════════ -->
+<div class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-brand-icon">C</div>
+    <div class="sb-brand-text">
+      <div class="title">CMS</div>
+      <div class="sub">Convergence</div>
+    </div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-section">Main</div>
+
+    <a href="dashboard.html" class="sb-item REPLACE_dashboard">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;opacity:.7"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
+      <span class="label">Dashboard</span>
+    </a>
+    <a href="planner.html" class="sb-item REPLACE_planner">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;opacity:.7"><rect x="1.5" y="2.5" width="13" height="12" rx="2"/><path d="M5 1v3M11 1v3M1.5 6.5h13M5 10.5l2 2 4-4"/></svg>
+      <span class="label">Planner</span>
+    </a>
+    <a href="meetings.html" class="sb-item REPLACE_meetings">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;opacity:.7"><rect x="1.5" y="2.5" width="13" height="12" rx="2"/><path d="M5 1v3M11 1v3M1.5 6.5h13"/></svg>
+      <span class="label">Meetings</span>
+    </a>
+    <a href="items.html" class="sb-item REPLACE_items">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;opacity:.7"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3.5L10.5 10"/></svg>
+      <span class="label">Item Tracker</span>
+    </a>
+    <a href="documents.html" class="sb-item REPLACE_documents">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;opacity:.7"><path d="M9.5 1H3.5A1.5 1.5 0 0 0 2 2.5v11A1.5 1.5 0 0 0 3.5 15h9A1.5 1.5 0 0 0 14 13.5V5.5L9.5 1z"/><path d="M9 1v5h5M5 9h6M5 12h4"/></svg>
+      <span class="label">D.O. Letters</span>
+    </a>
+    <a href="worklog.html" class="sb-item REPLACE_worklog">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;opacity:.7"><rect x="1.5" y="1.5" width="13" height="13" rx="2"/><path d="M5 8h6M5 5h6M5 11h3"/></svg>
+      <span class="label">Daily Work</span>
+    </a>
+    <a href="reviews.html" class="sb-item REPLACE_reviews">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;opacity:.7"><polyline points="1,10 4,6 7,9 10,4 15,7"/></svg>
+      <span class="label">Team Activity</span>
+    </a>
+    <a href="task-board.html" class="sb-item REPLACE_taskboard">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;opacity:.7"><rect x="1" y="1" width="14" height="14" rx="2"/><line x1="1" y1="6" x2="15" y2="6"/><line x1="6" y1="6" x2="6" y2="15"/></svg>
+      <span class="label">Task Board</span>
+    </a>
+    <a href="minutes.html" class="sb-item REPLACE_minutes">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;opacity:.7"><rect x="2.5" y="1" width="11" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>
+      <span class="label">Minutes</span>
+    </a>
+    <a href="admin-panel.html" class="sb-item REPLACE_admin">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;opacity:.7"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M2.93 2.93l1.41 1.41M11.66 11.66l1.41 1.41M2.93 13.07l1.41-1.41M11.66 4.34l1.41-1.41"/></svg>
+      <span class="label">Admin Panel</span>
+    </a>
+  </nav>
+</div>
+
+<!-- ═══════════════════ HEADER ═══════════════════ -->
+<div class="header">
+  <div class="page-title">
+    <div class="name">REPLACE_TITLE</div>
+    <div class="sub">REPLACE_SUB</div>
+  </div>
+  <div class="header-actions">
+    <button class="hbtn" style="position:relative" title="Notifications">
+      🔔
+      <span style="position:absolute;top:4px;right:4px;background:var(--bad);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1">3</span>
+    </button>
+    <button class="user-btn">
+      <span class="u-avatar" style="background:#1e2333">AD</span>
+      <span class="name">Admin</span>
+      <span class="caret">▾</span>
+    </button>
+  </div>
+</div>

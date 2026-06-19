@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KPI Tracking — CMS</title>
+<link rel="stylesheet" href="_layout.css">
+<style>
+.two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start }
+.panel { background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; margin-bottom:16px }
+.panel-head { padding:16px 18px; border-bottom:1px solid var(--line); font-weight:600; font-size:15px; color:var(--ink) }
+.panel-body { padding:20px 22px }
+.fg { margin-bottom:14px }
+.fg label { display:block; font-size:11px; font-weight:600; color:var(--ink3); margin-bottom:5px }
+.fg input, .fg select, .fg textarea {
+  width:100%; border:1px solid var(--line); border-radius:8px;
+  padding:7px 10px; font-size:13px; outline:none; font-family:inherit; color:var(--ink);
+}
+.fg input:focus, .fg select:focus, .fg textarea:focus { border-color:var(--accent) }
+.fg textarea { resize:vertical }
+.row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px }
+.btn-dark { padding:8px 18px; background:var(--ink); color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; transition:opacity .13s }
+.btn-dark:hover { opacity:.84 }
+.kpi-stat-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px }
+.kpi-stat { border-radius:12px; padding:16px 18px; border:1px solid var(--line) }
+.kpi-stat .lbl { font-size:10px; letter-spacing:.06em; text-transform:uppercase }
+.kpi-stat .val { font-size:30px; font-weight:600; line-height:1; margin-top:9px }
+.kpi-stat .sub { font-size:11px; margin-top:6px }
+.kpi-row { padding:10px 14px; border-bottom:1px solid var(--line); font-size:13px }
+.kpi-row:last-child { border-bottom:none }
+.entry-row { padding:10px 14px; border-bottom:1px solid var(--line); font-size:13px }
+.entry-row:last-child { border-bottom:none }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-brand-icon">C</div>
+    <div class="sb-brand-text"><div class="title">CMS</div><div class="sub">Convergence</div></div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-section">Main</div>
+    <a href="dashboard.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg><span class="label">Dashboard</span></a>
+    <a href="planner.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="2.5" width="13" height="12" rx="2"/><path d="M5 1v3M11 1v3M1.5 6.5h13M5 10.5l2 2 4-4"/></svg><span class="label">Planner</span></a>
+    <a href="meetings.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="2.5" width="13" height="12" rx="2"/><path d="M5 1v3M11 1v3M1.5 6.5h13"/></svg><span class="label">Meetings</span></a>
+    <a href="items.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3.5L10.5 10"/></svg><span class="label">Item Tracker</span></a>
+    <a href="documents.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><path d="M9.5 1H3.5A1.5 1.5 0 0 0 2 2.5v11A1.5 1.5 0 0 0 3.5 15h9A1.5 1.5 0 0 0 14 13.5V5.5L9.5 1z"/><path d="M9 1v5h5M5 9h6M5 12h4"/></svg><span class="label">D.O. Letters</span></a>
+    <a href="worklog.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="1.5" width="13" height="13" rx="2"/><path d="M5 8h6M5 5h6M5 11h3"/></svg><span class="label">Daily Work</span></a>
+    <a href="reviews.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><polyline points="1,10 4,6 7,9 10,4 15,7"/></svg><span class="label">Team Activity</span></a>
+    <a href="task-board.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1" y="1" width="14" height="14" rx="2"/><line x1="1" y1="6" x2="15" y2="6"/><line x1="6" y1="6" x2="6" y2="15"/></svg><span class="label">Task Board</span></a>
+    <a href="minutes.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="2.5" y="1" width="11" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg><span class="label">Minutes</span></a>
+    <a href="admin-panel.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M2.93 2.93l1.41 1.41M11.66 11.66l1.41 1.41M2.93 13.07l1.41-1.41M11.66 4.34l1.41-1.41"/></svg><span class="label">Admin Panel</span></a>
+  </nav>
+</div>
+
+<!-- Header -->
+<div class="header">
+  <div class="page-title"><div class="name">KPI Tracking</div><div class="sub">Key performance indicators</div></div>
+  <div class="header-actions">
+    <button class="hbtn"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1a5 5 0 0 1 5 5c0 3 1.5 4 1.5 4h-13S3 9 3 6a5 5 0 0 1 5-5zM6 13a2 2 0 0 0 4 0"/></svg></button>
+    <button class="user-btn"><span class="u-avatar" style="background:#1e2333">AD</span><span class="name">Admin</span><span class="caret">▾</span></button>
+  </div>
+</div>
+
+<div class="app"><div class="wrap">
+
+  <div class="filterbar">
+    <div class="period"><div class="l">KPI Tracking</div><div class="v">Key Performance Indicators</div></div>
+  </div>
+
+  <div class="kpi-stat-row" id="stat-row"></div>
+
+  <div class="two-col">
+    <!-- LEFT -->
+    <div>
+      <div class="panel">
+        <div class="panel-head">Define KPI</div>
+        <div class="panel-body">
+          <div class="fg"><label>Title</label><input type="text" id="k-title" placeholder="e.g. Daily school visits"></div>
+          <div class="row2">
+            <div class="fg"><label>Metric Unit</label><input type="text" id="k-unit" placeholder="visits, %, calls…"></div>
+            <div class="fg"><label>Target Value</label><input type="number" id="k-target" placeholder="e.g. 5"></div>
+          </div>
+          <div class="fg">
+            <label>Frequency</label>
+            <select id="k-freq"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select>
+          </div>
+          <div class="fg"><label>Description</label><textarea id="k-desc" rows="2" placeholder="What does this KPI measure?"></textarea></div>
+          <button class="btn-dark" onclick="createKPI()">Create KPI</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">KPI Definitions <span id="kpi-count" style="font-size:13px;font-weight:400;color:var(--ink3);margin-left:4px">(0)</span></div>
+        <div id="kpi-list"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div>
+      <div class="panel">
+        <div class="panel-head">Log Daily Value</div>
+        <div class="panel-body">
+          <div class="fg"><label>KPI</label><select id="e-kpi"><option value="">— Select KPI —</option></select></div>
+          <div class="row2">
+            <div class="fg"><label>Value</label><input type="number" id="e-value" placeholder="Actual value"></div>
+            <div class="fg"><label>Date</label><input type="date" id="e-date"></div>
+          </div>
+          <div class="fg"><label>Notes</label><textarea id="e-notes" rows="2" placeholder="Any context or notes…"></textarea></div>
+          <button class="btn-dark" onclick="logEntry()">Log Value</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">Recent Entries</div>
+        <div id="entry-list"></div>
+      </div>
+    </div>
+  </div>
+
+</div></div>
+
+<div id="toast" style="position:fixed;bottom:24px;right:24px;background:#1e293b;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:500;opacity:0;transition:opacity .25s;z-index:9999;pointer-events:none"></div>
+
+<script>
+const TODAY = new Date().toISOString().slice(0,10);
+
+let KPIS = [
+  { id:1, title:'Daily School Visits',       metric_unit:'visits', target_value:5,  frequency:'daily',   description:'Number of convergence school visits completed per day' },
+  { id:2, title:'Meeting Attendance Rate',   metric_unit:'%',      target_value:80, frequency:'weekly',  description:'% of team members attending weekly convergence meetings' },
+  { id:3, title:'Action Point Closure Rate', metric_unit:'%',      target_value:70, frequency:'monthly', description:'% of action points closed within the target period' },
+  { id:4, title:'MoM Submission Rate',       metric_unit:'%',      target_value:90, frequency:'monthly', description:'% of conducted meetings with filed minutes of meeting' },
+];
+
+let ENTRIES = [
+  { id:1, kpi:1, value:6, date:'2026-06-18', notes:'Visited Kancheepuram, Tiruvallur blocks' },
+  { id:2, kpi:2, value:85, date:'2026-06-16', notes:'3 absentees this week' },
+  { id:3, kpi:1, value:4, date:'2026-06-17', notes:'' },
+  { id:4, kpi:3, value:65, date:'2026-06-01', notes:'5 items still pending from VP-SMC meeting' },
+  { id:5, kpi:4, value:92, date:'2026-06-01', notes:'' },
+  { id:6, kpi:1, value:5, date:'2026-06-16', notes:'All targets met today' },
+];
+
+let nextKpiId = 10, nextEntryId = 10;
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.style.opacity = '1';
+  setTimeout(() => el.style.opacity = '0', 2500);
+}
+
+function computeStats() {
+  const metToday = ENTRIES.filter(e => {
+    if (e.date !== TODAY) return false;
+    const k = KPIS.find(x => x.id === e.kpi);
+    return k && +e.value >= +k.target_value;
+  }).length;
+  const d = new Date(); d.setDate(d.getDate() - 7);
+  const cutoff = d.toISOString().slice(0,10);
+  const week = ENTRIES.filter(e => e.date >= cutoff);
+  const weekRate = week.length
+    ? Math.round(week.filter(e => { const k = KPIS.find(x => x.id === e.kpi); return k && +e.value >= +k.target_value; }).length / week.length * 100) + '%'
+    : '—';
+  const allMet = ENTRIES.filter(e => { const k = KPIS.find(x => x.id === e.kpi); return k && +e.value >= +k.target_value; }).length;
+  const compliance = ENTRIES.length ? Math.round(allMet / ENTRIES.length * 100) + '%' : '—';
+  return [
+    { hero:true, l:'Total KPIs', v:KPIS.length, sub:'defined' },
+    { l:'Met Today', v:metToday, sub:'targets hit today' },
+    { l:'This Week Hit Rate', v:weekRate, sub:'last 7 days' },
+    { l:'Overall Compliance', v:compliance, sub:'all time' },
+  ];
+}
+
+function renderStats() {
+  document.getElementById('stat-row').innerHTML = computeStats().map(s => `
+    <div class="kpi-stat" style="background:${s.hero ? 'var(--ink)' : '#fff'};color:${s.hero ? '#fff' : 'var(--ink)'}">
+      <div class="lbl" style="color:${s.hero ? 'rgba(255,255,255,.55)' : 'var(--ink3)'}">${s.l}</div>
+      <div class="val">${s.v}</div>
+      <div class="sub" style="color:${s.hero ? 'rgba(255,255,255,.8)' : 'var(--ink3)'}">${s.sub}</div>
+    </div>`).join('');
+}
+
+function renderKpiList() {
+  document.getElementById('kpi-count').textContent = `(${KPIS.length})`;
+  const el = document.getElementById('kpi-list');
+  el.innerHTML = !KPIS.length
+    ? '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No KPIs defined yet.</div>'
+    : KPIS.map(k => `
+      <div class="kpi-row">
+        <div style="font-weight:600">${k.title}</div>
+        <div style="font-size:11px;color:var(--ink3);display:flex;gap:12px;margin-top:3px;flex-wrap:wrap">
+          <span>Target: ${k.target_value} ${k.metric_unit}</span>
+          <span>Freq: ${k.frequency}</span>
+        </div>
+        ${k.description ? `<div style="font-size:11px;color:var(--ink2);margin-top:2px">${k.description}</div>` : ''}
+      </div>`).join('');
+  const sel = document.getElementById('e-kpi');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— Select KPI —</option>' +
+    KPIS.map(k => `<option value="${k.id}">${k.title} (target: ${k.target_value} ${k.metric_unit})</option>`).join('');
+  sel.value = cur;
+}
+
+function renderEntries() {
+  const sorted = [...ENTRIES].sort((a,b) => new Date(b.date)-new Date(a.date)).slice(0,20);
+  const el = document.getElementById('entry-list');
+  el.innerHTML = !sorted.length
+    ? '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No entries yet.</div>'
+    : sorted.map(e => {
+      const k = KPIS.find(x => x.id === e.kpi);
+      const met = k && +e.value >= +k.target_value;
+      return `
+        <div class="entry-row">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:3px">
+            <span style="font-weight:600;flex:1">${k?.title ?? '—'}</span>
+            <span style="font-size:15px;color:${met ? 'var(--ok)' : 'var(--bad)'}">${met ? '✓' : '✗'}</span>
+          </div>
+          <div style="font-size:11px;color:var(--ink3);display:flex;gap:12px;flex-wrap:wrap;margin-top:2px">
+            <span style="color:${met ? 'var(--ok)' : 'var(--bad)'};font-weight:600">${e.value} ${k?.metric_unit ?? ''}</span>
+            ${k ? `<span>/ ${k.target_value} ${k.metric_unit}</span>` : ''}
+            <span>${e.date}</span>
+          </div>
+          ${e.notes ? `<div style="font-size:11px;color:var(--ink3);margin-top:3px;font-style:italic">${e.notes}</div>` : ''}
+        </div>`;
+    }).join('');
+}
+
+function createKPI() {
+  const title = document.getElementById('k-title').value.trim();
+  const target = document.getElementById('k-target').value;
+  if (!title) { toast('Enter KPI title'); return; }
+  if (!target || isNaN(+target)) { toast('Enter a valid target value'); return; }
+  KPIS.push({ id:nextKpiId++, title, metric_unit:document.getElementById('k-unit').value.trim(), target_value:+target, frequency:document.getElementById('k-freq').value, description:document.getElementById('k-desc').value.trim() });
+  ['k-title','k-unit','k-target','k-desc'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('k-freq').value = 'daily';
+  renderKpiList(); renderStats(); toast('KPI created');
+}
+
+function logEntry() {
+  const kpiId = document.getElementById('e-kpi').value;
+  const value = document.getElementById('e-value').value;
+  if (!kpiId) { toast('Select a KPI'); return; }
+  if (!value || isNaN(+value)) { toast('Enter a valid value'); return; }
+  ENTRIES.unshift({ id:nextEntryId++, kpi:+kpiId, value:+value, date:document.getElementById('e-date').value || TODAY, notes:document.getElementById('e-notes').value.trim() });
+  document.getElementById('e-value').value = '';
+  document.getElementById('e-notes').value = '';
+  renderEntries(); renderStats(); toast('Value logged');
+}
+
+document.getElementById('e-date').value = TODAY;
+renderStats(); renderKpiList(); renderEntries();
+</script>
+</body>
+</html>

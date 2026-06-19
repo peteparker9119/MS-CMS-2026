@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin Panel — CMS</title>
+<link rel="stylesheet" href="_layout.css">
+<style>
+/* ── Tabs ── */
+.page-tabs {
+  display:flex; background:var(--paper); border-radius:10px; padding:4px; gap:3px;
+}
+.page-tabs button {
+  padding:7px 18px; border:none; border-radius:8px; cursor:pointer;
+  font-size:13px; font-weight:500; color:var(--ink3);
+  background:transparent; transition:all .13s;
+}
+.page-tabs button.on {
+  background:#fff; color:var(--ink); font-weight:600;
+  box-shadow:0 1px 4px rgba(0,0,0,.1);
+}
+
+/* ── Stat cards ── */
+.stat-strip { display:grid; gap:12px; margin-bottom:20px }
+.stat-card-h {
+  background:#fff; border:1px solid var(--line); border-radius:12px;
+  padding:14px 18px; display:flex; align-items:center; gap:14px;
+  box-shadow:0 1px 4px rgba(15,23,42,.05);
+}
+.stat-icon {
+  width:42px; height:42px; border-radius:11px;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.stat-icon span { font-weight:800; font-size:17px; color:#fff }
+.stat-lbl { font-size:12px; color:var(--ink3); font-weight:600; text-transform:uppercase; letter-spacing:.05em }
+
+/* ── User table ── */
+.u-table-wrap { background:#fff; border:1px solid var(--line); border-radius:14px; overflow:hidden }
+.u-table-head {
+  display:grid; grid-template-columns:2.5fr 1fr 1.5fr 1fr 1fr auto;
+  padding:9px 18px; background:var(--paper); border-bottom:1px solid var(--line);
+  font-size:11px; font-weight:700; color:var(--ink3); text-transform:uppercase; letter-spacing:.06em;
+}
+.u-row {
+  display:grid; grid-template-columns:2.5fr 1fr 1.5fr 1fr 1fr auto;
+  padding:13px 18px; align-items:center; border-bottom:1px solid var(--line);
+  transition:background .12s;
+}
+.u-row:last-child { border-bottom:none }
+.u-row:hover { background:var(--paper) }
+.u-avatar-sq {
+  width:36px; height:36px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  font-weight:700; font-size:13px; color:#fff; flex-shrink:0;
+}
+.role-pill {
+  display:inline-block; padding:3px 10px; border-radius:99px;
+  font-size:11px; font-weight:700; letter-spacing:.04em; white-space:nowrap;
+}
+.status-pill {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:3px 10px; border-radius:99px;
+  font-size:11px; font-weight:700; cursor:pointer; border:none;
+}
+.status-pill .dot { width:6px; height:6px; border-radius:50%; display:inline-block }
+
+/* ── Unit cards ── */
+.units-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px }
+.unit-card {
+  background:#fff; border:1px solid var(--line); border-radius:14px;
+  padding:18px 20px; box-shadow:0 1px 4px rgba(15,23,42,.05);
+}
+.unit-icon {
+  width:42px; height:42px; border-radius:11px;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.unit-icon span { font-weight:800; font-size:15px; color:#fff }
+
+/* ── Menu list ── */
+.menu-card {
+  background:#fff; border:1px solid var(--line); border-radius:14px;
+  padding:16px 20px; box-shadow:0 1px 4px rgba(15,23,42,.05); margin-bottom:10px;
+}
+.menu-icon {
+  width:44px; height:44px; border-radius:12px;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px;
+}
+.field-chip {
+  display:inline-flex; align-items:center; gap:4px;
+  font-size:11px; padding:2px 8px; border-radius:99px;
+  background:#f1f5f9; color:var(--ink3);
+}
+.field-chip .req { color:var(--bad) }
+
+/* ── Search input ── */
+.search-inp {
+  border:1.5px solid var(--line); border-radius:9px; padding:8px 12px;
+  font-size:13px; outline:none; font-family:inherit; color:var(--ink); width:280px;
+}
+.search-inp:focus { border-color:var(--accent) }
+
+/* ── Buttons ── */
+.btn-dark {
+  padding:8px 18px; background:#1e2333; color:#fff; border:none;
+  border-radius:9px; cursor:pointer; font-size:13px; font-weight:700;
+  transition:opacity .13s;
+}
+.btn-dark:hover { opacity:.85 }
+.btn-outline {
+  padding:6px 14px; border:1.5px solid var(--line); border-radius:7px;
+  background:#fff; font-size:12px; font-weight:600; cursor:pointer; color:var(--ink2);
+  transition:border-color .12s;
+}
+.btn-outline:hover { border-color:var(--accent) }
+.btn-red {
+  padding:6px 14px; border:1.5px solid #fca5a5; border-radius:7px;
+  background:#fff5f5; font-size:12px; font-weight:600; cursor:pointer; color:var(--bad);
+}
+.btn-accent {
+  padding:6px 14px; border:1.5px solid var(--accent); border-radius:7px;
+  background:var(--accent-light); font-size:12px; font-weight:600; cursor:pointer; color:var(--accent-dark);
+}
+.btn-blue {
+  padding:5px 12px; border:1.5px solid #bae6fd; border-radius:7px;
+  background:#e0f2fe; font-size:12px; font-weight:600; cursor:pointer; color:#0369a1;
+}
+
+/* ── Modal ── */
+.modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:2000;
+  display:flex; align-items:center; justify-content:center;
+}
+.modal-box {
+  background:#fff; border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.25);
+  max-height:90vh; display:flex; flex-direction:column; overflow:hidden;
+}
+.modal-box.sm { width:520px }
+.modal-box.lg { width:720px }
+.modal-box.xl { width:920px }
+.modal-head {
+  padding:20px 24px 16px; border-bottom:1px solid var(--line); flex-shrink:0;
+  font-weight:700; font-size:18px; color:var(--ink);
+}
+.modal-body { padding:22px 24px; overflow-y:auto; flex:1 }
+.modal-foot { padding:14px 24px; border-top:1px solid var(--line); flex-shrink:0; display:flex; gap:8px; justify-content:flex-end }
+
+/* ── Form fields in modal ── */
+.mf { margin-bottom:14px }
+.mf label {
+  display:block; font-size:11px; font-weight:600; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--ink3); margin-bottom:6px;
+}
+.mf input, .mf select, .mf textarea {
+  width:100%; border:1.5px solid var(--line); border-radius:9px;
+  padding:9px 12px; font-size:14px; outline:none; font-family:inherit;
+  color:var(--ink); background:#fff;
+}
+.mf input:focus, .mf select:focus, .mf textarea:focus { border-color:var(--accent) }
+.mf textarea { resize:vertical; min-height:60px }
+.row2m { display:grid; grid-template-columns:1fr 1fr; gap:12px }
+.row3m { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px }
+
+/* ── Menu access buttons ── */
+.access-btn {
+  flex:1; padding:8px 0; border-radius:9px; cursor:pointer;
+  font-size:12px; font-weight:600; transition:all .13s; border:1.5px solid;
+}
+.toggle-btn {
+  flex:1; padding:8px 0; border-radius:9px; cursor:pointer;
+  font-size:12px; font-weight:600; transition:all .13s; border:1.5px solid;
+}
+
+/* ── Menu permission grid ── */
+.perm-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px }
+.perm-item {
+  display:flex; align-items:center; gap:10px; cursor:pointer;
+  padding:9px 12px; border-radius:9px; border:1.5px solid; transition:all .13s;
+}
+.perm-item input { accent-color:var(--accent); width:14px; height:14px; flex-shrink:0 }
+
+/* ── Field builder ── */
+.field-builder-row {
+  background:#fff; border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-bottom:6px;
+}
+.fbr-top {
+  display:grid; grid-template-columns:44px 1fr 1fr 120px 30px;
+  gap:6px; padding:8px 10px; align-items:center;
+}
+.fbr-bottom {
+  display:grid; grid-template-columns:44px 1fr auto;
+  gap:6px; padding:0 10px 8px; align-items:center;
+}
+.fbr-input {
+  border:1.5px solid var(--line); border-radius:7px;
+  padding:7px 10px; font-size:13px; outline:none; font-family:inherit; width:100%;
+}
+.fbr-input:focus { border-color:var(--accent) }
+.fbr-move { display:flex; flex-direction:column; align-items:center; gap:1px }
+.fbr-move button {
+  background:none; border:none; cursor:pointer; color:var(--ink3);
+  padding:0; font-size:11px; line-height:1; display:flex;
+}
+.fbr-move button:disabled { color:var(--line); cursor:default }
+.fbr-order { font-size:10px; font-weight:700; color:var(--ink3) }
+.fbr-del {
+  background:none; border:1px solid #fca5a5; border-radius:7px;
+  width:30px; height:30px; cursor:pointer; color:var(--bad);
+  font-size:15px; display:flex; align-items:center; justify-content:center;
+}
+.field-type-note {
+  font-size:11px; color:var(--ok); font-weight:600; padding:4px 0 0 54px;
+}
+
+/* ── Builder tabs ── */
+.builder-tabs { display:flex; background:var(--paper); border-radius:9px; padding:3px; gap:2px }
+.builder-tabs button {
+  padding:5px 14px; border:none; border-radius:7px; cursor:pointer;
+  font-size:12px; font-weight:600; transition:all .13s;
+  background:transparent; color:var(--ink3);
+}
+.builder-tabs button.on {
+  background:#fff; color:var(--accent-dark);
+  box-shadow:0 1px 3px rgba(15,23,42,.08);
+}
+
+/* Options tag editor */
+.opt-tag {
+  display:inline-flex; align-items:center; gap:4px;
+  background:var(--accent-light); color:var(--accent-dark);
+  border-radius:99px; padding:3px 10px; font-size:12px; margin:2px;
+}
+.opt-tag button {
+  background:none; border:none; cursor:pointer; color:var(--accent);
+  font-size:13px; line-height:1; padding:0 0 0 2px; display:flex; align-items:center;
+}
+.opt-add-row { display:flex; gap:6px; margin-top:6px }
+.opt-add-row input {
+  flex:1; border:1.5px solid var(--line); border-radius:8px;
+  padding:6px 10px; font-size:13px; outline:none;
+}
+.opt-add-row input:focus { border-color:var(--accent) }
+.opt-add-btn {
+  padding:6px 14px; border:1.5px solid var(--accent); border-radius:8px;
+  background:var(--accent-light); color:var(--accent-dark);
+  font-size:12px; font-weight:700; cursor:pointer;
+}
+
+/* Entries modal table */
+.et { width:100%; border-collapse:collapse; font-size:13px }
+.et thead tr { background:var(--paper); border-bottom:2px solid var(--line) }
+.et th { padding:9px 14px; text-align:left; font-weight:700; color:var(--ink3); font-size:11px; text-transform:uppercase; letter-spacing:.05em; white-space:nowrap }
+.et td { padding:10px 14px; color:var(--ink2); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.et tr:hover td { background:var(--paper) }
+.et tbody tr:not(:last-child) td { border-bottom:1px solid var(--line) }
+
+/* Empty dashed box */
+.empty-dashed {
+  padding:60px 0; text-align:center; border:2px dashed var(--line);
+  border-radius:16px; color:var(--ink3); font-size:14px;
+}
+.empty-dashed .big { font-size:32px; margin-bottom:10px }
+.empty-dashed .head { font-weight:600; margin-bottom:6px }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-brand-icon">C</div>
+    <div class="sb-brand-text">
+      <div class="title">CMS</div>
+      <div class="sub">Convergence</div>
+    </div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-section">Main</div>
+    <a href="dashboard.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
+      <span class="label">Dashboard</span>
+    </a>
+    <a href="planner.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="2.5" width="13" height="12" rx="2"/><path d="M5 1v3M11 1v3M1.5 6.5h13M5 10.5l2 2 4-4"/></svg>
+      <span class="label">Planner</span>
+    </a>
+    <a href="meetings.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="2.5" width="13" height="12" rx="2"/><path d="M5 1v3M11 1v3M1.5 6.5h13"/></svg>
+      <span class="label">Meetings</span>
+    </a>
+    <a href="items.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3.5L10.5 10"/></svg>
+      <span class="label">Item Tracker</span>
+    </a>
+    <a href="documents.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><path d="M9.5 1H3.5A1.5 1.5 0 0 0 2 2.5v11A1.5 1.5 0 0 0 3.5 15h9A1.5 1.5 0 0 0 14 13.5V5.5L9.5 1z"/><path d="M9 1v5h5M5 9h6M5 12h4"/></svg>
+      <span class="label">D.O. Letters</span>
+    </a>
+    <a href="worklog.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="1.5" width="13" height="13" rx="2"/><path d="M5 8h6M5 5h6M5 11h3"/></svg>
+      <span class="label">Daily Work</span>
+    </a>
+    <a href="reviews.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><polyline points="1,10 4,6 7,9 10,4 15,7"/></svg>
+      <span class="label">Team Activity</span>
+    </a>
+    <a href="task-board.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1" y="1" width="14" height="14" rx="2"/><line x1="1" y1="6" x2="15" y2="6"/><line x1="6" y1="6" x2="6" y2="15"/></svg>
+      <span class="label">Task Board</span>
+    </a>
+    <a href="minutes.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="2.5" y="1" width="11" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>
+      <span class="label">Minutes</span>
+    </a>
+    <a href="admin-panel.html" class="sb-item active">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.5" style="flex-shrink:0"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M2.93 2.93l1.41 1.41M11.66 11.66l1.41 1.41M2.93 13.07l1.41-1.41M11.66 4.34l1.41-1.41"/></svg>
+      <span class="label">Admin Panel</span>
+    </a>
+  </nav>
+</div>
+
+<!-- Header -->
+<div class="header">
+  <div class="page-title">
+    <div class="name">Admin Panel</div>
+    <div class="sub">System configuration</div>
+  </div>
+  <div class="header-actions">
+    <button class="hbtn" style="position:relative">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1a5 5 0 0 1 5 5c0 3 1.5 4 1.5 4h-13S3 9 3 6a5 5 0 0 1 5-5zM6 13a2 2 0 0 0 4 0"/></svg>
+      <span style="position:absolute;top:4px;right:4px;background:var(--bad);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">2</span>
+    </button>
+    <button class="user-btn">
+      <span class="u-avatar" style="background:#1e2333">AD</span>
+      <span class="name">Admin</span>
+      <span class="caret">▾</span>
+    </button>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="app">
+  <div class="wrap">
+
+    <!-- Page header + tabs -->
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:12px">
+      <div>
+        <div style="font-weight:700;font-size:26px;letter-spacing:-.02em;color:var(--ink)">Admin Panel</div>
+        <div style="font-size:13px;color:var(--ink3);margin-top:3px">Manage user accounts, roles, menu access and convergence units</div>
+      </div>
+      <div class="page-tabs">
+        <button class="on" onclick="switchTab('users')">Users &amp; Logins</button>
+        <button onclick="switchTab('units')">Convergence Units</button>
+        <button onclick="switchTab('menus')">Menu Builder</button>
+      </div>
+    </div>
+
+    <!-- Tab panels -->
+    <div id="tab-users"><!-- rendered by JS --></div>
+    <div id="tab-units" style="display:none"><!-- rendered by JS --></div>
+    <div id="tab-menus" style="display:none"><!-- rendered by JS --></div>
+
+  </div>
+</div>
+
+<!-- ── MODALS ── -->
+
+<!-- User Edit Modal -->
+<div class="modal-overlay" id="user-modal" style="display:none" onclick="if(event.target===this)closeUserModal()">
+  <div class="modal-box lg">
+    <div class="modal-head" id="user-modal-title">Edit User</div>
+    <div class="modal-body">
+      <div class="row2m">
+        <div class="mf"><label>First Name</label><input type="text" id="um-first" placeholder="First name"></div>
+        <div class="mf"><label>Last Name</label><input type="text" id="um-last" placeholder="Last name"></div>
+      </div>
+      <div class="mf"><label>Email (optional)</label><input type="email" id="um-email" placeholder="user@example.com"></div>
+      <div class="mf">
+        <label>WhatsApp Number</label>
+        <input type="text" id="um-wa" placeholder="e.g. 919876543210 (no + prefix)">
+        <div style="font-size:11px;color:var(--ink3);margin-top:3px">Country code + number, no + sign</div>
+      </div>
+      <div class="row2m">
+        <div class="mf">
+          <label>Role</label>
+          <select id="um-role" onchange="onUmRoleChange()">
+            <option value="super_admin">Super Admin</option>
+            <option value="admin">Admin</option>
+            <option value="poc">Unit Rep</option>
+            <option value="team">Team</option>
+          </select>
+        </div>
+        <div class="mf" id="um-unit-wrap">
+          <label>Convergence Unit</label>
+          <select id="um-unit">
+            <option value="">— None —</option>
+            <option value="vp">VETRI Palligal (VP)</option>
+            <option value="smc">SMC</option>
+            <option value="cg">Career Guidance</option>
+            <option value="acis">ACIS</option>
+            <option value="nsnop">NSNOP</option>
+            <option value="alumni">Alumni</option>
+            <option value="manarkeni">Manarkeni</option>
+          </select>
+        </div>
+      </div>
+      <div class="mf">
+        <label>Account Status</label>
+        <div style="display:flex;gap:8px">
+          <button class="toggle-btn" id="um-active-on" onclick="setUmActive(true)">✓ Active</button>
+          <button class="toggle-btn" id="um-active-off" onclick="setUmActive(false)">✗ Disabled</button>
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--line);padding-top:16px;margin-top:4px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <span style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)">Menu &amp; Feature Access</span>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--ink3)">
+            <input type="checkbox" id="um-all-menus" onchange="toggleAllMenus()" style="accent-color:var(--accent)"> Select all
+          </label>
+        </div>
+        <div class="perm-grid" id="um-perm-grid"><!-- rendered by JS --></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeUserModal()">Cancel</button>
+      <button class="btn-dark" onclick="saveUser()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Unit Modal -->
+<div class="modal-overlay" id="unit-modal" style="display:none" onclick="if(event.target===this)closeUnitModal()">
+  <div class="modal-box sm">
+    <div class="modal-head" id="unit-modal-title">Create Convergence Unit</div>
+    <div class="modal-body">
+      <div class="mf"><label>Full Name</label><input type="text" id="um2-name" placeholder="e.g. School Management Committee"></div>
+      <div class="row3m">
+        <div class="mf"><label>Abbreviation</label><input type="text" id="um2-abbr" placeholder="SMC"></div>
+        <div class="mf"><label>Slug</label><input type="text" id="um2-slug" placeholder="smc"></div>
+        <div class="mf"><label>Colour</label><input type="color" id="um2-color" value="#378ADD" style="height:40px;padding:3px 6px;cursor:pointer"></div>
+      </div>
+      <div class="mf"><label>Member Name</label><input type="text" id="um2-member" placeholder="Name of the point-of-contact member"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeUnitModal()">Cancel</button>
+      <button class="btn-dark" id="unit-modal-save" onclick="saveUnit()">Create Unit</button>
+    </div>
+  </div>
+</div>
+
+<!-- Menu Modal -->
+<div class="modal-overlay" id="menu-modal" style="display:none" onclick="if(event.target===this)closeMenuModal()">
+  <div class="modal-box xl">
+    <div class="modal-head" id="menu-modal-title">Create Custom Menu</div>
+    <div class="modal-body" style="padding:22px 24px">
+      <div style="display:grid;grid-template-columns:5fr 7fr;gap:24px">
+        <!-- Left col -->
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="mf" style="margin-bottom:0"><label>Menu Name</label><input type="text" id="mm-name" placeholder="e.g. School Reports" oninput="onMmNameInput()"></div>
+          <div class="mf" style="margin-bottom:0">
+            <label>URL Slug</label>
+            <div style="position:relative">
+              <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--ink3)">/</span>
+              <input type="text" id="mm-slug" placeholder="school-reports" style="padding-left:22px;border:1.5px solid var(--line);border-radius:9px;width:100%;padding-left:22px;padding-top:9px;padding-bottom:9px;padding-right:12px;font-size:14px;outline:none;color:var(--ink)">
+            </div>
+          </div>
+          <div class="mf" style="margin-bottom:0"><label>Description</label><textarea id="mm-desc" rows="2" placeholder="What this menu is for…"></textarea></div>
+          <div class="mf" style="margin-bottom:0">
+            <label>Icon</label>
+            <div style="display:flex;flex-wrap:wrap;gap:6px" id="mm-icon-picker"><!-- rendered by JS --></div>
+          </div>
+          <div class="mf" style="margin-bottom:0">
+            <label>Access Control</label>
+            <div style="display:flex;gap:6px">
+              <button class="access-btn" id="ac-all"   onclick="setMmAccess('all')">All Users</button>
+              <button class="access-btn" id="ac-admin" onclick="setMmAccess('admin')">Admin Only</button>
+              <button class="access-btn" id="ac-poc"   onclick="setMmAccess('poc')">Unit Only</button>
+            </div>
+          </div>
+          <div class="mf" style="margin-bottom:0">
+            <label>Status</label>
+            <div style="display:flex;gap:6px">
+              <button class="toggle-btn" id="mm-status-on"  onclick="setMmStatus(true)">Active</button>
+              <button class="toggle-btn" id="mm-status-off" onclick="setMmStatus(false)">Inactive</button>
+            </div>
+          </div>
+        </div>
+        <!-- Right col: field builder -->
+        <div style="border-left:1px solid var(--line);padding-left:22px;display:flex;flex-direction:column">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <div class="builder-tabs">
+              <button class="on" id="bt-build" onclick="setBuilderTab('build')">Field Builder</button>
+              <button id="bt-preview" onclick="setBuilderTab('preview')">Preview</button>
+            </div>
+            <button class="btn-dark" id="add-field-btn" onclick="addField()" style="padding:6px 14px;font-size:12px">+ Add Field</button>
+          </div>
+          <div id="field-builder-area" style="flex:1;max-height:440px;overflow-y:auto"><!-- rendered by JS --></div>
+          <div id="field-preview-area" style="flex:1;max-height:440px;overflow-y:auto;display:none"><!-- rendered by JS --></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeMenuModal()">Cancel</button>
+      <button class="btn-dark" id="menu-modal-save" onclick="saveMenu()">Create Menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- Entries Modal -->
+<div class="modal-overlay" id="entries-modal" style="display:none" onclick="if(event.target===this)closeEntriesModal()">
+  <div class="modal-box xl">
+    <div style="padding:20px 24px 16px;border-bottom:1px solid var(--line);flex-shrink:0">
+      <div style="font-weight:700;font-size:18px;color:var(--ink)" id="entries-modal-title">Entries</div>
+      <div style="font-size:12px;color:var(--ink3);margin-top:3px" id="entries-modal-sub"></div>
+    </div>
+    <div class="modal-body" id="entries-modal-body"></div>
+    <div class="modal-foot">
+      <button class="btn-accent" id="entries-export-btn" onclick="exportEntriesCsv()" style="display:none">↓ Export CSV</button>
+      <div style="flex:1"></div>
+      <button class="btn-outline" onclick="closeEntriesModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" style="position:fixed;bottom:24px;right:24px;background:#1e2333;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:500;opacity:0;transition:opacity .25s;z-index:9999;pointer-events:none"></div>
+
+<script>
+/* ═══════════════════════════════════════
+   DATA
+═══════════════════════════════════════ */
+const MENU_DEFS = [
+  { slug:'dashboard',   label:'Dashboard',   desc:'Overview, KPIs & convergence matrix' },
+  { slug:'meetings',    label:'Meetings',     desc:'Calendar view & MoM entry' },
+  { slug:'planner',     label:'Planner',      desc:'Schedule meetings across unit pairs' },
+  { slug:'minutes',     label:'Minutes',      desc:'Record and view minutes' },
+  { slug:'items',       label:'Item Tracker', desc:'Raise and track convergence items' },
+  { slug:'documents',   label:'D.O. Letters', desc:'Upload and browse official letters' },
+  { slug:'admin-panel', label:'Admin Panel',  desc:'User, unit & permission management' },
+];
+const MENU_SLUGS = MENU_DEFS.map(m => m.slug);
+
+const ROLE_META = {
+  super_admin:{ label:'Super Admin', bg:'#4f46e5', color:'#fff' },
+  admin:      { label:'Admin',       bg:'#1e2333', color:'#fff' },
+  poc:        { label:'Unit Rep',    bg:'#dbeafe', color:'#1d4ed8' },
+  team:       { label:'Team',        bg:'#f1f5f9', color:'#475569' },
+};
+
+const ICONS = ['grid','list','document','chart','folder','star','settings','users','calendar','tag'];
+
+const FIELD_TYPES = [
+  { value:'text',     label:'Text' },
+  { value:'number',   label:'Number' },
+  { value:'date',     label:'Date' },
+  { value:'email',    label:'Email' },
+  { value:'phone',    label:'Phone' },
+  { value:'select',   label:'Dropdown' },
+  { value:'checkbox', label:'Checkbox' },
+  { value:'textarea', label:'Long Text' },
+  { value:'file',     label:'File Upload' },
+];
+
+const TYPE_ICON = { text:'T',number:'#',date:'D',email:'@',phone:'☎',select:'▾',checkbox:'☑',textarea:'¶',file:'📎' };
+
+let USERS = [
+  { id:1, username:'superadmin', first_name:'S.', last_name:'Krishnamurthy', email:'admin@tn.gov.in', role:'super_admin', is_active:true, unit:null, unit_name:null, unit_color:null, whatsapp_number:'919876543210', menu_permissions:[] },
+  { id:2, username:'vp_admin',   first_name:'Vijaya',    last_name:'Priya',      email:'', role:'admin', is_active:true,  unit:'vp',  unit_name:'VETRI Palligal (VP)', unit_color:'#6366f1', whatsapp_number:'919876543211', menu_permissions:[] },
+  { id:3, username:'smc_poc',    first_name:'Selvi',     last_name:'M.',         email:'', role:'poc',   is_active:true,  unit:'smc', unit_name:'SMC',  unit_color:'#ec4899', whatsapp_number:'919876543212', menu_permissions:['dashboard','meetings','items','documents'] },
+  { id:4, username:'cg_poc',     first_name:'Ramesh',    last_name:'K.',         email:'', role:'poc',   is_active:true,  unit:'cg',  unit_name:'Career Guidance', unit_color:'#f97316', whatsapp_number:'', menu_permissions:[] },
+  { id:5, username:'acis_poc',   first_name:'Anitha',    last_name:'S.',         email:'', role:'poc',   is_active:false, unit:'acis',unit_name:'ACIS', unit_color:'#14b8a6', whatsapp_number:'', menu_permissions:[] },
+  { id:6, username:'nsnop_poc',  first_name:'Murugan',   last_name:'P.',         email:'', role:'poc',   is_active:true,  unit:'nsnop',unit_name:'NSNOP', unit_color:'#22c55e', whatsapp_number:'919876543213', menu_permissions:[] },
+  { id:7, username:'alumni_poc', first_name:'Kavitha',   last_name:'R.',         email:'', role:'team',  is_active:true,  unit:'alumni',unit_name:'Alumni', unit_color:'#3b82f6', whatsapp_number:'', menu_permissions:[] },
+  { id:8, username:'mana_poc',   first_name:'Devi',      last_name:'L.',         email:'', role:'poc',   is_active:true,  unit:'manarkeni',unit_name:'Manarkeni', unit_color:'#f59e0b', whatsapp_number:'919876543214', menu_permissions:[] },
+];
+
+let UNITS = [
+  { id:1, name:'VETRI Palligal (VP)',  abbr:'VP',      slug:'vp',        color:'#6366f1', member_name:'Vijaya Priya' },
+  { id:2, name:'SMC',                  abbr:'SMC',     slug:'smc',       color:'#ec4899', member_name:'Selvi M.' },
+  { id:3, name:'Career Guidance',      abbr:'CG',      slug:'cg',        color:'#f97316', member_name:'Ramesh K.' },
+  { id:4, name:'ACIS',                 abbr:'ACIS',    slug:'acis',      color:'#14b8a6', member_name:'Anitha S.' },
+  { id:5, name:'NSNOP',               abbr:'NSNOP',   slug:'nsnop',     color:'#22c55e', member_name:'Murugan P.' },
+  { id:6, name:'Alumni',               abbr:'ALU',     slug:'alumni',    color:'#3b82f6', member_name:'Kavitha R.' },
+  { id:7, name:'Manarkeni',            abbr:'MNK',     slug:'manarkeni', color:'#f59e0b', member_name:'Devi L.' },
+];
+
+let MENUS_CUSTOM = [
+  { id:1, name:'School Reports', slug:'school-reports', icon:'document', description:'Monthly school report submissions', access:'all', is_active:true, entry_count:12,
+    fields:[ { id:1,label:'Report Title',field_key:'title',field_type:'text',placeholder:'',required:true,options:[] }, { id:2,label:'Month',field_key:'month',field_type:'select',placeholder:'Select month',required:true,options:['January','February','March','April','May','June','July','August','September','October','November','December'] }, { id:3,label:'Remarks',field_key:'remarks',field_type:'textarea',placeholder:'',required:false,options:[] } ] },
+  { id:2, name:'Field Visit Log', slug:'field-visit', icon:'users', description:'Track field visits by convergence teams', access:'poc', is_active:true, entry_count:5,
+    fields:[ { id:4,label:'Visit Date',field_key:'visit_date',field_type:'date',placeholder:'',required:true,options:[] }, { id:5,label:'Location',field_key:'location',field_type:'text',placeholder:'Village/Block name',required:true,options:[] }, { id:6,label:'Observations',field_key:'observations',field_type:'textarea',placeholder:'',required:false,options:[] } ] },
+];
+
+let nextUserId = 20;
+let nextUnitId = 20;
+let nextMenuId = 20;
+let nextFieldId = 100;
+
+let currentTab = 'users';
+let editUserId = null;
+let editUnitId = null;
+let editMenuId = null;
+let umActive = true;
+let mmAccess = 'all';
+let mmStatus = true;
+let mmIcon = 'list';
+let builderTab = 'build';
+let mmFields = [];
+let userSearch = '';
+let currentEntriesMenu = null;
+
+/* ═══════════════════════════════════════
+   TOAST
+═══════════════════════════════════════ */
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.opacity = '1';
+  setTimeout(() => el.style.opacity = '0', 2500);
+}
+
+/* ═══════════════════════════════════════
+   TABS
+═══════════════════════════════════════ */
+function switchTab(t) {
+  currentTab = t;
+  ['users','units','menus'].forEach(x => {
+    document.getElementById('tab-' + x).style.display = x === t ? '' : 'none';
+  });
+  document.querySelectorAll('.page-tabs button').forEach((b, i) => {
+    const tabs = ['users','units','menus'];
+    b.classList.toggle('on', tabs[i] === t);
+  });
+  if (t === 'users') renderUsers();
+  if (t === 'units') renderUnits();
+  if (t === 'menus') renderMenus();
+}
+
+/* ═══════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════ */
+function initials(u) {
+  const p = ((u.first_name ?? '') + ' ' + (u.last_name ?? '')).trim().split(' ');
+  return (p.length >= 2 ? p[0][0] + p[1][0] : p[0]?.[0] ?? '?').toUpperCase();
+}
+
+function roleColor(role) {
+  return role === 'super_admin' ? '#4f46e5' : role === 'admin' ? '#1e2333' : role === 'poc' ? '#3b82f6' : '#64748b';
+}
+
+function rolePill(role) {
+  const m = ROLE_META[role] ?? ROLE_META.team;
+  return `<span class="role-pill" style="background:${m.bg};color:${m.color}">${m.label}</span>`;
+}
+
+function statusPill(active) {
+  if (active) return `<span class="status-pill" style="background:#dcfce7;color:#166534;border:none"><span class="dot" style="background:#16a34a"></span> Active</span>`;
+  return `<span class="status-pill" style="background:#fee2e2;color:#991b1b;border:none"><span class="dot" style="background:#dc2626"></span> Disabled</span>`;
+}
+
+function menuCount(u) {
+  if (!u.menu_permissions || u.menu_permissions.length === 0) return '✓ Full access';
+  return `${u.menu_permissions.length}/${MENU_SLUGS.length} menus`;
+}
+
+function slugify(s) { return s.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,''); }
+
+/* ═══════════════════════════════════════
+   USERS TAB
+═══════════════════════════════════════ */
+function renderUsers() {
+  const total  = USERS.length;
+  const active = USERS.filter(u => u.is_active).length;
+  const admins = USERS.filter(u => u.role === 'admin' || u.role === 'super_admin').length;
+  const pocs   = USERS.filter(u => u.role === 'poc').length;
+
+  const stats = [
+    { label:'Total Users', value:total,  color:'#4f46e5' },
+    { label:'Active',      value:active, color:'#16a34a' },
+    { label:'Admin',       value:admins, color:'#0f172a' },
+    { label:'Unit Rep',    value:pocs,   color:'#2563eb' },
+  ];
+
+  const q = userSearch.toLowerCase();
+  const filtered = USERS.filter(u =>
+    !q ||
+    u.username?.toLowerCase().includes(q) ||
+    (u.first_name ?? '').toLowerCase().includes(q) ||
+    (u.last_name ?? '').toLowerCase().includes(q) ||
+    (u.unit_name ?? '').toLowerCase().includes(q)
+  );
+
+  document.getElementById('tab-users').innerHTML = `
+    <div class="stat-strip" style="grid-template-columns:repeat(4,1fr)">
+      ${stats.map(s => `
+        <div class="stat-card-h">
+          <div class="stat-icon" style="background:${s.color}"><span>${s.value}</span></div>
+          <div class="stat-lbl">${s.label}</div>
+        </div>`).join('')}
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <input class="search-inp" type="text" placeholder="Search name, username, unit…"
+        value="${userSearch}" oninput="userSearch=this.value;renderUsers()">
+    </div>
+
+    <div class="u-table-wrap">
+      <div class="u-table-head">
+        <span>User</span><span>Role</span><span>Unit</span><span>Status</span><span>Menus</span><span>Actions</span>
+      </div>
+      ${filtered.length === 0
+        ? '<div style="padding:40px;text-align:center;color:var(--ink3);font-size:13px">No users found.</div>'
+        : filtered.map((u, i) => {
+          const name = ((u.first_name ?? '') + ' ' + (u.last_name ?? '')).trim() || u.username;
+          const mc = menuCount(u);
+          const mcOk = mc === '✓ Full access';
+          return `
+            <div class="u-row" style="background:${u.is_active ? '#fff' : '#fafafa'}">
+              <div style="display:flex;align-items:center;gap:11px">
+                <div class="u-avatar-sq" style="background:${roleColor(u.role)}">${initials(u)}</div>
+                <div>
+                  <div style="font-weight:600;font-size:14px;color:${u.is_active ? 'var(--ink)' : 'var(--ink3)'}">${name}</div>
+                  <div style="font-size:11px;color:var(--ink3);margin-top:1px">@${u.username}${u.email ? ' · ' + u.email : ''}</div>
+                </div>
+              </div>
+              <div>${rolePill(u.role)}</div>
+              <div style="font-size:13px;color:var(--ink2)">
+                ${u.unit_color ? `<span style="width:8px;height:8px;border-radius:50%;background:${u.unit_color};display:inline-block;margin-right:6px;vertical-align:middle"></span>` : ''}
+                ${u.unit_name ?? '<span style="color:var(--ink3)">—</span>'}
+              </div>
+              <div>
+                <button onclick="toggleUserActive(${u.id})" style="background:none;border:none;padding:0;cursor:pointer">
+                  ${statusPill(u.is_active)}
+                </button>
+              </div>
+              <div style="font-size:12px;color:${mcOk ? 'var(--ok)' : 'var(--ink2)'};font-weight:${mcOk ? 700 : 400}">${mc}</div>
+              <div style="display:flex;gap:6px;padding-left:8px">
+                <button class="btn-outline" style="color:var(--accent-dark);font-size:12px;border:1.5px solid var(--line)" onclick="openUserModal(${u.id})">Edit</button>
+                <button class="btn-red" style="font-size:12px" onclick="deleteUser(${u.id})">Delete</button>
+              </div>
+            </div>`;
+        }).join('')}
+    </div>
+  `;
+}
+
+function toggleUserActive(id) {
+  const u = USERS.find(x => x.id === id);
+  if (!u) return;
+  u.is_active = !u.is_active;
+  renderUsers();
+  toast(u.is_active ? 'User enabled' : 'User disabled');
+}
+
+function deleteUser(id) {
+  const u = USERS.find(x => x.id === id);
+  if (!u) return;
+  if (!confirm(`Delete user "${u.username}"? This cannot be undone.`)) return;
+  USERS = USERS.filter(x => x.id !== id);
+  renderUsers();
+  toast('User deleted');
+}
+
+function openUserModal(id) {
+  const u = USERS.find(x => x.id === id);
+  if (!u) return;
+  editUserId = id;
+  const name = ((u.first_name ?? '') + ' ' + (u.last_name ?? '')).trim() || u.username;
+  document.getElementById('user-modal-title').textContent = `Edit — ${u.username}`;
+  document.getElementById('um-first').value = u.first_name ?? '';
+  document.getElementById('um-last').value  = u.last_name ?? '';
+  document.getElementById('um-email').value = u.email ?? '';
+  document.getElementById('um-wa').value    = u.whatsapp_number ?? '';
+  document.getElementById('um-role').value  = u.role;
+  document.getElementById('um-unit').value  = u.unit ?? '';
+  umActive = u.is_active;
+  onUmRoleChange();
+  renderUmActive();
+  renderPermGrid(u.menu_permissions ?? []);
+  document.getElementById('user-modal').style.display = 'flex';
+}
+
+function closeUserModal() {
+  document.getElementById('user-modal').style.display = 'none';
+  editUserId = null;
+}
+
+function onUmRoleChange() {
+  const role = document.getElementById('um-role').value;
+  const isAdmin = role === 'admin' || role === 'super_admin';
+  document.getElementById('um-unit-wrap').style.display = isAdmin ? 'none' : '';
+}
+
+function setUmActive(v) {
+  umActive = v;
+  renderUmActive();
+}
+
+function renderUmActive() {
+  const on  = document.getElementById('um-active-on');
+  const off = document.getElementById('um-active-off');
+  on.style.cssText  = `flex:1;padding:8px 0;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600;transition:all .13s;border:1.5px solid ${umActive ? '#16a34a' : 'var(--line)'};background:${umActive ? '#dcfce7' : '#fff'};color:${umActive ? '#166534' : 'var(--ink3)'}`;
+  off.style.cssText = `flex:1;padding:8px 0;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600;transition:all .13s;border:1.5px solid ${!umActive ? '#dc2626' : 'var(--line)'};background:${!umActive ? '#fee2e2' : '#fff'};color:${!umActive ? '#991b1b' : 'var(--ink3)'}`;
+}
+
+function renderPermGrid(current) {
+  const allOn = current.length === 0 || current.length === MENU_SLUGS.length;
+  document.getElementById('um-all-menus').checked = allOn;
+  document.getElementById('um-perm-grid').innerHTML = MENU_DEFS.map(m => {
+    const on = current.length === 0 || current.includes(m.slug);
+    return `
+      <label class="perm-item" style="border-color:${on ? 'var(--accent)' : 'var(--line)'};background:${on ? 'var(--accent-light)' : '#fff'}" onclick="togglePerm('${m.slug}')">
+        <input type="checkbox" ${on ? 'checked' : ''} style="accent-color:var(--accent);width:14px;height:14px;flex-shrink:0" onclick="event.stopPropagation();togglePerm('${m.slug}')">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:${on ? 'var(--accent-dark)' : 'var(--ink)'}">${m.label}</div>
+          <div style="font-size:11px;color:var(--ink3);margin-top:1px">${m.desc}</div>
+        </div>
+      </label>`;
+  }).join('');
+}
+
+function getCurrentPerms() {
+  return MENU_DEFS
+    .filter(m => {
+      const labels = document.getElementById('um-perm-grid');
+      const inputs = labels?.querySelectorAll('input[type=checkbox]');
+      if (!inputs) return false;
+      const idx = MENU_DEFS.indexOf(m);
+      return inputs[idx]?.checked;
+    })
+    .map(m => m.slug);
+}
+
+function togglePerm(slug) {
+  const inputs = document.getElementById('um-perm-grid').querySelectorAll('input[type=checkbox]');
+  const idx = MENU_DEFS.findIndex(m => m.slug === slug);
+  if (idx < 0) return;
+  const checked = inputs[idx].checked;
+  const current = MENU_DEFS.map((m, i) => inputs[i]?.checked ? m.slug : null).filter(Boolean);
+  // toggle target
+  const newPerms = checked
+    ? current.filter(s => s !== slug)
+    : [...current, slug];
+  renderPermGrid(newPerms.length === MENU_SLUGS.length ? [] : newPerms);
+}
+
+function toggleAllMenus() {
+  const allOn = document.getElementById('um-all-menus').checked;
+  renderPermGrid(allOn ? [] : []);
+  if (!allOn) renderPermGrid([]); // all off
+  // If unchecking "all", uncheck all
+  const inputs = document.getElementById('um-perm-grid').querySelectorAll('input[type=checkbox]');
+  inputs.forEach(inp => inp.checked = allOn);
+  // re-render
+  renderPermGrid(allOn ? [] : MENU_DEFS.map((_, i) => { inputs[i].checked; return null; }).filter(Boolean));
+  if (allOn) renderPermGrid([]);
+  else {
+    document.getElementById('um-perm-grid').querySelectorAll('.perm-item').forEach(el => {
+      const inp = el.querySelector('input');
+      inp.checked = false;
+      el.style.borderColor = 'var(--line)';
+      el.style.background = '#fff';
+      el.querySelector('div div').style.color = 'var(--ink)';
+    });
+  }
+}
+
+function saveUser() {
+  const u = USERS.find(x => x.id === editUserId);
+  if (!u) return;
+  const first = document.getElementById('um-first').value.trim();
+  const last  = document.getElementById('um-last').value.trim();
+  if (!first || !last) { toast('Enter first and last name'); return; }
+  u.first_name = first;
+  u.last_name  = last;
+  u.email      = document.getElementById('um-email').value.trim();
+  u.whatsapp_number = document.getElementById('um-wa').value.trim();
+  u.role       = document.getElementById('um-role').value;
+  u.is_active  = umActive;
+  const role = u.role;
+  if (role !== 'admin' && role !== 'super_admin') {
+    u.unit = document.getElementById('um-unit').value || null;
+  }
+  // Perms: read checkboxes
+  const inputs = document.getElementById('um-perm-grid').querySelectorAll('input[type=checkbox]');
+  const perms = MENU_DEFS.filter((m, i) => inputs[i]?.checked).map(m => m.slug);
+  u.menu_permissions = perms.length === MENU_SLUGS.length ? [] : perms;
+  closeUserModal();
+  renderUsers();
+  toast('User updated');
+}
+
+/* ═══════════════════════════════════════
+   UNITS TAB
+═══════════════════════════════════════ */
+function renderUnits() {
+  document.getElementById('tab-units').innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+      <button class="btn-dark" onclick="openUnitModal(null)">+ Create Unit</button>
+    </div>
+    <div class="units-grid">
+      ${UNITS.map(u => `
+        <div class="unit-card">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+            <div class="unit-icon" style="background:${u.color}"><span>${u.abbr}</span></div>
+            <div>
+              <div style="font-weight:700;font-size:15px;color:var(--ink)">${u.name}</div>
+              <div style="font-size:11px;color:var(--ink3);margin-top:1px">slug: ${u.slug}</div>
+            </div>
+          </div>
+          ${u.member_name ? `<div style="font-size:12px;color:var(--ink2);margin-bottom:12px">${u.member_name}</div>` : ''}
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <button class="btn-outline" style="flex:1;color:var(--accent-dark)" onclick="openUnitModal(${u.id})">Edit</button>
+            <button class="btn-red" style="flex:1" onclick="deleteUnit(${u.id})">Delete</button>
+          </div>
+        </div>`).join('')}
+    </div>
+  `;
+}
+
+function openUnitModal(id) {
+  editUnitId = id;
+  if (id) {
+    const u = UNITS.find(x => x.id === id);
+    if (!u) return;
+    document.getElementById('unit-modal-title').textContent = `Edit Unit — ${u.abbr}`;
+    document.getElementById('unit-modal-save').textContent = 'Save Changes';
+    document.getElementById('um2-name').value   = u.name;
+    document.getElementById('um2-abbr').value   = u.abbr;
+    document.getElementById('um2-slug').value   = u.slug;
+    document.getElementById('um2-color').value  = u.color;
+    document.getElementById('um2-member').value = u.member_name ?? '';
+  } else {
+    document.getElementById('unit-modal-title').textContent = 'Create Convergence Unit';
+    document.getElementById('unit-modal-save').textContent = 'Create Unit';
+    document.getElementById('um2-name').value   = '';
+    document.getElementById('um2-abbr').value   = '';
+    document.getElementById('um2-slug').value   = '';
+    document.getElementById('um2-color').value  = '#378ADD';
+    document.getElementById('um2-member').value = '';
+  }
+  document.getElementById('unit-modal').style.display = 'flex';
+}
+
+function closeUnitModal() {
+  document.getElementById('unit-modal').style.display = 'none';
+  editUnitId = null;
+}
+
+function saveUnit() {
+  const name   = document.getElementById('um2-name').value.trim();
+  const abbr   = document.getElementById('um2-abbr').value.trim();
+  const slug   = document.getElementById('um2-slug').value.trim();
+  const color  = document.getElementById('um2-color').value;
+  const member = document.getElementById('um2-member').value.trim();
+  if (!name || !abbr || !slug) { toast('Name, abbreviation and slug are required'); return; }
+  if (editUnitId) {
+    const u = UNITS.find(x => x.id === editUnitId);
+    if (u) { u.name = name; u.abbr = abbr; u.slug = slug; u.color = color; u.member_name = member; }
+    toast('Unit updated');
+  } else {
+    UNITS.push({ id: nextUnitId++, name, abbr, slug, color, member_name: member });
+    toast('Unit created');
+  }
+  closeUnitModal();
+  renderUnits();
+}
+
+function deleteUnit(id) {
+  const u = UNITS.find(x => x.id === id);
+  if (!u) return;
+  if (!confirm(`Delete unit "${u.name}"?`)) return;
+  UNITS = UNITS.filter(x => x.id !== id);
+  renderUnits();
+  toast('Unit deleted');
+}
+
+/* ═══════════════════════════════════════
+   MENUS TAB
+═══════════════════════════════════════ */
+const ACCESS_LABELS = { all:'All Users', admin:'Admin Only', poc:'Unit Only' };
+
+function renderMenus() {
+  const total   = MENUS_CUSTOM.length;
+  const active  = MENUS_CUSTOM.filter(m => m.is_active).length;
+  const entries = MENUS_CUSTOM.reduce((s, m) => s + (m.entry_count ?? 0), 0);
+  const totalF  = MENUS_CUSTOM.reduce((s, m) => s + (m.fields?.length ?? 0), 0);
+
+  document.getElementById('tab-menus').innerHTML = `
+    <div class="stat-strip" style="grid-template-columns:repeat(3,1fr)">
+      ${[
+        { label:'Custom Menus', value:total,   color:'#4f46e5' },
+        { label:'Active',       value:active,  color:'#16a34a' },
+        { label:'Total Entries',value:entries, color:'#0891b2' },
+      ].map(s => `
+        <div class="stat-card-h">
+          <div class="stat-icon" style="background:${s.color}"><span>${s.value}</span></div>
+          <div class="stat-lbl">${s.label}</div>
+        </div>`).join('')}
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="font-size:13px;color:var(--ink3)">
+        ${totalF > 0 ? `${totalF} total fields across ${total} menu${total !== 1 ? 's' : ''}` : `${total} custom menu${total !== 1 ? 's' : ''} configured`}
+      </div>
+      <button class="btn-dark" onclick="openMenuModal(null)">+ Create Menu</button>
+    </div>
+
+    ${MENUS_CUSTOM.length === 0
+      ? `<div class="empty-dashed"><div class="big">🧩</div><div class="head">No custom menus yet</div><div style="font-size:13px">Create a menu to define new data-collection modules.</div></div>`
+      : MENUS_CUSTOM.map(m => `
+        <div class="menu-card">
+          <div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:16px;align-items:flex-start">
+            <div class="menu-icon" style="background:${m.is_active ? 'var(--accent-light)' : 'var(--paper)'}">
+              <span style="font-size:12px;font-weight:700;color:${m.is_active ? 'var(--accent-dark)' : 'var(--ink3)'};text-transform:uppercase">${(m.icon ?? 'li').slice(0,3)}</span>
+            </div>
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;flex-wrap:wrap">
+                <span style="font-weight:700;font-size:15px;color:var(--ink)">${m.name}</span>
+                <span style="font-size:11px;color:var(--ink3);background:var(--paper);border:1px solid var(--line);border-radius:99px;padding:2px 8px">/${m.slug}</span>
+                <span style="font-size:11px;color:var(--ink3);background:var(--paper);border:1px solid var(--line);border-radius:99px;padding:2px 8px">${ACCESS_LABELS[m.access] ?? m.access}</span>
+                ${(m.entry_count ?? 0) > 0 ? `<span style="font-size:11px;color:#0891b2;background:#e0f2fe;border:1px solid #bae6fd;border-radius:99px;padding:2px 8px;font-weight:700">${m.entry_count} entr${m.entry_count === 1 ? 'y' : 'ies'}</span>` : ''}
+              </div>
+              ${m.description ? `<div style="font-size:13px;color:var(--ink2);margin-bottom:6px">${m.description}</div>` : ''}
+              <div style="display:flex;gap:5px;flex-wrap:wrap">
+                ${(m.fields ?? []).map(f => `<span class="field-chip"><span>${TYPE_ICON[f.field_type] ?? 'T'}</span>${f.label}${f.required ? '<span class="req">*</span>' : ''}</span>`).join('')}
+                ${!(m.fields ?? []).length ? '<span style="font-size:12px;color:var(--ink3)">No fields defined</span>' : ''}
+              </div>
+            </div>
+            <button onclick="toggleMenuActive(${m.id})" style="background:none;border:none;padding:0;cursor:pointer">
+              ${statusPill(m.is_active)}
+            </button>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+              <button class="btn-blue" onclick="openEntriesModal(${m.id})">Entries${(m.entry_count ?? 0) > 0 ? ' (' + m.entry_count + ')' : ''}</button>
+              <button class="btn-outline" style="color:var(--accent-dark)" onclick="openMenuModal(${m.id})">Edit</button>
+              <button class="btn-red" onclick="deleteMenu(${m.id})">Delete</button>
+            </div>
+          </div>
+        </div>`).join('')}
+  `;
+}
+
+function toggleMenuActive(id) {
+  const m = MENUS_CUSTOM.find(x => x.id === id);
+  if (!m) return;
+  m.is_active = !m.is_active;
+  renderMenus();
+}
+
+function deleteMenu(id) {
+  const m = MENUS_CUSTOM.find(x => x.id === id);
+  if (!m) return;
+  if (!confirm(`Delete menu "${m.name}"?`)) return;
+  MENUS_CUSTOM = MENUS_CUSTOM.filter(x => x.id !== id);
+  renderMenus();
+  toast('Menu deleted');
+}
+
+/* ── Menu Modal ── */
+function openMenuModal(id) {
+  editMenuId = id;
+  mmFields = [];
+  builderTab = 'build';
+
+  if (id) {
+    const m = MENUS_CUSTOM.find(x => x.id === id);
+    if (!m) return;
+    document.getElementById('menu-modal-title').textContent = `Edit Menu — ${m.name}`;
+    document.getElementById('menu-modal-save').textContent = 'Save Changes';
+    document.getElementById('mm-name').value  = m.name;
+    document.getElementById('mm-slug').value  = m.slug;
+    document.getElementById('mm-desc').value  = m.description ?? '';
+    mmAccess = m.access;
+    mmStatus = m.is_active;
+    mmIcon   = m.icon ?? 'list';
+    mmFields = (m.fields ?? []).map(f => ({ ...f, options: [...(f.options ?? [])] }));
+  } else {
+    document.getElementById('menu-modal-title').textContent = 'Create Custom Menu';
+    document.getElementById('menu-modal-save').textContent = 'Create Menu';
+    document.getElementById('mm-name').value  = '';
+    document.getElementById('mm-slug').value  = '';
+    document.getElementById('mm-desc').value  = '';
+    mmAccess = 'all';
+    mmStatus = true;
+    mmIcon   = 'list';
+    mmFields = [];
+  }
+
+  renderMmIconPicker();
+  renderMmAccess();
+  renderMmStatus();
+  renderBuilderArea();
+  setBuilderTab('build');
+  document.getElementById('menu-modal').style.display = 'flex';
+}
+
+function closeMenuModal() {
+  document.getElementById('menu-modal').style.display = 'none';
+  editMenuId = null;
+}
+
+function onMmNameInput() {
+  if (!editMenuId) {
+    const name = document.getElementById('mm-name').value;
+    document.getElementById('mm-slug').value = slugify(name);
+  }
+}
+
+function renderMmIconPicker() {
+  document.getElementById('mm-icon-picker').innerHTML = ICONS.map(ic => `
+    <button type="button" onclick="setMmIcon('${ic}')" id="ic-${ic}"
+      style="width:36px;height:36px;border-radius:8px;cursor:pointer;font-size:11px;
+      border:1.5px solid ${mmIcon === ic ? 'var(--accent)' : 'var(--line)'};
+      background:${mmIcon === ic ? 'var(--accent-light)' : '#fff'};
+      color:${mmIcon === ic ? 'var(--accent-dark)' : 'var(--ink3)'};
+      transition:.12s">${ic.slice(0,3)}</button>
+  `).join('');
+}
+
+function setMmIcon(ic) {
+  mmIcon = ic;
+  renderMmIconPicker();
+}
+
+function renderMmAccess() {
+  ['all','admin','poc'].forEach(v => {
+    const btn = document.getElementById('ac-' + v);
+    if (!btn) return;
+    const on = mmAccess === v;
+    btn.style.cssText = `flex:1;padding:8px 0;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600;transition:all .13s;border:1.5px solid ${on ? 'var(--accent)' : 'var(--line)'};background:${on ? 'var(--accent-light)' : '#fff'};color:${on ? 'var(--accent-dark)' : 'var(--ink3)'}`;
+  });
+}
+
+function setMmAccess(v) {
+  mmAccess = v;
+  renderMmAccess();
+}
+
+function renderMmStatus() {
+  const on  = document.getElementById('mm-status-on');
+  const off = document.getElementById('mm-status-off');
+  on.style.cssText  = `flex:1;padding:8px 0;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600;transition:all .13s;border:1.5px solid ${mmStatus ? '#16a34a' : 'var(--line)'};background:${mmStatus ? '#dcfce7' : '#fff'};color:${mmStatus ? '#166534' : 'var(--ink3)'}`;
+  off.style.cssText = `flex:1;padding:8px 0;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600;transition:all .13s;border:1.5px solid ${!mmStatus ? '#dc2626' : 'var(--line)'};background:${!mmStatus ? '#fee2e2' : '#fff'};color:${!mmStatus ? '#991b1b' : 'var(--ink3)'}`;
+}
+
+function setMmStatus(v) {
+  mmStatus = v;
+  renderMmStatus();
+}
+
+/* ── Field builder ── */
+function setBuilderTab(t) {
+  builderTab = t;
+  document.getElementById('bt-build').classList.toggle('on', t === 'build');
+  document.getElementById('bt-preview').classList.toggle('on', t === 'preview');
+  document.getElementById('add-field-btn').style.display = t === 'build' ? '' : 'none';
+  document.getElementById('field-builder-area').style.display  = t === 'build' ? '' : 'none';
+  document.getElementById('field-preview-area').style.display  = t === 'preview' ? '' : 'none';
+  if (t === 'preview') renderFieldPreview();
+}
+
+function addField() {
+  mmFields.push({ id: nextFieldId++, label:'', field_key:'', field_type:'text', placeholder:'', required:false, options:[] });
+  renderBuilderArea();
+}
+
+function removeField(idx) {
+  mmFields.splice(idx, 1);
+  renderBuilderArea();
+}
+
+function moveField(idx, dir) {
+  const swap = idx + dir;
+  if (swap < 0 || swap >= mmFields.length) return;
+  [mmFields[idx], mmFields[swap]] = [mmFields[swap], mmFields[idx]];
+  renderBuilderArea();
+}
+
+function renderBuilderArea() {
+  const el = document.getElementById('field-builder-area');
+  if (!mmFields.length) {
+    el.innerHTML = `<div style="padding:32px 0;text-align:center;border:2px dashed var(--line);border-radius:12px;color:var(--ink3);font-size:13px">No fields yet — click "+ Add Field" to start building</div>`;
+    return;
+  }
+
+  const colHead = `<div style="display:grid;grid-template-columns:44px 1fr 1fr 120px 30px;gap:6px;padding:2px 10px;margin-bottom:4px">
+    ${['↕','Label','Key','Type',''].map((h, i) => `<div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;text-align:${i===0||i===4?'center':'left'}">${h}</div>`).join('')}
+  </div>`;
+
+  el.innerHTML = colHead + mmFields.map((f, i) => `
+    <div class="field-builder-row">
+      <div class="fbr-top">
+        <div class="fbr-move">
+          <button ${i===0?'disabled':''} onclick="moveField(${i},-1)">▲</button>
+          <span class="fbr-order">${i+1}</span>
+          <button ${i===mmFields.length-1?'disabled':''} onclick="moveField(${i},1)">▼</button>
+        </div>
+        <input class="fbr-input" type="text" placeholder="Field label" value="${f.label}"
+          oninput="mmFields[${i}].label=this.value;if(!${!!editMenuId})mmFields[${i}].field_key=slugify(this.value.replace(/ /g,'_')).replace(/-/g,'_')">
+        <input class="fbr-input" type="text" placeholder="field_key" value="${f.field_key}"
+          oninput="mmFields[${i}].field_key=this.value" style="font-size:12px">
+        <select class="fbr-input" onchange="mmFields[${i}].field_type=this.value;renderBuilderArea()">
+          ${FIELD_TYPES.map(t => `<option value="${t.value}" ${f.field_type===t.value?'selected':''}>${t.label}</option>`).join('')}
+        </select>
+        <button class="fbr-del" onclick="removeField(${i})">×</button>
+      </div>
+      <div class="fbr-bottom">
+        <div></div>
+        <input class="fbr-input" type="text" placeholder="Placeholder text (optional)" value="${f.placeholder ?? ''}"
+          oninput="mmFields[${i}].placeholder=this.value" style="font-size:12px">
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--ink2);white-space:nowrap;padding-right:8px">
+          <input type="checkbox" ${f.required?'checked':''} onchange="mmFields[${i}].required=this.checked" style="accent-color:var(--accent)"> Required
+        </label>
+      </div>
+      ${f.field_type === 'select' ? `
+        <div style="padding:0 10px 10px 54px;border-top:1px dashed var(--line)">
+          <div style="font-size:10px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin:8px 0 6px">Dropdown Options</div>
+          <div>${(f.options??[]).map((opt,oi) => `<span class="opt-tag">${opt}<button onclick="removeOpt(${i},${oi})">×</button></span>`).join('')}</div>
+          <div class="opt-add-row">
+            <input type="text" id="opt-inp-${i}" placeholder="Type an option, press Enter"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();addOpt(${i})}">
+            <button class="opt-add-btn" onclick="addOpt(${i})">+ Add</button>
+          </div>
+        </div>` : ''}
+    </div>
+  `).join('');
+}
+
+function addOpt(fieldIdx) {
+  const inp = document.getElementById(`opt-inp-${fieldIdx}`);
+  const v = inp?.value.trim();
+  if (!v) return;
+  if (!mmFields[fieldIdx].options) mmFields[fieldIdx].options = [];
+  if (mmFields[fieldIdx].options.includes(v)) { inp.value = ''; return; }
+  mmFields[fieldIdx].options.push(v);
+  renderBuilderArea();
+}
+
+function removeOpt(fieldIdx, optIdx) {
+  mmFields[fieldIdx].options.splice(optIdx, 1);
+  renderBuilderArea();
+}
+
+function renderFieldPreview() {
+  const name = document.getElementById('mm-name').value || 'Untitled Form';
+  const desc = document.getElementById('mm-desc').value;
+  const el = document.getElementById('field-preview-area');
+
+  let fieldsHtml = '';
+  if (!mmFields.length) {
+    fieldsHtml = `<div style="padding:24px;text-align:center;color:var(--ink3);border:2px dashed var(--line);border-radius:8px;font-size:13px">Add fields to see preview</div>`;
+  } else {
+    fieldsHtml = mmFields.map(f => {
+      let inp = '';
+      const ph = f.placeholder || f.label;
+      const s = 'width:100%;border:1.5px solid var(--line);border-radius:8px;padding:8px 12px;background:#f8fafc;color:var(--ink3);font-size:13px;font-family:inherit';
+      if (f.field_type === 'textarea') inp = `<textarea disabled rows="2" style="${s};resize:none" placeholder="${ph}"></textarea>`;
+      else if (f.field_type === 'select') inp = `<select disabled style="${s}"><option>${ph}</option>${(f.options??[]).map(o=>`<option>${o}</option>`).join('')}</select>`;
+      else if (f.field_type === 'checkbox') inp = `<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink3)"><input type="checkbox" disabled>${ph}</label>`;
+      else if (f.field_type === 'file') inp = `<div style="border:2px dashed var(--line);border-radius:8px;padding:12px 16px;text-align:center;color:var(--ink3);font-size:13px">📎 ${ph}</div>`;
+      else inp = `<input type="${f.field_type}" disabled style="${s}" placeholder="${ph}">`;
+      return `<div>
+        <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin-bottom:6px">
+          ${f.label || 'Untitled field'}${f.required ? '<span style="color:var(--bad);margin-left:3px">*</span>' : ''}
+        </label>
+        ${inp}
+      </div>`;
+    }).join('');
+    fieldsHtml += `<button disabled style="padding:10px 0;border:none;border-radius:9px;background:#1e2333;color:#fff;font-size:14px;font-weight:700;opacity:.5;cursor:not-allowed;width:100%">Submit Entry</button>`;
+    fieldsHtml = `<div style="display:flex;flex-direction:column;gap:16px">${fieldsHtml}</div>`;
+  }
+
+  el.innerHTML = `
+    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 24px">
+      <div style="margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--line)">
+        <div style="font-weight:700;font-size:18px;color:var(--ink);margin-bottom:4px">${name}</div>
+        ${desc ? `<div style="font-size:13px;color:var(--ink2)">${desc}</div>` : ''}
+      </div>
+      ${fieldsHtml}
+    </div>`;
+}
+
+function saveMenu() {
+  const name = document.getElementById('mm-name').value.trim();
+  const slug = document.getElementById('mm-slug').value.trim();
+  const desc = document.getElementById('mm-desc').value.trim();
+  if (!name) { toast('Enter a menu name'); return; }
+  if (!slug) { toast('Enter a slug'); return; }
+
+  const fieldsData = mmFields.map((f, i) => ({ ...f, order: i }));
+
+  if (editMenuId) {
+    const m = MENUS_CUSTOM.find(x => x.id === editMenuId);
+    if (m) { m.name = name; m.slug = slug; m.description = desc; m.icon = mmIcon; m.access = mmAccess; m.is_active = mmStatus; m.fields = fieldsData; }
+    toast('Menu updated');
+  } else {
+    MENUS_CUSTOM.push({ id: nextMenuId++, name, slug, description: desc, icon: mmIcon, access: mmAccess, is_active: mmStatus, entry_count: 0, fields: fieldsData });
+    toast('Menu created');
+  }
+  closeMenuModal();
+  renderMenus();
+}
+
+/* ── Entries Modal ── */
+const SAMPLE_ENTRIES = {
+  1: [
+    { id:1, submitted_at:'2026-06-10T09:30:00', submitted_by_name:'Selvi M.', data:{ title:'May School Report', month:'May', remarks:'All in order' } },
+    { id:2, submitted_at:'2026-06-05T14:15:00', submitted_by_name:'Ramesh K.', data:{ title:'Apr School Report', month:'April', remarks:'' } },
+  ],
+  2: [
+    { id:3, submitted_at:'2026-06-12T11:00:00', submitted_by_name:'Murugan P.', data:{ visit_date:'2026-06-11', location:'Tiruvallur Block', observations:'Good progress seen' } },
+  ],
+};
+
+function openEntriesModal(id) {
+  const m = MENUS_CUSTOM.find(x => x.id === id);
+  if (!m) return;
+  currentEntriesMenu = m;
+  const entries = SAMPLE_ENTRIES[id] ?? [];
+  document.getElementById('entries-modal-title').textContent = `Entries — ${m.name}`;
+  document.getElementById('entries-modal-sub').textContent = `${entries.length} submission${entries.length !== 1 ? 's' : ''}`;
+
+  const cols = m.fields ?? [];
+  const expBtn = document.getElementById('entries-export-btn');
+  expBtn.style.display = entries.length > 0 ? '' : 'none';
+
+  let bodyHtml = '';
+  if (!entries.length) {
+    bodyHtml = `<div style="text-align:center;padding:48px 0;color:var(--ink3);font-size:14px"><div style="font-size:32px;margin-bottom:10px">📭</div>No entries have been submitted yet.</div>`;
+  } else {
+    bodyHtml = `
+      <div style="overflow-x:auto">
+        <table class="et">
+          <thead><tr>
+            <th>Date</th><th>Submitted By</th>
+            ${cols.map(f => `<th>${f.label}</th>`).join('')}
+          </tr></thead>
+          <tbody>
+            ${entries.map(e => `<tr>
+              <td>${new Date(e.submitted_at).toLocaleString()}</td>
+              <td style="font-weight:600;color:var(--ink)">${e.submitted_by_name}</td>
+              ${cols.map(f => { const v = e.data?.[f.field_key]; return `<td>${v != null && v !== '' ? v : '—'}</td>`; }).join('')}
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+  document.getElementById('entries-modal-body').innerHTML = bodyHtml;
+  document.getElementById('entries-modal').style.display = 'flex';
+}
+
+function closeEntriesModal() {
+  document.getElementById('entries-modal').style.display = 'none';
+  currentEntriesMenu = null;
+}
+
+function exportEntriesCsv() {
+  const m = currentEntriesMenu;
+  if (!m) return;
+  const entries = SAMPLE_ENTRIES[m.id] ?? [];
+  if (!entries.length) return;
+  const cols = m.fields ?? [];
+  const headers = ['Date','Submitted By',...cols.map(f => f.label)];
+  const rows = entries.map(e => [
+    new Date(e.submitted_at).toLocaleString(),
+    e.submitted_by_name,
+    ...cols.map(f => { const v = e.data?.[f.field_key] ?? ''; return Array.isArray(v) ? v.join(', ') : String(v); }),
+  ]);
+  const csv = [headers,...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type:'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `${m.slug}-entries.csv`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ─── ESC key closes modals ─── */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeUserModal(); closeUnitModal(); closeMenuModal(); closeEntriesModal();
+  }
+});
+
+/* ─── Init ─── */
+renderUsers();
+</script>
+</body>
+</html>

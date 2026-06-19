@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Daily Work — CMS</title>
+<link rel="stylesheet" href="_layout.css">
+<style>
+/* Kanban board */
+.kanban-board { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; align-items:start }
+.kanban-col {
+  background:var(--paper);
+  border-radius:12px;
+  padding:14px 12px;
+  min-height:420px;
+  display:flex; flex-direction:column;
+}
+.col-header {
+  display:flex; align-items:center; gap:8px; margin-bottom:14px;
+}
+.col-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0 }
+.col-title { font-weight:700; font-size:14px; color:var(--ink); flex:1 }
+.col-count {
+  margin-left:auto; background:var(--line); border-radius:20px;
+  padding:1px 8px; font-size:11px; color:var(--ink3);
+}
+.col-tasks { flex:1 }
+
+/* Task card */
+.task-card {
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:12px 14px;
+  margin-bottom:10px;
+}
+.task-title { font-weight:700; font-size:13.5px; color:var(--ink); margin-bottom:6px }
+.task-badges { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px }
+.pri-badge {
+  display:inline-block; padding:2px 8px; border-radius:12px;
+  font-size:10px; font-weight:700; text-transform:capitalize;
+}
+.pri-badge.normal   { background:#f1f5f9; color:var(--ink3) }
+.pri-badge.high     { background:#fef3c7; color:#92400e }
+.pri-badge.critical { background:#fee2e2; color:#991b1b }
+.task-meta { font-size:11px; color:var(--ink3); margin-bottom:5px }
+.task-meta.overdue  { color:var(--bad) }
+.task-meta.ok       { color:var(--ok) }
+.task-actions { display:flex; gap:7px; margin-top:6px; flex-wrap:wrap }
+.t-btn {
+  padding:4px 10px; border-radius:6px; border:none; cursor:pointer;
+  font-size:11px; font-weight:600; transition:opacity .13s;
+}
+.t-btn:hover { opacity:.82 }
+.t-btn.start  { background:#0ea5e9; color:#fff }
+.t-btn.done   { background:#10b981; color:#fff }
+.t-btn.reopen { background:#f1f5f9; color:var(--ink2); border:1px solid var(--line) }
+
+/* Done confirm inline */
+.done-form {
+  background:var(--paper); border-radius:8px;
+  padding:10px 12px; margin-bottom:8px;
+  border:1px solid var(--line);
+}
+.done-form label { font-size:11px; font-weight:600; color:var(--ink3); display:block; margin-bottom:6px }
+.done-form input {
+  width:100%; border:1px solid var(--line); border-radius:6px;
+  padding:5px 8px; font-size:13px; margin-bottom:8px; outline:none;
+}
+.done-form input:focus { border-color:var(--accent) }
+.done-form-btns { display:flex; gap:8px }
+
+/* Create task form */
+.create-form-card {
+  background:#fff; border:1px solid var(--line);
+  border-radius:12px; padding:18px 20px; margin-bottom:20px;
+}
+.create-form-title { font-weight:600; font-size:15px; color:var(--ink); margin-bottom:14px }
+.create-form-row { display:grid; grid-template-columns:5fr 3fr 3fr 1fr; gap:10px; align-items:end }
+.cf-group label { font-size:11px; font-weight:600; color:var(--ink3); display:block; margin-bottom:6px }
+.cf-group input,
+.cf-group select {
+  width:100%; border:1px solid var(--line); border-radius:8px;
+  padding:7px 10px; font-size:13px; outline:none;
+}
+.cf-group input:focus,
+.cf-group select:focus { border-color:var(--accent) }
+
+/* New task dashed btn */
+.add-task-btn {
+  width:100%; border:1px dashed var(--line); border-radius:8px;
+  padding:8px; background:none; cursor:pointer;
+  font-size:12px; color:var(--ink3); margin-top:10px;
+  transition:background .13s;
+}
+.add-task-btn:hover { background:rgba(0,0,0,.03) }
+
+/* Summary stats */
+.stats-row { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap }
+.stat-card {
+  background:#fff; border:1px solid var(--line); border-radius:10px;
+  padding:12px 18px; flex:1; min-width:100px;
+}
+.stat-val { font-size:22px; font-weight:800; color:var(--ink); line-height:1 }
+.stat-lbl { font-size:11px; color:var(--ink3); margin-top:4px }
+
+/* Page header action area */
+.page-actions { display:flex; align-items:center; gap:10px }
+.new-task-btn {
+  padding:7px 14px; background:var(--ink); color:#fff;
+  border:none; border-radius:8px; cursor:pointer;
+  font-size:13px; font-weight:600;
+  transition:opacity .13s;
+}
+.new-task-btn:hover { opacity:.85 }
+.new-task-btn.cancel { background:#f1f5f9; color:var(--ink2) }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-brand-icon">C</div>
+    <div class="sb-brand-text">
+      <div class="title">CMS</div>
+      <div class="sub">Convergence</div>
+    </div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-section">Main</div>
+    <a href="dashboard.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
+      <span class="label">Dashboard</span>
+    </a>
+    <a href="planner.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="2.5" width="13" height="12" rx="2"/><path d="M5 1v3M11 1v3M1.5 6.5h13M5 10.5l2 2 4-4"/></svg>
+      <span class="label">Planner</span>
+    </a>
+    <a href="meetings.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="2.5" width="13" height="12" rx="2"/><path d="M5 1v3M11 1v3M1.5 6.5h13"/></svg>
+      <span class="label">Meetings</span>
+    </a>
+    <a href="items.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3.5L10.5 10"/></svg>
+      <span class="label">Item Tracker</span>
+    </a>
+    <a href="documents.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><path d="M9.5 1H3.5A1.5 1.5 0 0 0 2 2.5v11A1.5 1.5 0 0 0 3.5 15h9A1.5 1.5 0 0 0 14 13.5V5.5L9.5 1z"/><path d="M9 1v5h5M5 9h6M5 12h4"/></svg>
+      <span class="label">D.O. Letters</span>
+    </a>
+    <a href="worklog.html" class="sb-item active">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="1.5" width="13" height="13" rx="2"/><path d="M5 8h6M5 5h6M5 11h3"/></svg>
+      <span class="label">Daily Work</span>
+    </a>
+    <a href="reviews.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><polyline points="1,10 4,6 7,9 10,4 15,7"/></svg>
+      <span class="label">Team Activity</span>
+    </a>
+    <a href="task-board.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1" y="1" width="14" height="14" rx="2"/><line x1="1" y1="6" x2="15" y2="6"/><line x1="6" y1="6" x2="6" y2="15"/></svg>
+      <span class="label">Task Board</span>
+    </a>
+    <a href="minutes.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="2.5" y="1" width="11" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>
+      <span class="label">Minutes</span>
+    </a>
+    <a href="admin-panel.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M2.93 2.93l1.41 1.41M11.66 11.66l1.41 1.41M2.93 13.07l1.41-1.41M11.66 4.34l1.41-1.41"/></svg>
+      <span class="label">Admin Panel</span>
+    </a>
+  </nav>
+</div>
+
+<!-- Header -->
+<div class="header">
+  <div class="page-title">
+    <div class="name">Daily Work</div>
+    <div class="sub">Personal task tracker</div>
+  </div>
+  <div class="header-actions">
+    <button class="hbtn" style="position:relative">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1a5 5 0 0 1 5 5c0 3 1.5 4 1.5 4h-13S3 9 3 6a5 5 0 0 1 5-5zM6 13a2 2 0 0 0 4 0"/></svg>
+      <span style="position:absolute;top:4px;right:4px;background:var(--bad);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">2</span>
+    </button>
+    <button class="user-btn">
+      <span class="u-avatar" style="background:#6366f1">SK</span>
+      <span class="name">Suresh K.</span>
+      <span class="caret">▾</span>
+    </button>
+  </div>
+</div>
+
+<!-- Main content -->
+<div class="app">
+  <div class="wrap">
+
+    <!-- Page top bar -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div>
+        <div style="font-size:18px;font-weight:700;color:var(--ink)">Work Log</div>
+        <div style="font-size:12px;color:var(--ink3);margin-top:2px">Daily task tracker</div>
+      </div>
+      <button class="new-task-btn" id="toggle-create-btn" onclick="toggleCreate()">+ New Task</button>
+    </div>
+
+    <!-- Summary stats -->
+    <div class="stats-row" id="stats-row">
+      <!-- rendered by JS -->
+    </div>
+
+    <!-- Create form (hidden by default) -->
+    <div class="create-form-card" id="create-form" style="display:none">
+      <div class="create-form-title">New Task</div>
+      <div class="create-form-row">
+        <div class="cf-group">
+          <label>Title</label>
+          <input type="text" id="cf-title" placeholder="Task title" onkeydown="if(event.key==='Enter') submitCreate()">
+        </div>
+        <div class="cf-group">
+          <label>Priority</label>
+          <select id="cf-priority">
+            <option value="normal">Normal</option>
+            <option value="high">High</option>
+            <option value="critical">Critical</option>
+          </select>
+        </div>
+        <div class="cf-group">
+          <label>Deadline</label>
+          <input type="date" id="cf-deadline">
+        </div>
+        <div class="cf-group">
+          <label>&nbsp;</label>
+          <button class="t-btn done" style="width:100%;padding:7px 10px;font-size:13px" onclick="submitCreate()">Add</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kanban board -->
+    <div class="kanban-board" id="kanban-board">
+      <!-- rendered by JS -->
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ── Data ── */
+const TODAY = new Date().toISOString().slice(0, 10);
+
+let TASKS = [
+  { id: 1, title: 'Prepare VP-SMC convergence meeting agenda', priority: 'high', status: 'todo', deadline: '2026-06-20', started_at: null, hours_taken: null },
+  { id: 2, title: 'Update student enrollment data for ACIS unit', priority: 'normal', status: 'todo', deadline: '2026-06-22', started_at: null, hours_taken: null },
+  { id: 3, title: 'Follow up on pending DO letters from SMC block', priority: 'critical', status: 'todo', deadline: '2026-06-15', started_at: null, hours_taken: null },
+  { id: 4, title: 'Compile MoM action points from last week meetings', priority: 'high', status: 'in_progress', deadline: '2026-06-19', started_at: new Date(Date.now() - 2.5 * 3600000).toISOString(), hours_taken: null },
+  { id: 5, title: 'Review career guidance program reports Q1', priority: 'normal', status: 'in_progress', deadline: '2026-06-21', started_at: new Date(Date.now() - 1.2 * 3600000).toISOString(), hours_taken: null },
+  { id: 6, title: 'Coordinate with NSNOP team for field visit', priority: 'normal', status: 'done', deadline: '2026-06-14', started_at: null, hours_taken: 3.5 },
+  { id: 7, title: 'Submit monthly compliance report to district office', priority: 'high', status: 'done', deadline: '2026-06-12', started_at: null, hours_taken: 2.0 },
+  { id: 8, title: 'Draft agenda for Alumni meet Q2', priority: 'normal', status: 'done', deadline: '2026-06-10', started_at: null, hours_taken: 1.5 },
+];
+
+let nextId = 100;
+let createOpen = false;
+// track which tasks have inline done form open
+const doneFormOpen = new Set();
+
+function calcHours(startedAt) {
+  if (!startedAt) return '';
+  const diff = (Date.now() - new Date(startedAt).getTime()) / 3600000;
+  return Math.max(0, diff).toFixed(1);
+}
+
+function grouped() {
+  return {
+    todo:        TASKS.filter(t => t.status === 'todo'),
+    in_progress: TASKS.filter(t => t.status === 'in_progress'),
+    done:        TASKS.filter(t => t.status === 'done'),
+  };
+}
+
+/* ── Render ── */
+function renderStats() {
+  const g = grouped();
+  const overdue = TASKS.filter(t => t.deadline && t.deadline < TODAY && t.status !== 'done').length;
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-val">${TASKS.length}</div>
+      <div class="stat-lbl">Total Tasks</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="color:#94a3b8">${g.todo.length}</div>
+      <div class="stat-lbl">To Do</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="color:#0ea5e9">${g.in_progress.length}</div>
+      <div class="stat-lbl">In Progress</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="color:var(--ok)">${g.done.length}</div>
+      <div class="stat-lbl">Done</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" style="color:var(--bad)">${overdue}</div>
+      <div class="stat-lbl">Overdue</div>
+    </div>
+  `;
+}
+
+function renderTaskCard(task) {
+  const isOverdue = task.deadline && task.deadline < TODAY && task.status !== 'done';
+  const showDoneForm = doneFormOpen.has(task.id);
+
+  let deadlineHtml = '';
+  if (task.deadline) {
+    const cls = isOverdue ? 'overdue' : '';
+    const prefix = isOverdue ? '⚠ Overdue: ' : 'Due: ';
+    deadlineHtml = `<div class="task-meta ${cls}">${prefix}${task.deadline}</div>`;
+  }
+
+  let startedHtml = '';
+  if (task.status === 'in_progress' && task.started_at) {
+    const t = new Date(task.started_at).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+    const hrs = calcHours(task.started_at);
+    startedHtml = `<div class="task-meta">Started: ${t} &nbsp;·&nbsp; ${hrs}h elapsed</div>`;
+  }
+
+  let hoursTakenHtml = '';
+  if (task.status === 'done' && task.hours_taken != null) {
+    hoursTakenHtml = `<div class="task-meta ok">⏱ ${task.hours_taken}h taken</div>`;
+  }
+
+  let doneFormHtml = '';
+  if (showDoneForm) {
+    const suggestedHours = calcHours(task.started_at);
+    doneFormHtml = `
+      <div class="done-form">
+        <label>Hours taken:</label>
+        <input type="number" id="done-hours-${task.id}" min="0" step="0.25" value="${suggestedHours}" placeholder="0.0">
+        <div class="done-form-btns">
+          <button class="t-btn done" onclick="confirmDone(${task.id})">Mark Done</button>
+          <button class="t-btn reopen" onclick="cancelDoneForm(${task.id})">Cancel</button>
+        </div>
+      </div>
+    `;
+  }
+
+  let actionHtml = '';
+  if (task.status === 'todo') {
+    actionHtml = `<button class="t-btn start" onclick="transition(${task.id},'in_progress')">▶ Start</button>`;
+  } else if (task.status === 'in_progress' && !showDoneForm) {
+    actionHtml = `<button class="t-btn done" onclick="openDoneForm(${task.id})">✓ Done</button>`;
+  } else if (task.status === 'done') {
+    actionHtml = `<button class="t-btn reopen" onclick="transition(${task.id},'todo')">↺ Reopen</button>`;
+  }
+
+  return `
+    <div class="task-card" id="task-${task.id}">
+      <div class="task-title">${task.title}</div>
+      <div class="task-badges">
+        <span class="pri-badge ${task.priority}">${task.priority}</span>
+      </div>
+      ${deadlineHtml}
+      ${startedHtml}
+      ${hoursTakenHtml}
+      ${doneFormHtml}
+      <div class="task-actions">${actionHtml}</div>
+    </div>
+  `;
+}
+
+function renderColumn(title, tasks, dotColor, showCreate) {
+  const emptyHtml = tasks.length === 0
+    ? `<div style="font-size:12px;color:var(--ink3);text-align:center;padding:20px 0;opacity:.7">No tasks</div>`
+    : '';
+  const addBtnHtml = showCreate
+    ? `<button class="add-task-btn" onclick="showCreateForm()">+ New Task</button>`
+    : '';
+  return `
+    <div class="kanban-col">
+      <div class="col-header">
+        <div class="col-dot" style="background:${dotColor}"></div>
+        <span class="col-title">${title}</span>
+        <span class="col-count">${tasks.length}</span>
+      </div>
+      <div class="col-tasks">
+        ${tasks.map(renderTaskCard).join('')}
+        ${emptyHtml}
+      </div>
+      ${addBtnHtml}
+    </div>
+  `;
+}
+
+function render() {
+  renderStats();
+  const g = grouped();
+  document.getElementById('kanban-board').innerHTML =
+    renderColumn('To Do', g.todo, '#94a3b8', true) +
+    renderColumn('In Progress', g.in_progress, '#0ea5e9', false) +
+    renderColumn('Done', g.done, '#10b981', false);
+}
+
+/* ── Actions ── */
+function transition(id, newStatus) {
+  const task = TASKS.find(t => t.id === id);
+  if (!task) return;
+  task.status = newStatus;
+  if (newStatus === 'in_progress') {
+    task.started_at = new Date().toISOString();
+    task.hours_taken = null;
+  } else if (newStatus === 'todo') {
+    task.started_at = null;
+    task.hours_taken = null;
+    doneFormOpen.delete(id);
+  }
+  render();
+}
+
+function openDoneForm(id) {
+  doneFormOpen.add(id);
+  render();
+}
+
+function cancelDoneForm(id) {
+  doneFormOpen.delete(id);
+  render();
+}
+
+function confirmDone(id) {
+  const task = TASKS.find(t => t.id === id);
+  if (!task) return;
+  const inp = document.getElementById(`done-hours-${id}`);
+  const hours = parseFloat(inp?.value) || 0;
+  task.status = 'done';
+  task.hours_taken = hours > 0 ? hours : null;
+  doneFormOpen.delete(id);
+  render();
+}
+
+function toggleCreate() {
+  createOpen = !createOpen;
+  document.getElementById('create-form').style.display = createOpen ? 'block' : 'none';
+  document.getElementById('toggle-create-btn').textContent = createOpen ? '✕ Cancel' : '+ New Task';
+  document.getElementById('toggle-create-btn').className = 'new-task-btn' + (createOpen ? ' cancel' : '');
+  if (createOpen) {
+    setTimeout(() => document.getElementById('cf-title').focus(), 50);
+  }
+}
+
+function showCreateForm() {
+  if (!createOpen) toggleCreate();
+  document.getElementById('cf-title').focus();
+}
+
+function submitCreate() {
+  const title = document.getElementById('cf-title').value.trim();
+  if (!title) {
+    document.getElementById('cf-title').style.borderColor = 'var(--bad)';
+    setTimeout(() => document.getElementById('cf-title').style.borderColor = '', 1500);
+    return;
+  }
+  const priority = document.getElementById('cf-priority').value;
+  const deadline = document.getElementById('cf-deadline').value || null;
+
+  TASKS.unshift({
+    id: nextId++,
+    title,
+    priority,
+    status: 'todo',
+    deadline,
+    started_at: null,
+    hours_taken: null,
+  });
+
+  // reset form
+  document.getElementById('cf-title').value = '';
+  document.getElementById('cf-priority').value = 'normal';
+  document.getElementById('cf-deadline').value = '';
+  toggleCreate();
+  render();
+}
+
+/* ── Init ── */
+render();
+</script>
+</body>
+</html>

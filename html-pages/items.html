@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Item Tracker — CMS Convergence</title>
+<link rel="stylesheet" href="_layout.css">
+<style>
+/* ── Item row ── */
+.itemrow {
+  display:grid; grid-template-columns:auto 1fr auto;
+  gap:13px; align-items:center;
+  border-radius:10px; padding:13px 15px; margin-bottom:8px;
+  background:var(--paper); cursor:pointer; transition:.13s;
+  border:1px solid var(--line); border-left:3px solid transparent;
+}
+.itemrow:hover { border-color:var(--accent); background:var(--accent-light) }
+.itemrow.done  { opacity:.6 }
+.iid  { font-size:11px; font-weight:700; color:#fff; padding:4px 9px; border-radius:7px; white-space:nowrap; font-family:'Inter',sans-serif; letter-spacing:.04em }
+.it   { font-size:15px; font-weight:600; line-height:1.3; color:var(--ink) }
+.imeta{ font-size:13px; color:var(--ink3); margin-top:4px; display:flex; gap:6px; flex-wrap:wrap; align-items:center }
+.dl-badge { font-size:10px; font-weight:700; color:#fff; border-radius:5px; padding:2px 7px }
+
+/* ── SLA chip (inline) ── */
+.sla-chip {
+  font-size:11px; padding:2px 8px; border-radius:99px;
+  font-weight:600; display:inline-flex; align-items:center; gap:4px; white-space:nowrap;
+}
+
+/* ── SLA card (modal) ── */
+.sla-card { border-radius:12px; padding:14px 16px }
+.sla-stats { display:flex; gap:16px; flex-wrap:wrap }
+.sla-stat  { display:flex; flex-direction:column; align-items:center; min-width:48px }
+.sla-stat .sv { font-weight:800; font-size:16px; line-height:1; color:var(--ink) }
+.sla-stat .sl { font-size:10px; text-transform:uppercase; letter-spacing:.05em; margin-top:2px }
+
+/* ── Create form card ── */
+.form-card { background:var(--panel); border-radius:var(--r); padding:22px; box-shadow: inset 0 1px 0 rgba(255,255,255,.85), 0 2px 8px rgba(15,23,42,.07), 0 12px 32px -8px rgba(99,102,241,.10), 0 0 0 1px rgba(15,23,42,.05) }
+.list-card { background:var(--panel); border-radius:var(--r); padding:22px; box-shadow: inset 0 1px 0 rgba(255,255,255,.85), 0 2px 8px rgba(15,23,42,.07), 0 12px 32px -8px rgba(99,102,241,.10), 0 0 0 1px rgba(15,23,42,.05) }
+.card-title { font-weight:700; font-size:18px; color:var(--ink); margin:0 }
+
+/* ── Unit toggle pill ── */
+.unit-pill {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:5px 10px; border-radius:99px; cursor:pointer;
+  font-size:12px; border:1.5px solid var(--line);
+  background:#fff; color:var(--ink2); font-weight:500;
+  transition:.12s; user-select:none;
+}
+.unit-pill.on { font-weight:700 }
+
+/* ── Modal overlay ── */
+.modal-overlay {
+  display:none; position:fixed; inset:0; z-index:2000;
+  background:rgba(15,23,42,.55); backdrop-filter:blur(3px);
+  align-items:flex-start; justify-content:center; padding:32px 16px;
+}
+.modal-overlay.open { display:flex }
+.modal-box {
+  background:var(--panel); border-radius:16px;
+  width:100%; max-width:620px; max-height:88vh; overflow-y:auto;
+  box-shadow:0 24px 80px rgba(15,23,42,.25);
+  animation:mslide .18s ease;
+}
+@keyframes mslide { from{transform:translateY(-16px);opacity:0} to{transform:none;opacity:1} }
+.modal-hdr {
+  padding:20px 24px 16px; border-bottom:1px solid var(--line);
+  position:sticky; top:0; background:var(--panel); z-index:2;
+}
+.modal-close {
+  flex-shrink:0; border:1px solid var(--line); background:var(--paper);
+  border-radius:50%; width:30px; height:30px; cursor:pointer;
+  font-size:15px; color:var(--ink2); display:flex; align-items:center; justify-content:center; line-height:1;
+}
+.modal-body { padding:0 24px 24px }
+.modal-section { border-bottom:1px solid var(--line); padding:14px 0 }
+.modal-section:last-child { border-bottom:none }
+.section-lbl {
+  font-size:11px; letter-spacing:.07em; text-transform:uppercase;
+  color:var(--ink3); margin-bottom:8px; font-weight:700;
+}
+
+/* ── Action items in modal ── */
+.ai-row {
+  display:flex; gap:9px; align-items:flex-start;
+  padding:8px 0; font-size:14px; border-bottom:1px solid var(--line2);
+}
+.ai-check {
+  width:16px; height:16px; border-radius:5px; border:1.5px solid var(--ink3);
+  background:transparent; flex-shrink:0; margin-top:2px; cursor:pointer; position:relative;
+}
+.ai-check.done { background:var(--ok); border-color:var(--ok) }
+.ai-check.done::after {
+  content:''; position:absolute; left:4.5px; top:1.5px;
+  width:4px; height:8px; border:solid #fff; border-width:0 2px 2px 0;
+  transform:rotate(45deg);
+}
+.ai-id { font-size:11px; color:var(--ink3); background:var(--paper); padding:3px 7px; border-radius:6px; white-space:nowrap; margin-top:2px }
+
+/* ── Status badge (modal header) ── */
+.stat-pill {
+  display:inline-flex; align-items:center; padding:3px 10px; border-radius:99px;
+  font-size:11px; font-weight:600; letter-spacing:.03em; text-transform:uppercase;
+}
+.sp-open    { background:#dbeafe; color:#1d4ed8 }
+.sp-pending { background:#fef3c7; color:#92400e }
+.sp-closed  { background:#d1fae5; color:#065f46 }
+
+/* ── WhatsApp banner ── */
+.wa-banner {
+  display:none; background:#dcfce7; border:1px solid #86efac; border-radius:12px;
+  padding:12px 18px; margin-bottom:16px;
+  align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+}
+.wa-banner.show { display:flex }
+
+/* ── SLA history ── */
+.sla-hist-row { background:var(--paper); border-radius:8px; padding:8px 12px; font-size:12px; color:var(--ink2) }
+
+/* ── Two-column layout ── */
+.two-col { display:grid; grid-template-columns:5fr 7fr; gap:20px; align-items:start }
+@media(max-width:960px){ .two-col { grid-template-columns:1fr } }
+
+/* ── Edit area ── */
+.edit-btn {
+  border:none; background:var(--accent-light); color:var(--accent-dark);
+  font-size:11px; font-weight:600; padding:3px 10px; border-radius:7px; cursor:pointer;
+}
+.assigned-box {
+  display:inline-flex; align-items:center; gap:8px;
+  padding:6px 12px; border-radius:10px; background:#e0f2fe; border:1px solid #7dd3fc;
+}
+
+/* ── Priority badge ── */
+.prio-Critical .it  { border-left:none }
+.prio-High     .it  { border-left:none }
+</style>
+</head>
+<body>
+
+<!-- ── Sidebar ── -->
+<div class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-brand-icon">C</div>
+    <div class="sb-brand-text"><div class="title">CMS</div><div class="sub">Convergence</div></div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-section">Main</div>
+    <a href="dashboard.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
+      <span class="label">Dashboard</span>
+    </a>
+    <a href="planner.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="2.5" width="13" height="12" rx="2"/><path d="M5 1v3M11 1v3M1.5 6.5h13M5 10.5l2 2 4-4"/></svg>
+      <span class="label">Planner</span>
+    </a>
+    <a href="meetings.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="2.5" width="13" height="12" rx="2"/><path d="M5 1v3M11 1v3M1.5 6.5h13"/></svg>
+      <span class="label">Meetings</span>
+    </a>
+    <a href="items.html" class="sb-item active">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.5" style="flex-shrink:0"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3.5L10.5 10"/></svg>
+      <span class="label">Item Tracker</span>
+    </a>
+    <a href="documents.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><path d="M9.5 1H3.5A1.5 1.5 0 0 0 2 2.5v11A1.5 1.5 0 0 0 3.5 15h9A1.5 1.5 0 0 0 14 13.5V5.5L9.5 1z"/><path d="M9 1v5h5M5 9h6M5 12h4"/></svg>
+      <span class="label">D.O. Letters</span>
+    </a>
+    <a href="worklog.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="1.5" width="13" height="13" rx="2"/><path d="M5 8h6M5 5h6M5 11h3"/></svg>
+      <span class="label">Daily Work</span>
+    </a>
+    <a href="reviews.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><polyline points="1,10 4,6 7,9 10,4 15,7"/></svg>
+      <span class="label">Team Activity</span>
+    </a>
+    <a href="task-board.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1" y="1" width="14" height="14" rx="2"/><line x1="1" y1="6" x2="15" y2="6"/><line x1="6" y1="6" x2="6" y2="15"/></svg>
+      <span class="label">Task Board</span>
+    </a>
+    <a href="minutes.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="2.5" y="1" width="11" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>
+      <span class="label">Minutes</span>
+    </a>
+    <a href="admin-panel.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M2.93 2.93l1.41 1.41M11.66 11.66l1.41 1.41M2.93 13.07l1.41-1.41M11.66 4.34l1.41-1.41"/></svg>
+      <span class="label">Admin Panel</span>
+    </a>
+  </nav>
+</div>
+
+<!-- ── Header ── -->
+<div class="header">
+  <div class="page-title">
+    <div class="name">Item Tracker</div>
+    <div class="sub">Create &amp; track support items across convergence units</div>
+  </div>
+  <div class="header-actions">
+    <button class="hbtn" style="position:relative">
+      <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1a5.5 5.5 0 0 1 5.5 5.5c0 3.5 1.5 5 1.5 5H1s1.5-1.5 1.5-5A5.5 5.5 0 0 1 8 1zM6.5 13.5a1.5 1.5 0 0 0 3 0"/></svg>
+      <span style="position:absolute;top:4px;right:4px;background:var(--bad);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1">3</span>
+    </button>
+    <button class="user-btn">
+      <span class="u-avatar" style="background:#1e2333">AD</span>
+      <span class="name">Admin</span>
+      <span class="caret">▾</span>
+    </button>
+  </div>
+</div>
+
+<!-- ── App ── -->
+<div class="app"><div class="wrap">
+
+  <!-- ── Filter bar ── -->
+  <div class="filterbar">
+    <div class="period">
+      <div class="l">Item tracker</div>
+      <div class="v">Create &amp; track items</div>
+    </div>
+    <div class="dfilter">
+      <div class="seg" id="statusSeg">
+        <button class="on" onclick="setStatusFilter('all',this)">All</button>
+        <button onclick="setStatusFilter('open',this)">Open</button>
+        <button onclick="setStatusFilter('pending',this)">Pending</button>
+        <button onclick="setStatusFilter('closed',this)">Closed</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── WhatsApp banner (shown after create) ── -->
+  <div class="wa-banner" id="waBanner">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:20px">✅</span>
+      <div>
+        <div style="font-weight:700;font-size:14px;color:#166534" id="waItemId">SU-007 created</div>
+        <div style="font-size:12px;color:#166534;opacity:.8">Share this item via WhatsApp?</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="shareWhatsApp()" style="padding:7px 10px;border:none;border-radius:9px;background:#25D366;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center" title="Share on WhatsApp">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+      </button>
+      <button onclick="document.getElementById('waBanner').classList.remove('show')" style="padding:7px 14px;border:1px solid #86efac;border-radius:9px;background:transparent;color:#166534;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer">Dismiss</button>
+    </div>
+  </div>
+
+  <!-- ── Two-column layout ── -->
+  <div class="two-col">
+
+    <!-- ── Create form ── -->
+    <div class="form-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <h5 class="card-title">Create item</h5>
+        <span style="font-size:11px;color:var(--ink3)">raise a need / request to another unit</span>
+      </div>
+
+      <!-- Type -->
+      <div style="margin-bottom:14px">
+        <label>Type</label>
+        <select id="fType" onchange="updateTypePreview()">
+          <option value="support"   data-code="SU" data-color="#378ADD">Support</option>
+          <option value="request"   data-code="RQ" data-color="#7F77DD">Request</option>
+          <option value="alert"     data-code="AL" data-color="#E0A21C">Alert</option>
+          <option value="emergency" data-code="EM" data-color="#D85A30">Emergency</option>
+          <option value="need"      data-code="NE" data-color="#1D9E75">Need</option>
+          <option value="fund"      data-code="FU" data-color="#16A085">Fund</option>
+          <option value="infra"     data-code="IN" data-color="#8E7CC3">Infra</option>
+          <option value="school"    data-code="SC" data-color="#D4537E">School</option>
+          <option value="student"   data-code="ST" data-color="#C0392B">Student</option>
+        </select>
+      </div>
+
+      <!-- Title -->
+      <div style="margin-bottom:14px">
+        <label>Title</label>
+        <input type="text" id="fTitle" placeholder="Short summary of the item" oninput="clearErr('errTitle')">
+        <div id="errTitle" style="font-size:11px;color:#dc2626;margin-top:4px;display:none">⚠ Item title is required</div>
+      </div>
+
+      <!-- Raise to unit(s) -->
+      <div style="margin-bottom:14px">
+        <label>Raise to unit(s)</label>
+        <div id="errTargets" style="font-size:11px;color:#dc2626;margin-bottom:6px;display:none">⚠ Select at least one target unit</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px" id="unitPills">
+          <span class="unit-pill" data-unit="smc" data-color="#ec4899" onclick="toggleUnit(this)">
+            <span class="dot" style="background:#ec4899"></span> SMC
+          </span>
+          <span class="unit-pill" data-unit="cg" data-color="#f97316" onclick="toggleUnit(this)">
+            <span class="dot" style="background:#f97316"></span> Career Guidance
+          </span>
+          <span class="unit-pill" data-unit="acis" data-color="#14b8a6" onclick="toggleUnit(this)">
+            <span class="dot" style="background:#14b8a6"></span> ACIS
+          </span>
+          <span class="unit-pill" data-unit="nsnop" data-color="#22c55e" onclick="toggleUnit(this)">
+            <span class="dot" style="background:#22c55e"></span> NSNOP
+          </span>
+          <span class="unit-pill" data-unit="alumni" data-color="#3b82f6" onclick="toggleUnit(this)">
+            <span class="dot" style="background:#3b82f6"></span> Alumni
+          </span>
+          <span class="unit-pill" data-unit="manarkeni" data-color="#f59e0b" onclick="toggleUnit(this)">
+            <span class="dot" style="background:#f59e0b"></span> Manarkeni
+          </span>
+        </div>
+      </div>
+
+      <!-- Assign to (shown after unit selected) -->
+      <div id="assignSection" style="margin-bottom:14px;display:none">
+        <label>Assign to <span style="text-transform:none;letter-spacing:0;opacity:.65;font-size:11px">(optional)</span></label>
+        <select id="fAssignTo">
+          <option value="">— Unassigned —</option>
+          <option value="1">Priya Sundaram (@priya_smc) — SMC</option>
+          <option value="2">Anand Selvam (@anand_cg) — Career Guidance</option>
+          <option value="3">Meera Krishnan (@meera_acis) — ACIS</option>
+          <option value="4">Sakthi Murugan (@sakthi_nsnop) — NSNOP</option>
+          <option value="5">Rajesh Kumar (@rajesh_alumni) — Alumni</option>
+          <option value="6">Kavitha Murthy (@kavitha_mana) — Manarkeni</option>
+        </select>
+      </div>
+
+      <!-- Details -->
+      <div style="margin-bottom:14px">
+        <label>Details</label>
+        <textarea id="fDesc" placeholder="What you need / what support is requested…" rows="3"></textarea>
+      </div>
+
+      <!-- Priority + ID preview -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div>
+          <label>Priority</label>
+          <select id="fPrio">
+            <option>Normal</option>
+            <option>High</option>
+            <option>Critical</option>
+          </select>
+        </div>
+        <div>
+          <label>Will get ID</label>
+          <input type="text" id="idPreview" value="SU-???" disabled style="background:var(--paper)">
+        </div>
+      </div>
+
+      <!-- SLA section -->
+      <div style="background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin-bottom:10px">🎯 SLA (Service Level Agreement)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <label>Start date</label>
+            <input type="date" id="fSlaStart" onchange="updateSLAPreview()">
+          </div>
+          <div>
+            <label>End date</label>
+            <input type="date" id="fSlaEnd" onchange="updateSLAPreview()">
+          </div>
+        </div>
+        <div id="slaPreview" style="margin-top:10px;display:none"></div>
+      </div>
+
+      <!-- Buttons -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn primary" style="flex:1" onclick="createItem()">Create item</button>
+        <button class="btn" onclick="emailDraft()">✉ Email draft</button>
+      </div>
+    </div>
+
+    <!-- ── Item list ── -->
+    <div class="list-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <h5 class="card-title">All items</h5>
+        <span style="font-size:11px;color:var(--ink3)">tap to open · add action items</span>
+      </div>
+
+      <div id="itemList">
+
+        <!-- Item SU-001: Overdue (breached) -->
+        <div class="itemrow" style="border-left-color:#dc2626" onclick="openModal('su001')">
+          <span class="iid" style="background:#378ADD">SU-001</span>
+          <div>
+            <div class="it">Share beneficiary list with SMC team</div>
+            <div class="imeta">
+              <span style="display:inline-flex;align-items:center;gap:4px"><span class="dot" style="background:#6366f1"></span>VP</span>
+              <span>→</span>
+              <span style="display:inline-flex;align-items:center;gap:4px"><span class="dot" style="background:#ec4899"></span>SMC</span>
+              <span>·</span>
+              <span>VP × SMC · Jun 10</span>
+              <span>·</span>
+              <span>👤 Priya Sundaram</span>
+              <br style="width:100%">
+              <span class="sla-chip" style="background:#fef2f2;color:#991b1b;border:1px solid #fca5a5">🎯 SLA 3d overdue <span style="opacity:.55;font-weight:400">87%</span></span>
+            </div>
+          </div>
+          <span class="stat-pill sp-open">open</span>
+        </div>
+
+        <!-- Item RQ-002: Warning SLA -->
+        <div class="itemrow" style="border-left-color:#d97706" onclick="openModal('rq002')">
+          <span class="iid" style="background:#7F77DD">RQ-002</span>
+          <div>
+            <div class="it">Map overlapping school zones for joint planning</div>
+            <div class="imeta">
+              <span style="display:inline-flex;align-items:center;gap:4px"><span class="dot" style="background:#6366f1"></span>VP</span>
+              <span>→</span>
+              <span style="display:inline-flex;align-items:center;gap:4px"><span class="dot" style="background:#ec4899"></span>SMC</span>
+              <span>·</span>
+              <span>VP × SMC · Jun 10</span>
+              <span>·</span>
+              <span>2 action item(s)</span>
+              <br style="width:100%">
+              <span class="sla-chip" style="background:#fef3c7;color:#92400e;border:1px solid #fbbf24">🎯 SLA 2d left <span style="opacity:.55;font-weight:400">78%</span></span>
+            </div>
+          </div>
+          <span class="stat-pill sp-pending">pending</span>
+        </div>
+
+        <!-- Item NE-003: On track -->
+        <div class="itemrow" onclick="openModal('ne003')">
+          <span class="iid" style="background:#1D9E75">NE-003</span>
+          <div>
+            <div class="it">Align reporting formats across VP and Career Guidance</div>
+            <div class="imeta">
+              <span style="display:inline-flex;align-items:center;gap:4px"><span class="dot" style="background:#6366f1"></span>VP</span>
+              <span>→</span>
+              <span style="display:inline-flex;align-items:center;gap:4px"><span class="dot" style="background:#f97316"></span>CG</span>
+              <span>·</span>
+              <span>VP × CG · Jun 05</span>
+              <span>·</span>
+              <span>1 action item(s)</span>
+              <br style="width:100%">
+              <span class="sla-chip" style="background:#dcfce7;color:#166534;border:1px solid #86efac">🎯 SLA 12d left <span style="opacity:.55;font-weight:400">45%</span></span>
+            </div>
+          </div>
+          <span class="stat-pill sp-open">open</span>
+        </div>
+
+        <!-- Item AL-004: Warning, no assign -->
+        <div class="itemrow" style="border-left-color:#d97706" onclick="openModal('al004')">
+          <span class="iid" style="background:#E0A21C">AL-004</span>
+          <div>
+            <div class="it">Alert: Missing Q2 enrollment data from ACIS schools</div>
+            <div class="imeta">
+              <span style="display:inline-flex;align-items:center;gap:4px"><span class="dot" style="background:#6366f1"></span>VP</span>
+              <span>→</span>
+              <span style="display:inline-flex;align-items:center;gap:4px"><span class="dot" style="background:#14b8a6"></span>ACIS</span>
+              <span>·</span>
+              <span>Jun 12</span>
+              <span>·</span>
+              <span>0 action item(s)</span>
+              <br style="width:100%">
+              <span class="sla-chip" style="background:#fef3c7;color:#92400e;border:1px solid #fbbf24">🎯 SLA 1d left <span style="opacity:.55;font-weight:400">92%</span></span>
+            </div>
+          </div>
+          <span class="stat-pill sp-pending">pending</span>
+        </div>
+
+        <!-- Item FU-005: Open, no SLA -->
+        <div class="itemrow" onclick="openModal('fu005')">
+          <span class="iid" style="background:#16A085">FU-005</span>
+          <div>
+            <div class="it">Request budget allocation for joint field visits — NSNOP &amp; Alumni</div>
+            <div class="imeta">
+              <span style="display:inline-flex;align-items:center;gap:4px"><span class="dot" style="background:#22c55e"></span>NSNOP</span>
+              <span>→</span>
+              <span style="display:inline-flex;align-items:center;gap:4px"><span class="dot" style="background:#3b82f6"></span>Alumni</span>
+              <span>·</span>
+              <span>Jun 05</span>
+              <span>·</span>
+              <span>👤 Rajesh Kumar</span>
+            </div>
+          </div>
+          <span class="stat-pill sp-open">open</span>
+        </div>
+
+        <!-- Item SU-006: Closed (done) -->
+        <div class="itemrow done" onclick="openModal('su006')">
+          <span class="iid" style="background:#10b981">SU-006</span>
+          <div>
+            <div class="it" style="text-decoration:line-through;color:var(--ink3)">Submit Q1 student data to district office</div>
+            <div class="imeta">
+              <span style="display:inline-flex;align-items:center;gap:4px"><span class="dot" style="background:#6366f1"></span>VP</span>
+              <span>→</span>
+              <span style="display:inline-flex;align-items:center;gap:4px"><span class="dot" style="background:#22c55e"></span>NSNOP</span>
+              <span>·</span>
+              <span>May 15</span>
+              <span>·</span>
+              <span>👤 Kavitha Murthy</span>
+            </div>
+          </div>
+          <span class="stat-pill sp-closed">closed</span>
+        </div>
+
+        <!-- Item IN-007: Closed -->
+        <div class="itemrow done" onclick="openModal('in007')">
+          <span class="iid" style="background:#10b981">IN-007</span>
+          <div>
+            <div class="it" style="text-decoration:line-through;color:var(--ink3)">Coordinate joint field visits for May</div>
+            <div class="imeta">
+              <span style="display:inline-flex;align-items:center;gap:4px"><span class="dot" style="background:#6366f1"></span>VP</span>
+              <span>→</span>
+              <span style="display:inline-flex;align-items:center;gap:4px"><span class="dot" style="background:#22c55e"></span>NSNOP</span>
+              <span>·</span>
+              <span>May 15</span>
+            </div>
+          </div>
+          <span class="stat-pill sp-closed">closed</span>
+        </div>
+
+      </div><!-- /itemList -->
+
+      <div style="text-align:center;margin-top:16px">
+        <button class="btn">Load more items…</button>
+      </div>
+    </div><!-- /list-card -->
+  </div><!-- /two-col -->
+
+</div></div><!-- /wrap /app -->
+
+
+<!-- ─────────────────────────────────── ITEM MODAL ── -->
+<div class="modal-overlay" id="itemModal" onclick="overlayClick(event,'itemModal')">
+  <div class="modal-box" role="dialog">
+
+    <!-- Header -->
+    <div class="modal-hdr" id="mHdr">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <span class="iid" id="mItemId" style="background:#378ADD;flex-shrink:0;margin-top:2px">SU-001</span>
+        <span style="font-weight:700;font-size:18px;line-height:1.35;flex:1;color:var(--ink)" id="mTitle">Share beneficiary list with SMC team</span>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap" id="mMeta"></div>
+    </div>
+
+    <div class="modal-body">
+
+      <!-- Raised by → to -->
+      <div class="modal-section">
+        <div class="section-lbl">Raised by → to</div>
+        <div id="mRaisedBy" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px"></div>
+      </div>
+
+      <!-- Assignment -->
+      <div class="modal-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div class="section-lbl" style="margin:0">Assigned To</div>
+          <button class="edit-btn" id="mAssignBtn" onclick="toggleAssign()">+ Assign</button>
+        </div>
+        <div id="mAssignView"></div>
+        <div id="mAssignEdit" style="display:none">
+          <select id="mAssignSelect" style="margin-bottom:8px">
+            <option value="">— Unassigned —</option>
+            <option value="priya">Priya Sundaram (@priya_smc)</option>
+            <option value="anand">Anand Selvam (@anand_cg)</option>
+            <option value="meera">Meera Krishnan (@meera_acis)</option>
+            <option value="sakthi">Sakthi Murugan (@sakthi_nsnop)</option>
+            <option value="rajesh">Rajesh Kumar (@rajesh_alumni)</option>
+            <option value="kavitha">Kavitha Murthy (@kavitha_mana)</option>
+          </select>
+          <div style="display:flex;gap:8px">
+            <button onclick="saveAssign()" style="flex:1;border:none;background:var(--accent);color:#fff;font-weight:600;font-size:13px;padding:8px 0;border-radius:9px;cursor:pointer">Save</button>
+            <button onclick="toggleAssign()" style="flex:1;border:1px solid var(--line);background:transparent;color:var(--ink2);font-size:13px;padding:8px 0;border-radius:9px;cursor:pointer">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLA -->
+      <div class="modal-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div class="section-lbl" style="margin:0">SLA Dates</div>
+          <button class="edit-btn" id="mSlaBtn" onclick="toggleSlaEdit()">+ Set SLA</button>
+        </div>
+        <div id="mSlaView"></div>
+        <div id="mSlaEdit" style="display:none">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <div><label>Start</label><input type="date" id="mSlaStart" onchange="updateModalSLAPreview()"></div>
+            <div><label>End</label><input type="date" id="mSlaEnd" onchange="updateModalSLAPreview()"></div>
+          </div>
+          <div id="mSlaEditPreview" style="margin-bottom:10px"></div>
+          <div style="display:flex;gap:8px">
+            <button onclick="saveSLA()" style="flex:1;border:none;background:var(--accent);color:#fff;font-weight:600;font-size:13px;padding:8px 0;border-radius:9px;cursor:pointer">Save SLA</button>
+            <button onclick="toggleSlaEdit()" style="flex:1;border:1px solid var(--line);background:transparent;color:var(--ink2);font-size:13px;padding:8px 0;border-radius:9px;cursor:pointer">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Details / Description -->
+      <div class="modal-section" id="mDetailsSection">
+        <div class="section-lbl">Details</div>
+        <div id="mDetails" style="font-size:15px;line-height:1.65;color:var(--ink2)"></div>
+      </div>
+
+      <!-- Action items -->
+      <div class="modal-section">
+        <div class="section-lbl">Action items <span style="text-transform:none;letter-spacing:0;opacity:.7;font-size:11px">— each tracked with its own AI- id</span></div>
+        <div id="mAiList"></div>
+        <div style="margin-top:12px">
+          <textarea id="mAiText" placeholder="Add an action item (gets an AI- tracking id)…" rows="2" style="margin-bottom:9px"></textarea>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:11px;color:var(--ink3)">Add action item</span>
+            <button onclick="addActionItem()" style="border:0;background:var(--accent);color:#fff;font-weight:600;font-size:13px;padding:10px 18px;border-radius:10px;cursor:pointer">Add action item</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer buttons -->
+      <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+        <button id="mBtnClose" onclick="changeStatus('closed')" style="flex:1;border:none;background:var(--ink);color:#fff;font-weight:600;font-size:14px;padding:11px 0;border-radius:10px;cursor:pointer">Mark closed</button>
+        <button id="mBtnPending" onclick="changeStatus('pending')" style="border:1px solid var(--line);background:transparent;color:var(--ink2);font-size:13px;padding:10px 14px;border-radius:10px;cursor:pointer">Mark pending</button>
+        <button onclick="emailItem()" style="border:1px solid var(--line);background:transparent;color:var(--ink2);font-size:13px;padding:10px 14px;border-radius:10px;cursor:pointer">✉ Email</button>
+        <button onclick="shareWhatsAppModal()" style="padding:10px 12px;border:none;border-radius:10px;background:#25D366;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center" title="Share on WhatsApp">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        </button>
+      </div>
+
+    </div><!-- /modal-body -->
+  </div><!-- /modal-box -->
+</div><!-- /itemModal -->
+
+
+<script>
+/* ── Data ── */
+const ITEMS = {
+  su001: {
+    id:'SU-001', type:'Support', typeColor:'#378ADD', typePrio:'Normal',
+    title:'Share beneficiary list with SMC team',
+    raiser:{ name:'VETRI Palligal', abbr:'VP', color:'#6366f1' },
+    targets:[{ name:'SMC', color:'#ec4899' }],
+    assignedTo:'Priya Sundaram',
+    status:'open',
+    createdAt:'2026-06-10',
+    description:'VP unit needs to share the full beneficiary list from Q1 school visits with the SMC team for coordinated outreach. The list includes 342 students across 18 schools.',
+    sla:{ start:'2026-06-10', end:'2026-06-15', status:'breached', total:5, elapsed:8, remaining:0, overdue:3, pct:100 },
+    slaHistory:[
+      { by:'Rajan Kumar', at:'2026-06-10 09:00', oldStart:null, oldEnd:null, newStart:'2026-06-10', newEnd:'2026-06-15' }
+    ],
+    actionItems:[
+      { id:'AI-001', done:true,  text:'Export beneficiary records from Q1 database' },
+      { id:'AI-002', done:false, text:'Format list as per SMC template and share via portal' },
+    ],
+  },
+  rq002: {
+    id:'RQ-002', type:'Request', typeColor:'#7F77DD', typePrio:'High',
+    title:'Map overlapping school zones for joint planning',
+    raiser:{ name:'VETRI Palligal', abbr:'VP', color:'#6366f1' },
+    targets:[{ name:'SMC', color:'#ec4899' }],
+    assignedTo:null,
+    status:'pending',
+    createdAt:'2026-06-10',
+    description:'VP has identified 23 schools that fall under both VP and SMC jurisdiction. Requesting SMC to coordinate on a joint GIS mapping exercise to avoid duplication of efforts.',
+    sla:{ start:'2026-06-08', end:'2026-06-20', status:'warning', total:12, elapsed:10, remaining:2, overdue:0, pct:78 },
+    slaHistory:[],
+    actionItems:[
+      { id:'AI-003', done:false, text:'Prepare school zone boundary data in shapefile format' },
+      { id:'AI-004', done:false, text:'Schedule GIS coordination meeting with SMC GIS officer' },
+    ],
+  },
+  ne003: {
+    id:'NE-003', type:'Need', typeColor:'#1D9E75', typePrio:'Normal',
+    title:'Align reporting formats across VP and Career Guidance',
+    raiser:{ name:'VETRI Palligal', abbr:'VP', color:'#6366f1' },
+    targets:[{ name:'Career Guidance', color:'#f97316' }],
+    assignedTo:'Anand Selvam',
+    status:'open',
+    createdAt:'2026-06-05',
+    description:'VP and CG use different formats for monthly student progress reports. Requesting CG to adopt the standardised EMIS template for uniformity in district-level submissions.',
+    sla:{ start:'2026-06-05', end:'2026-06-30', status:'on_track', total:25, elapsed:13, remaining:12, overdue:0, pct:45 },
+    slaHistory:[],
+    actionItems:[
+      { id:'AI-005', done:true, text:'Share current CG report template with VP for review' },
+    ],
+  },
+  al004: {
+    id:'AL-004', type:'Alert', typeColor:'#E0A21C', typePrio:'High',
+    title:'Alert: Missing Q2 enrollment data from ACIS schools',
+    raiser:{ name:'VETRI Palligal', abbr:'VP', color:'#6366f1' },
+    targets:[{ name:'ACIS', color:'#14b8a6' }],
+    assignedTo:null,
+    status:'pending',
+    createdAt:'2026-06-12',
+    description:'ACIS-linked schools have not submitted Q2 enrollment data to the district EMIS portal. This is blocking VP\'s convergence dashboard update. Immediate attention required.',
+    sla:{ start:'2026-06-12', end:'2026-06-19', status:'warning', total:7, elapsed:6, remaining:1, overdue:0, pct:92 },
+    slaHistory:[],
+    actionItems:[],
+  },
+  fu005: {
+    id:'FU-005', type:'Fund', typeColor:'#16A085', typePrio:'Normal',
+    title:'Request budget allocation for joint field visits — NSNOP & Alumni',
+    raiser:{ name:'NSNOP', abbr:'NSNOP', color:'#22c55e' },
+    targets:[{ name:'Alumni', color:'#3b82f6' }],
+    assignedTo:'Rajesh Kumar',
+    status:'open',
+    createdAt:'2026-06-05',
+    description:'NSNOP is requesting ₹45,000 from the Alumni unit\'s convergence activity fund to cover transportation and documentation costs for 3 joint field visits to Tirunelveli cluster schools in July.',
+    sla:null,
+    slaHistory:[],
+    actionItems:[
+      { id:'AI-006', done:false, text:'Submit detailed cost breakdown to Alumni unit head' },
+      { id:'AI-007', done:false, text:'Get district-level approval for inter-unit fund transfer' },
+    ],
+  },
+  su006: {
+    id:'SU-006', type:'Support', typeColor:'#10b981', typePrio:'Normal',
+    title:'Submit Q1 student data to district office',
+    raiser:{ name:'VETRI Palligal', abbr:'VP', color:'#6366f1' },
+    targets:[{ name:'NSNOP', color:'#22c55e' }],
+    assignedTo:'Kavitha Murthy',
+    status:'closed',
+    createdAt:'2026-05-15',
+    description:'VP requested NSNOP support in collating and submitting Q1 student beneficiary data to the Tirunelveli district EMIS office. Completed on schedule.',
+    sla:{ start:'2026-05-15', end:'2026-05-31', status:'on_track', total:16, elapsed:16, remaining:0, overdue:0, pct:100 },
+    slaHistory:[],
+    actionItems:[
+      { id:'AI-008', done:true, text:'Compile data from 12 NSNOP-linked schools' },
+      { id:'AI-009', done:true, text:'Upload to district EMIS portal and get acknowledgement' },
+    ],
+  },
+  in007: {
+    id:'IN-007', type:'Infra', typeColor:'#10b981', typePrio:'Normal',
+    title:'Coordinate joint field visits for May',
+    raiser:{ name:'VETRI Palligal', abbr:'VP', color:'#6366f1' },
+    targets:[{ name:'NSNOP', color:'#22c55e' }],
+    assignedTo:null,
+    status:'closed',
+    createdAt:'2026-05-15',
+    description:'Coordinated 3 joint field visits between VP and NSNOP in May across Tenkasi, Tirunelveli and Nagercoil. All visits completed successfully.',
+    sla:null,
+    slaHistory:[],
+    actionItems:[
+      { id:'AI-010', done:true, text:'Fix schedule conflict for May 22 visit' },
+    ],
+  },
+};
+
+let currentItemKey = null;
+let assignEditOpen = false;
+let slaEditOpen = false;
+let aiCounter = 11;
+
+/* ── Status filter ── */
+function setStatusFilter(s, btn) {
+  document.querySelectorAll('#statusSeg button').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  const rows = document.querySelectorAll('.itemrow');
+  rows.forEach(row => {
+    if (s === 'all') { row.style.display = ''; return; }
+    const badge = row.querySelector('.stat-pill');
+    if (!badge) { row.style.display = 'none'; return; }
+    row.style.display = badge.classList.contains('sp-' + s) ? '' : 'none';
+  });
+}
+
+/* ── Create form helpers ── */
+const TYPES = {
+  support:   { code:'SU', color:'#378ADD' },
+  request:   { code:'RQ', color:'#7F77DD' },
+  alert:     { code:'AL', color:'#E0A21C' },
+  emergency: { code:'EM', color:'#D85A30' },
+  need:      { code:'NE', color:'#1D9E75' },
+  fund:      { code:'FU', color:'#16A085' },
+  infra:     { code:'IN', color:'#8E7CC3' },
+  school:    { code:'SC', color:'#D4537E' },
+  student:   { code:'ST', color:'#C0392B' },
+};
+
+function updateTypePreview() {
+  const sel = document.getElementById('fType');
+  const opt = sel.options[sel.selectedIndex];
+  const code = opt.getAttribute('data-code') || 'SU';
+  document.getElementById('idPreview').value = code + '-???';
+}
+
+function toggleUnit(pill) {
+  const on = pill.classList.toggle('on');
+  const color = pill.getAttribute('data-color');
+  if (on) {
+    pill.style.borderColor = color;
+    pill.style.background  = color + '18';
+    pill.style.color       = color;
+  } else {
+    pill.style.borderColor = 'var(--line)';
+    pill.style.background  = '#fff';
+    pill.style.color       = 'var(--ink2)';
+  }
+  const anyOn = document.querySelectorAll('.unit-pill.on').length > 0;
+  document.getElementById('assignSection').style.display = anyOn ? '' : 'none';
+  clearErr('errTargets');
+}
+
+function clearErr(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'none';
+}
+
+function computeSLAMetrics(start, end) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const s = new Date(start + 'T00:00:00');
+  const e = new Date(end   + 'T00:00:00');
+  const total    = Math.round((e - s) / 86400000);
+  if (total <= 0) return null;
+  const elapsed  = Math.max(0, Math.round((today - s) / 86400000));
+  const remaining= Math.max(0, Math.round((e - today) / 86400000));
+  const overdue  = today > e ? Math.round((today - e) / 86400000) : 0;
+  const pct      = Math.min(100, Math.round(elapsed / total * 100));
+  let status;
+  if (today < s)        status = 'not_started';
+  else if (today > e)   status = 'breached';
+  else if (remaining===0) status = 'due_today';
+  else if (pct >= 80)   status = 'warning';
+  else                  status = 'on_track';
+  return { total, elapsed, remaining, overdue, pct, status };
+}
+
+const SLA_PAL = {
+  not_started: { color:'#64748b', bg:'#f1f5f9', border:'#e2e8f0', bar:'#94a3b8', label:'Not started' },
+  on_track:    { color:'#166534', bg:'#dcfce7', border:'#86efac', bar:'#22c55e', label:'On track'    },
+  warning:     { color:'#92400e', bg:'#fef3c7', border:'#fbbf24', bar:'#f59e0b', label:'Warning'     },
+  due_today:   { color:'#b45309', bg:'#fef9c3', border:'#fcd34d', bar:'#eab308', label:'Due today'   },
+  breached:    { color:'#991b1b', bg:'#fef2f2', border:'#fca5a5', bar:'#ef4444', label:'Breached'    },
+};
+
+function renderSLACard(slaObj, startStr, endStr) {
+  if (!slaObj) return '<div style="font-size:13px;color:var(--ink3);font-style:italic">No SLA set</div>';
+  const pal = SLA_PAL[slaObj.status] ?? SLA_PAL.not_started;
+  const remainOrOverdue = slaObj.status === 'breached'
+    ? `<div class="sla-stat"><span class="sv" style="color:${pal.color}">${slaObj.overdue}d</span><span class="sl" style="color:${pal.color}">Overdue</span></div>`
+    : `<div class="sla-stat"><span class="sv">${slaObj.remaining}d</span><span class="sl" style="color:${pal.color}">Remaining</span></div>`;
+  return `
+    <div class="sla-card" style="background:${pal.bg};border:1px solid ${pal.border}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-weight:700;font-size:13px;color:${pal.color}">🎯 ${pal.label}</span>
+          <span style="font-size:11px;color:${pal.color};opacity:.8">${slaObj.pct}% elapsed</span>
+        </div>
+        <span style="font-size:11px;color:${pal.color}">${startStr} → ${endStr}</span>
+      </div>
+      <div style="height:6px;background:rgba(0,0,0,.08);border-radius:99px;overflow:hidden;margin-bottom:10px">
+        <div style="height:100%;border-radius:99px;width:${Math.min(100,slaObj.pct)}%;background:${pal.bar};transition:width .3s ease"></div>
+      </div>
+      <div class="sla-stats">
+        <div class="sla-stat"><span class="sv">${slaObj.total}d</span><span class="sl" style="color:${pal.color}">Total</span></div>
+        <div class="sla-stat"><span class="sv">${slaObj.elapsed}d</span><span class="sl" style="color:${pal.color}">Elapsed</span></div>
+        ${remainOrOverdue}
+      </div>
+    </div>`;
+}
+
+function updateSLAPreview() {
+  const s = document.getElementById('fSlaStart').value;
+  const e = document.getElementById('fSlaEnd').value;
+  const preview = document.getElementById('slaPreview');
+  if (s && e) {
+    const m = computeSLAMetrics(s, e);
+    preview.innerHTML = renderSLACard(m, s, e);
+    preview.style.display = '';
+  } else {
+    preview.style.display = 'none';
+  }
+}
+
+function createItem() {
+  const title = document.getElementById('fTitle').value.trim();
+  const targets = document.querySelectorAll('.unit-pill.on');
+  let valid = true;
+  if (!title) { document.getElementById('errTitle').style.display = ''; valid = false; }
+  if (!targets.length) { document.getElementById('errTargets').style.display = ''; valid = false; }
+  if (!valid) return;
+
+  const sel = document.getElementById('fType');
+  const code = sel.options[sel.selectedIndex].getAttribute('data-code');
+  const itemId = code + '-' + String(Math.floor(Math.random()*900)+100);
+
+  document.getElementById('waItemId').textContent = itemId + ' created';
+  document.getElementById('waBanner').classList.add('show');
+
+  // Reset form
+  document.getElementById('fTitle').value = '';
+  document.getElementById('fDesc').value = '';
+  document.getElementById('fSlaStart').value = '';
+  document.getElementById('fSlaEnd').value = '';
+  document.getElementById('fAssignTo').value = '';
+  document.getElementById('slaPreview').style.display = 'none';
+  document.querySelectorAll('.unit-pill.on').forEach(p => {
+    p.classList.remove('on');
+    p.style.borderColor = 'var(--line)';
+    p.style.background = '#fff';
+    p.style.color = 'var(--ink2)';
+  });
+  document.getElementById('assignSection').style.display = 'none';
+}
+
+function shareWhatsApp() {
+  const name = document.getElementById('waItemId').textContent.replace(' created','');
+  const msg = encodeURIComponent('📋 *MS-CMS Item: ' + name + '*\nType: Support | Priority: Normal\nStatus: OPEN');
+  window.open('https://wa.me/?text=' + msg, '_blank');
+}
+
+function emailDraft() {
+  const title = document.getElementById('fTitle').value || 'Untitled item';
+  const desc  = document.getElementById('fDesc').value;
+  const sub   = encodeURIComponent('[MS-CMS] — ' + title);
+  const body  = encodeURIComponent('TN EMIS — MS-CMS\n\n' + title + '\n\n' + desc);
+  window.open('mailto:?subject=' + sub + '&body=' + body);
+}
+
+/* ── Modal ── */
+function openModal(key) {
+  const item = ITEMS[key];
+  if (!item) return;
+  currentItemKey = key;
+  assignEditOpen = false;
+  slaEditOpen = false;
+
+  // Header
+  const idEl = document.getElementById('mItemId');
+  idEl.textContent = item.id;
+  idEl.style.background = item.typeColor;
+  document.getElementById('mTitle').textContent = item.title;
+
+  // Meta row
+  const spc = { open:'sp-open', pending:'sp-pending', closed:'sp-closed' };
+  document.getElementById('mMeta').innerHTML = `
+    <span class="stat-pill ${spc[item.status]||'sp-open'}">${item.status}</span>
+    <span style="font-size:13px;color:var(--ink3)">·</span>
+    <span style="font-size:13px;color:var(--ink2)">${item.type}</span>
+    <span style="font-size:13px;color:var(--ink3)">·</span>
+    <span style="font-size:13px;color:${item.typePrio==='Critical'?'var(--bad)':item.typePrio==='High'?'var(--warn)':'var(--ink2)'}">${item.typePrio} priority</span>
+    <span style="font-size:13px;color:var(--ink3)">·</span>
+    <span style="font-size:13px;color:var(--ink3)">raised ${item.createdAt}</span>
+  `;
+
+  // Raised by → to
+  let byHtml = `<span style="display:inline-flex;align-items:center;gap:5px;font-weight:600"><span class="dot" style="background:${item.raiser.color}"></span>${item.raiser.name}</span>`;
+  byHtml += '<span style="color:var(--ink3)">→</span>';
+  item.targets.forEach(t => {
+    byHtml += `<span style="display:inline-flex;align-items:center;gap:5px;color:var(--ink2)"><span class="dot" style="background:${t.color}"></span>${t.name}</span>`;
+  });
+  document.getElementById('mRaisedBy').innerHTML = byHtml;
+
+  // Assignment
+  renderAssignView(item);
+
+  // SLA
+  renderSLAView(item);
+
+  // Description
+  const ds = document.getElementById('mDetailsSection');
+  if (item.description) {
+    document.getElementById('mDetails').textContent = item.description;
+    ds.style.display = '';
+  } else { ds.style.display = 'none'; }
+
+  // Action items
+  renderAiList(item);
+
+  // Footer buttons
+  const btnClose = document.getElementById('mBtnClose');
+  const btnPend  = document.getElementById('mBtnPending');
+  if (item.status === 'closed') {
+    btnClose.style.display = 'none';
+    btnPend.textContent = 'Reopen';
+  } else {
+    btnClose.style.display = '';
+    btnPend.textContent = 'Mark ' + (item.status === 'pending' ? 'open' : 'pending');
+  }
+
+  document.getElementById('itemModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function renderAssignView(item) {
+  document.getElementById('mAssignEdit').style.display = 'none';
+  document.getElementById('mAssignView').style.display = '';
+  const btn = document.getElementById('mAssignBtn');
+  btn.textContent = item.assignedTo ? 'Reassign' : '+ Assign';
+  if (item.assignedTo) {
+    document.getElementById('mAssignView').innerHTML = `
+      <div class="assigned-box">
+        <span style="font-size:16px">👤</span>
+        <span style="font-weight:600;font-size:14px;color:#0c4a6e">${item.assignedTo}</span>
+      </div>`;
+  } else {
+    document.getElementById('mAssignView').innerHTML = '<div style="font-size:13px;color:var(--ink3);font-style:italic">Not assigned</div>';
+  }
+}
+
+function renderSLAView(item) {
+  document.getElementById('mSlaEdit').style.display = 'none';
+  document.getElementById('mSlaView').style.display = '';
+  const btn = document.getElementById('mSlaBtn');
+  if (item.sla) {
+    btn.textContent = 'Change SLA';
+    let html = renderSLACard(item.sla, item.sla.start, item.sla.end);
+    // SLA history
+    if (item.slaHistory && item.slaHistory.length) {
+      html += '<div style="margin-top:12px"><div style="font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px">SLA Change History</div>';
+      item.slaHistory.forEach(h => {
+        html += `<div class="sla-hist-row" style="margin-bottom:6px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+            <span style="font-weight:600;color:var(--ink)">${h.by}</span>
+            <span style="color:var(--ink3)">${h.at}</span>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:99px;font-size:11px">${h.oldStart||'—'} → ${h.oldEnd||'—'}</span>
+            <span style="color:var(--ink3)">→</span>
+            <span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:99px;font-size:11px">${h.newStart||'—'} → ${h.newEnd||'—'}</span>
+          </div>
+        </div>`;
+      });
+      html += '</div>';
+    }
+    document.getElementById('mSlaView').innerHTML = html;
+  } else {
+    btn.textContent = '+ Set SLA';
+    document.getElementById('mSlaView').innerHTML = '<div style="font-size:13px;color:var(--ink3);font-style:italic">No SLA set</div>';
+  }
+}
+
+function renderAiList(item) {
+  const list = document.getElementById('mAiList');
+  if (!item.actionItems.length) {
+    list.innerHTML = '<div style="font-size:13px;color:var(--ink3);font-style:italic">No action items yet.</div>';
+    return;
+  }
+  list.innerHTML = item.actionItems.map((ai, idx) => `
+    <div class="ai-row">
+      <span class="ai-check ${ai.done?'done':''}" onclick="toggleAI('${currentItemKey}',${idx})"></span>
+      <span class="ai-id">${ai.id}</span>
+      <span style="color:${ai.done?'var(--ink3)':'var(--ink)'};text-decoration:${ai.done?'line-through':'none'}">${ai.text}</span>
+    </div>`).join('');
+}
+
+function toggleAssign() {
+  assignEditOpen = !assignEditOpen;
+  document.getElementById('mAssignEdit').style.display = assignEditOpen ? '' : 'none';
+  document.getElementById('mAssignView').style.display = assignEditOpen ? 'none' : '';
+}
+
+function saveAssign() {
+  if (!currentItemKey) return;
+  const sel = document.getElementById('mAssignSelect');
+  const names = {priya:'Priya Sundaram',anand:'Anand Selvam',meera:'Meera Krishnan',sakthi:'Sakthi Murugan',rajesh:'Rajesh Kumar',kavitha:'Kavitha Murthy'};
+  ITEMS[currentItemKey].assignedTo = names[sel.value] || null;
+  renderAssignView(ITEMS[currentItemKey]);
+  assignEditOpen = false;
+}
+
+function toggleSlaEdit() {
+  slaEditOpen = !slaEditOpen;
+  document.getElementById('mSlaEdit').style.display = slaEditOpen ? '' : 'none';
+  document.getElementById('mSlaView').style.display = slaEditOpen ? 'none' : '';
+  if (slaEditOpen) {
+    const sla = ITEMS[currentItemKey].sla;
+    document.getElementById('mSlaStart').value = sla ? sla.start : '';
+    document.getElementById('mSlaEnd').value   = sla ? sla.end   : '';
+  }
+}
+
+function updateModalSLAPreview() {
+  const s = document.getElementById('mSlaStart').value;
+  const e = document.getElementById('mSlaEnd').value;
+  const prev = document.getElementById('mSlaEditPreview');
+  if (s && e) {
+    const m = computeSLAMetrics(s, e);
+    prev.innerHTML = renderSLACard(m, s, e);
+  } else { prev.innerHTML = ''; }
+}
+
+function saveSLA() {
+  if (!currentItemKey) return;
+  const s = document.getElementById('mSlaStart').value;
+  const e = document.getElementById('mSlaEnd').value;
+  const item = ITEMS[currentItemKey];
+  if (s && e) {
+    const m = computeSLAMetrics(s, e);
+    if (item.sla) {
+      // record history
+      item.slaHistory.push({ by:'Admin', at:new Date().toISOString().slice(0,16).replace('T',' '), oldStart:item.sla.start, oldEnd:item.sla.end, newStart:s, newEnd:e });
+    }
+    item.sla = { start:s, end:e, ...m };
+  } else {
+    item.sla = null;
+  }
+  slaEditOpen = false;
+  renderSLAView(item);
+}
+
+function toggleAI(key, idx) {
+  ITEMS[key].actionItems[idx].done = !ITEMS[key].actionItems[idx].done;
+  renderAiList(ITEMS[key]);
+}
+
+function addActionItem() {
+  if (!currentItemKey) return;
+  const text = document.getElementById('mAiText').value.trim();
+  if (!text) return;
+  const ai = { id:`AI-0${aiCounter++}`, done:false, text };
+  ITEMS[currentItemKey].actionItems.push(ai);
+  renderAiList(ITEMS[currentItemKey]);
+  document.getElementById('mAiText').value = '';
+}
+
+function changeStatus(newStatus) {
+  if (!currentItemKey) return;
+  ITEMS[currentItemKey].status = newStatus;
+  // Update modal meta
+  const spc = { open:'sp-open', pending:'sp-pending', closed:'sp-closed' };
+  const badge = document.querySelector('#mMeta .stat-pill');
+  if (badge) {
+    badge.className = 'stat-pill ' + (spc[newStatus]||'sp-open');
+    badge.textContent = newStatus;
+  }
+  const btnClose = document.getElementById('mBtnClose');
+  const btnPend  = document.getElementById('mBtnPending');
+  if (newStatus === 'closed') {
+    btnClose.style.display = 'none';
+    btnPend.textContent = 'Reopen';
+  } else {
+    btnClose.style.display = '';
+    btnPend.textContent = 'Mark ' + (newStatus === 'pending' ? 'open' : 'pending');
+  }
+}
+
+function emailItem() {
+  if (!currentItemKey) return;
+  const item = ITEMS[currentItemKey];
+  const sub  = encodeURIComponent(`[MS-CMS] ${item.id} — ${item.title}`);
+  const body = encodeURIComponent(`TN EMIS — MS-CMS\nType: ${item.type}\nItem: ${item.id}\nRaised by: ${item.raiser.name}\nTo: ${item.targets.map(t=>t.name).join(', ')}\n\n${item.description||''}`);
+  window.open(`mailto:?subject=${sub}&body=${body}`);
+}
+
+function shareWhatsAppModal() {
+  if (!currentItemKey) return;
+  const item = ITEMS[currentItemKey];
+  const tg   = item.targets.map(t => t.name).join(', ');
+  const msg  = encodeURIComponent(`📋 *MS-CMS Item: ${item.id}*\nType: ${item.type} | Priority: ${item.typePrio}\nTitle: ${item.title}\nRaised by: ${item.raiser.name} → ${tg}${item.description?'\n\n'+item.description:''}\n\nStatus: ${item.status.toUpperCase()}`);
+  window.open('https://wa.me/?text=' + msg, '_blank');
+}
+
+function closeModal() {
+  document.getElementById('itemModal').classList.remove('open');
+  document.body.style.overflow = '';
+  currentItemKey = null;
+}
+
+function overlayClick(e, id) {
+  if (e.target === document.getElementById(id)) closeModal();
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+</script>
+</body>
+</html>

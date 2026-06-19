@@ -137,7 +137,8 @@
       "Bash(USE_SQLITE=True python manage.py migrate meetings)",
       "Bash(ls:*)",
       "Bash(USE_SQLITE=True python manage.py migrate taskboard)",
-      "Bash(USE_SQLITE=True python manage.py runserver)"
+      "Bash(USE_SQLITE=True python manage.py runserver)",
+      "Bash(mysql:*)"
     ]
   }
 }

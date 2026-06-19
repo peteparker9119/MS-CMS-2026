@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gantt Chart — CMS</title>
+<link rel="stylesheet" href="_layout.css">
+<style>
+/* Gantt chart */
+.gantt-wrap { background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden }
+.gantt-inner { overflow-x:auto }
+.gantt-inner::-webkit-scrollbar { height:6px }
+.gantt-inner::-webkit-scrollbar-thumb { background:var(--line); border-radius:3px }
+
+.gantt-header { display:flex; border-bottom:1px solid var(--line); position:sticky; top:0; z-index:2; background:#fff }
+.gantt-label-col { width:200px; min-width:200px; padding:8px 14px; font-size:11px; color:var(--ink3); border-right:1px solid var(--line); flex-shrink:0 }
+.gantt-months { flex:1; display:flex; min-width:600px }
+.gantt-month { flex:1; padding:8px 4px; font-size:10px; color:var(--ink3); text-align:center; border-right:1px solid var(--line) }
+.gantt-month:last-child { border-right:none }
+
+.gantt-row { display:flex; border-bottom:1px solid var(--line); min-height:36px }
+.gantt-row:last-child { border-bottom:none }
+.gantt-row-label {
+  width:200px; min-width:200px; padding:8px 14px; font-size:12px; color:var(--ink);
+  border-right:1px solid var(--line); display:flex; align-items:center; gap:6px; flex-shrink:0;
+}
+.gantt-row-label span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.gantt-bar-area { flex:1; position:relative; padding:6px 0; min-width:600px }
+
+/* Buttons */
+.btn-dark { padding:7px 14px; background:var(--ink); color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600 }
+.btn-dark:hover { opacity:.84 }
+.btn-outline { padding:6px 14px; border:1.5px solid var(--line); border-radius:8px; background:#fff; font-size:13px; font-weight:600; cursor:pointer; color:var(--ink2) }
+
+/* Modal */
+.modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;display:flex;align-items:center;justify-content:center }
+.modal-box { background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.25);width:640px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden }
+.modal-head { padding:20px 24px 16px;border-bottom:1px solid var(--line);font-weight:700;font-size:18px;color:var(--ink) }
+.modal-body { padding:22px 24px;overflow-y:auto;flex:1 }
+.modal-foot { padding:14px 24px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end }
+.mf { margin-bottom:14px }
+.mf label { display:block;font-size:11px;font-weight:600;color:var(--ink3);margin-bottom:5px }
+.mf input, .mf select, .mf textarea { width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;outline:none;font-family:inherit;color:var(--ink) }
+.mf input:focus,.mf select:focus,.mf textarea:focus { border-color:var(--accent) }
+.mf textarea { resize:vertical }
+.row2 { display:grid;grid-template-columns:1fr 1fr;gap:10px }
+.row3 { display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px }
+
+/* Tooltip */
+.gantt-tooltip {
+  position:fixed; background:var(--ink); color:#fff; padding:12px 16px;
+  border-radius:8px; z-index:9999; font-size:12px; max-width:220px;
+  box-shadow:0 4px 20px rgba(0,0,0,.3); cursor:pointer; pointer-events:all;
+}
+
+/* Today line */
+.today-line { position:absolute; top:0; bottom:0; width:2px; background:#ef4444; z-index:1; opacity:.6 }
+.today-dot { position:absolute; top:-3px; left:-4px; width:10px; height:10px; border-radius:50%; background:#ef4444 }
+
+/* Color swatches */
+.color-swatch { width:24px; height:24px; border-radius:50%; cursor:pointer; border:2px solid transparent }
+.color-swatch.on { border-color:var(--ink) !important }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-brand-icon">C</div>
+    <div class="sb-brand-text"><div class="title">CMS</div><div class="sub">Convergence</div></div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-section">Main</div>
+    <a href="dashboard.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg><span class="label">Dashboard</span></a>
+    <a href="planner.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="2.5" width="13" height="12" rx="2"/><path d="M5 1v3M11 1v3M1.5 6.5h13M5 10.5l2 2 4-4"/></svg><span class="label">Planner</span></a>
+    <a href="meetings.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="2.5" width="13" height="12" rx="2"/><path d="M5 1v3M11 1v3M1.5 6.5h13"/></svg><span class="label">Meetings</span></a>
+    <a href="items.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3.5L10.5 10"/></svg><span class="label">Item Tracker</span></a>
+    <a href="documents.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><path d="M9.5 1H3.5A1.5 1.5 0 0 0 2 2.5v11A1.5 1.5 0 0 0 3.5 15h9A1.5 1.5 0 0 0 14 13.5V5.5L9.5 1z"/><path d="M9 1v5h5M5 9h6M5 12h4"/></svg><span class="label">D.O. Letters</span></a>
+    <a href="worklog.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="1.5" width="13" height="13" rx="2"/><path d="M5 8h6M5 5h6M5 11h3"/></svg><span class="label">Daily Work</span></a>
+    <a href="reviews.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><polyline points="1,10 4,6 7,9 10,4 15,7"/></svg><span class="label">Team Activity</span></a>
+    <a href="task-board.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1" y="1" width="14" height="14" rx="2"/><line x1="1" y1="6" x2="15" y2="6"/><line x1="6" y1="6" x2="6" y2="15"/></svg><span class="label">Task Board</span></a>
+    <a href="minutes.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="2.5" y="1" width="11" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg><span class="label">Minutes</span></a>
+    <a href="admin-panel.html" class="sb-item"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M2.93 2.93l1.41 1.41M11.66 11.66l1.41 1.41M2.93 13.07l1.41-1.41M11.66 4.34l1.41-1.41"/></svg><span class="label">Admin Panel</span></a>
+  </nav>
+</div>
+
+<!-- Header -->
+<div class="header">
+  <div class="page-title"><div class="name">Gantt Chart</div><div class="sub">Academic year project timeline</div></div>
+  <div class="header-actions">
+    <button class="hbtn"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1a5 5 0 0 1 5 5c0 3 1.5 4 1.5 4h-13S3 9 3 6a5 5 0 0 1 5-5zM6 13a2 2 0 0 0 4 0"/></svg></button>
+    <button class="user-btn"><span class="u-avatar" style="background:#1e2333">AD</span><span class="name">Admin</span><span class="caret">▾</span></button>
+  </div>
+</div>
+
+<div class="app"><div class="wrap">
+
+  <!-- Filter bar -->
+  <div class="filterbar">
+    <div class="period"><div class="l">Academic Year Gantt</div><div class="v">Project timeline overview</div></div>
+    <div class="seg" id="year-seg"></div>
+  </div>
+
+  <!-- Add task button -->
+  <div style="margin-bottom:16px">
+    <button class="btn-dark" onclick="openModal()">+ Add Task</button>
+  </div>
+
+  <!-- Gantt chart -->
+  <div class="gantt-wrap">
+    <div class="gantt-inner">
+      <div id="gantt-chart" style="min-width:800px"></div>
+    </div>
+  </div>
+
+</div></div>
+
+<!-- Tooltip -->
+<div class="gantt-tooltip" id="gantt-tooltip" style="display:none" onclick="closeTooltip()"></div>
+
+<!-- Create Task Modal -->
+<div class="modal-overlay" id="task-modal" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box">
+    <div class="modal-head">Add Gantt Task</div>
+    <div class="modal-body">
+      <div class="mf"><label>Title</label><input type="text" id="c-title" placeholder="Task title"></div>
+      <div class="row3">
+        <div class="mf">
+          <label>Unit</label>
+          <select id="c-unit">
+            <option value="">— Any —</option>
+            <option value="vp">VETRI Palligal (VP)</option>
+            <option value="smc">SMC</option>
+            <option value="cg">Career Guidance</option>
+            <option value="acis">ACIS</option>
+            <option value="nsnop">NSNOP</option>
+            <option value="alumni">Alumni</option>
+            <option value="manarkeni">Manarkeni</option>
+          </select>
+        </div>
+        <div class="mf"><label>Start Date</label><input type="date" id="c-start"></div>
+        <div class="mf"><label>End Date</label><input type="date" id="c-end"></div>
+      </div>
+      <div class="row3">
+        <div class="mf"><label>Progress (%)</label><input type="number" id="c-prog" min="0" max="100" value="0"></div>
+        <div class="mf">
+          <label>Color</label>
+          <div style="display:flex;gap:8px;margin-top:6px" id="color-swatches"></div>
+        </div>
+        <div class="mf" style="display:flex;align-items:flex-end;padding-bottom:4px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+            <input type="checkbox" id="c-mile"> Milestone ◆
+          </label>
+        </div>
+      </div>
+      <div class="mf"><label>Description</label><textarea id="c-desc" rows="2" placeholder="Optional details…"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn-dark" onclick="createTask()">Create</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" style="position:fixed;bottom:24px;right:24px;background:#1e293b;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:500;opacity:0;transition:opacity .25s;z-index:9999;pointer-events:none"></div>
+
+<script>
+const MONTHS = ['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
+const PRESET_COLORS = ['#378ADD','#1D9E75','#E0A21C','#D85A30','#8C6BE0'];
+
+let selectedColor = PRESET_COLORS[0];
+let selYear = currentAY();
+let tooltip = null;
+
+function currentAY() {
+  const now = new Date();
+  const m = now.getMonth(), y = now.getFullYear();
+  return m >= 3 ? `${y}-${y+1}` : `${y-1}-${y}`;
+}
+
+function academicYearFromDate(dateStr) {
+  const d = new Date(dateStr);
+  const m = d.getMonth(), y = d.getFullYear();
+  return m >= 3 ? `${y}-${y+1}` : `${y-1}-${y}`;
+}
+
+function ayStart(ay) { const y = parseInt(ay); return new Date(y, 3, 1); }
+function ayEnd(ay)   { const y = parseInt(ay.split('-')[1]); return new Date(y, 2, 31); }
+
+function pct(dateStr, ay) {
+  const start = ayStart(ay).getTime();
+  const end   = ayEnd(ay).getTime();
+  const d     = new Date(dateStr).getTime();
+  return Math.min(100, Math.max(0, ((d - start) / (end - start)) * 100));
+}
+
+function todayPct(ay) { return pct(new Date().toISOString().slice(0,10), ay); }
+
+let TASKS = [
+  { id:1, title:'VP-SMC Convergence Plan', unit:'vp', start_date:'2026-04-01', end_date:'2026-07-31', progress:60, milestone:false, color:'#378ADD', description:'Q1 convergence planning and execution', parent:null },
+  { id:2, title:'School Infrastructure Survey', unit:'smc', start_date:'2026-04-15', end_date:'2026-05-31', progress:100, milestone:false, color:'#1D9E75', description:'Survey across 45 government schools', parent:1 },
+  { id:3, title:'ACIS Data Migration', unit:'acis', start_date:'2026-05-01', end_date:'2026-08-31', progress:35, milestone:false, color:'#8C6BE0', description:'Migrate legacy student data to EMIS', parent:null },
+  { id:4, title:'Career Guidance Workshops', unit:'cg', start_date:'2026-06-01', end_date:'2026-09-30', progress:20, milestone:false, color:'#E0A21C', description:'Monthly workshops across blocks', parent:null },
+  { id:5, title:'NSNOP Camp Milestone', unit:'nsnop', start_date:'2026-08-15', end_date:'2026-08-15', progress:0, milestone:true, color:'#D85A30', description:'National School Safety Program camp', parent:null },
+  { id:6, title:'Annual Alumni Meet', unit:'alumni', start_date:'2026-11-01', end_date:'2026-11-30', progress:0, milestone:false, color:'#378ADD', description:'Annual convergence unit alumni meet', parent:null },
+  { id:7, title:'Manarkeni Block Visit', unit:'manarkeni', start_date:'2026-07-01', end_date:'2026-07-15', progress:0, milestone:false, color:'#E0A21C', description:'Field visit to Manarkeni block schools', parent:4 },
+];
+let nextTaskId = 20;
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.style.opacity = '1';
+  setTimeout(() => el.style.opacity = '0', 2500);
+}
+
+function getYears() {
+  const set = new Set([currentAY()]);
+  TASKS.forEach(t => {
+    if (t.start_date) set.add(academicYearFromDate(t.start_date));
+    if (t.end_date)   set.add(academicYearFromDate(t.end_date));
+  });
+  return [...set].sort().reverse();
+}
+
+function renderYearSeg() {
+  const years = getYears();
+  document.getElementById('year-seg').innerHTML = years.map(y =>
+    `<button class="${y === selYear ? 'on' : ''}" onclick="setYear('${y}')">${y}</button>`
+  ).join('');
+}
+
+function setYear(y) {
+  selYear = y;
+  renderYearSeg();
+  renderGantt();
+}
+
+function getGrouped() {
+  const filtered = TASKS.filter(t => {
+    const ay = t.start_date ? academicYearFromDate(t.start_date) : null;
+    return ay === selYear || (t.end_date && academicYearFromDate(t.end_date) === selYear);
+  });
+  const parents = filtered.filter(t => !t.parent);
+  const result = [];
+  parents.forEach(p => {
+    result.push({ ...p, indent:0 });
+    filtered.filter(c => c.parent === p.id).forEach(c => result.push({ ...c, indent:1 }));
+  });
+  filtered.filter(t => t.parent && !filtered.find(p => p.id === t.parent))
+    .forEach(t => result.push({ ...t, indent:0 }));
+  return result;
+}
+
+function renderGantt() {
+  const grouped = getGrouped();
+  const todayP  = todayPct(selYear);
+
+  const headerHtml = `
+    <div class="gantt-header">
+      <div class="gantt-label-col">Task</div>
+      <div class="gantt-months">
+        ${MONTHS.map((m, i) => `<div class="gantt-month" style="${i===11?'border-right:none':''}">${m}</div>`).join('')}
+      </div>
+      <div style="width:32px;min-width:32px"></div>
+    </div>`;
+
+  if (!grouped.length) {
+    document.getElementById('gantt-chart').innerHTML = headerHtml +
+      `<div style="padding:32px;text-align:center;font-size:13px;color:var(--ink3)">No tasks for ${selYear}.</div>`;
+    return;
+  }
+
+  const rowsHtml = grouped.map((task, idx) => {
+    const left  = pct(task.start_date, selYear);
+    const right = pct(task.end_date, selYear);
+    const width = Math.max(0.5, right - left);
+    const barColor = task.color ?? PRESET_COLORS[idx % PRESET_COLORS.length];
+
+    const barHtml = task.milestone
+      ? `<div title="${task.title}" onclick="showTooltip(event,${task.id})"
+          style="position:absolute;left:${right}%;top:50%;transform:translate(-50%,-50%) rotate(45deg);width:14px;height:14px;background:${barColor};cursor:pointer"></div>`
+      : `<div onclick="showTooltip(event,${task.id})"
+          style="position:absolute;left:${left}%;width:${width}%;top:6px;bottom:6px;background:${barColor};border-radius:4px;overflow:hidden;cursor:pointer;opacity:.9">
+          ${task.progress > 0 ? `<div style="width:${task.progress}%;height:100%;background:rgba(0,0,0,.2)"></div>` : ''}
+        </div>`;
+
+    const todayLineHtml = todayP >= 0 && todayP <= 100
+      ? `<div class="today-line" style="left:${todayP}%"><div class="today-dot"></div></div>`
+      : '';
+
+    return `
+      <div class="gantt-row">
+        <div class="gantt-row-label" style="padding-left:${14 + task.indent * 16}px">
+          ${task.milestone ? `<span style="color:${barColor};flex-shrink:0">◆</span>` : ''}
+          <span>${task.title}</span>
+        </div>
+        <div class="gantt-bar-area">
+          ${todayLineHtml}
+          ${barHtml}
+        </div>
+        <div style="width:32px;min-width:32px;display:flex;align-items:center;justify-content:center">
+          <button onclick="deleteTask(${task.id})" style="background:none;border:none;cursor:pointer;color:var(--ink3);font-size:14px;padding:4px" title="Delete">×</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('gantt-chart').innerHTML = headerHtml + rowsHtml;
+}
+
+function showTooltip(e, id) {
+  const task = TASKS.find(t => t.id === id);
+  if (!task) return;
+  const el = document.getElementById('gantt-tooltip');
+  const x = Math.min(e.clientX + 12, window.innerWidth - 240);
+  const y = e.clientY + 12;
+  el.style.left = x + 'px';
+  el.style.top  = y + 'px';
+  el.innerHTML = `
+    <div style="font-weight:700;margin-bottom:6px;font-size:13px">${task.title}</div>
+    <div style="opacity:.7;margin-bottom:3px">${task.start_date} → ${task.end_date}</div>
+    ${task.progress !== undefined ? `<div>Progress: ${task.progress}%</div>` : ''}
+    ${task.description ? `<div style="margin-top:6px;opacity:.8">${task.description}</div>` : ''}
+    <div style="margin-top:8px;font-size:10px;opacity:.5">Click to close</div>
+  `;
+  el.style.display = 'block';
+}
+
+function closeTooltip() {
+  document.getElementById('gantt-tooltip').style.display = 'none';
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#gantt-tooltip') && !e.target.closest('.gantt-bar-area')) {
+    closeTooltip();
+  }
+});
+
+function deleteTask(id) {
+  if (!confirm('Delete this task?')) return;
+  TASKS = TASKS.filter(t => t.id !== id);
+  renderYearSeg(); renderGantt(); toast('Deleted');
+}
+
+/* ── Modal ── */
+function renderColorSwatches() {
+  document.getElementById('color-swatches').innerHTML = PRESET_COLORS.map(c => `
+    <button type="button" class="color-swatch ${selectedColor === c ? 'on' : ''}"
+      style="background:${c};border-color:${selectedColor === c ? 'var(--ink)' : 'transparent'}"
+      onclick="selectColor('${c}')"></button>
+  `).join('');
+}
+
+function selectColor(c) {
+  selectedColor = c;
+  renderColorSwatches();
+}
+
+function openModal() {
+  selectedColor = PRESET_COLORS[0];
+  document.getElementById('c-title').value = '';
+  document.getElementById('c-unit').value  = '';
+  document.getElementById('c-start').value = '';
+  document.getElementById('c-end').value   = '';
+  document.getElementById('c-prog').value  = '0';
+  document.getElementById('c-mile').checked = false;
+  document.getElementById('c-desc').value  = '';
+  renderColorSwatches();
+  document.getElementById('task-modal').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('task-modal').style.display = 'none';
+}
+
+function createTask() {
+  const title = document.getElementById('c-title').value.trim();
+  const start = document.getElementById('c-start').value;
+  const end   = document.getElementById('c-end').value;
+  if (!title) { toast('Enter a title'); return; }
+  if (!start || !end) { toast('Set start and end dates'); return; }
+  TASKS.push({
+    id: nextTaskId++, title,
+    unit: document.getElementById('c-unit').value || null,
+    start_date: start, end_date: end,
+    progress: +(document.getElementById('c-prog').value) || 0,
+    milestone: document.getElementById('c-mile').checked,
+    color: selectedColor,
+    description: document.getElementById('c-desc').value.trim(),
+    parent: null,
+  });
+  closeModal();
+  renderYearSeg(); renderGantt();
+  toast('Task created');
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+/* ── Init ── */
+renderYearSeg();
+renderGantt();
+</script>
+</body>
+</html>

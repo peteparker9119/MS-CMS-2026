@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Planner — CMS Convergence</title>
+<link rel="stylesheet" href="_layout.css">
+<style>
+/* ── GCal font stack ── */
+body { font-family:'Google Sans',Roboto,'Inter',system-ui,sans-serif }
+
+/* ── Override app padding for full-height planner ── */
+.planner-layout {
+  display:flex; flex-direction:column;
+  height:calc(100vh - 57px); /* below fixed header */
+  overflow:hidden;
+}
+
+/* ── Top toolbar (GCal-style) ── */
+.gcal-toolbar {
+  display:flex; align-items:center; gap:10px; padding:10px 20px;
+  border-bottom:1px solid #e8eaed; background:#fff;
+  flex-shrink:0; flex-wrap:wrap; z-index:10;
+}
+.gcal-toolbar .brand { font-size:20px; font-weight:400; color:#5f6368; letter-spacing:-.5px }
+.gcal-btn {
+  border:1px solid #dadce0; border-radius:6px; padding:6px 16px;
+  font-size:14px; font-weight:500; cursor:pointer; background:#fff; color:#3c4043;
+  transition:.12s; white-space:nowrap;
+}
+.gcal-btn:hover { background:#f8f9fa }
+.gcal-nav { display:inline-flex; border:1px solid #dadce0; border-radius:6px; overflow:hidden }
+.gcal-nav button {
+  border:none; border-right:1px solid #dadce0; background:#fff;
+  width:36px; height:34px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  color:#5f6368; transition:.12s;
+}
+.gcal-nav button:last-child { border-right:none }
+.gcal-nav button:hover { background:#f8f9fa }
+.week-label { font-size:18px; font-weight:400; color:#3c4043; letter-spacing:-.01em; min-width:200px }
+.new-mtg-btn {
+  border:none; border-radius:20px; padding:8px 20px; font-size:14px;
+  font-weight:500; cursor:pointer; background:#1a73e8; color:#fff;
+  display:flex; align-items:center; gap:7px; flex-shrink:0;
+  box-shadow:0 1px 3px rgba(0,0,0,.2); transition:.12s;
+}
+.new-mtg-btn:hover { background:#1765cc; box-shadow:0 2px 6px rgba(0,0,0,.25) }
+
+/* ── Body: sidebar + week grid ── */
+.gcal-body { display:flex; flex:1; overflow:hidden }
+
+/* ── Left sidebar ── */
+.gcal-sidebar {
+  width:268px; flex-shrink:0; border-right:1px solid #e8eaed;
+  background:#fff; overflow-y:auto; padding:16px 16px 24px;
+}
+
+/* ── Mini calendar ── */
+.mini-cal-hdr { display:flex; align-items:center; justify-content:space-between; padding:4px 2px 8px }
+.mini-cal-hdr .mth { font-size:14px; font-weight:500; color:#3c4043 }
+.mini-nav { display:flex; gap:2px }
+.mini-nav button {
+  border:0; background:none; cursor:pointer; width:30px; height:30px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; color:#5f6368; font-size:18px; font-weight:300;
+}
+.mini-nav button:hover { background:#f1f3f4 }
+.mini-dow { display:grid; grid-template-columns:repeat(7,1fr); margin-bottom:4px }
+.mini-dow span { font-size:11px; color:#70757a; text-align:center; padding:3px 0; font-weight:500; letter-spacing:.3px }
+.mini-days { display:grid; grid-template-columns:repeat(7,1fr) }
+.mini-day {
+  height:32px; display:flex; align-items:center; justify-content:center;
+  cursor:pointer; position:relative; transition:background .12s;
+}
+.mini-day:hover .mini-inner { background:#f1f3f4 }
+.mini-inner {
+  width:28px; height:28px; border-radius:50%; display:flex; align-items:center;
+  justify-content:center; flex-direction:column; font-size:12px; line-height:1;
+  font-weight:400; color:#3c4043; position:relative;
+}
+.mini-inner.today-num { background:#1a73e8 !important; color:#fff; font-weight:700 }
+.mini-inner.other-num { color:#bdc1c6 }
+.mini-inner.in-week   { /* handled by band */ }
+.mini-day.in-week { background:#e8f0fe }
+.mini-day.band-l  { border-radius:50% 0 0 50% !important }
+.mini-day.band-r  { border-radius:0 50% 50% 0 !important }
+.mini-day.band-m  { border-radius:0 !important }
+.mini-dot {
+  width:4px; height:4px; border-radius:50%; position:absolute; bottom:1px; left:50%;
+  transform:translateX(-50%); background:#70757a;
+}
+.mini-dot.in-week-dot { background:#1a73e8 }
+
+/* ── Divider ── */
+.sidebar-divider { height:1px; background:#e8eaed; margin:16px -8px }
+
+/* ── Upcoming list ── */
+.upc-header { font-size:11px; font-weight:600; color:#5f6368; text-transform:uppercase; letter-spacing:.8px; padding:4px 4px 6px }
+.upc-item {
+  display:flex; gap:10px; align-items:flex-start; padding:8px 6px; border-radius:10px; cursor:pointer; transition:.12s;
+}
+.upc-item:hover { background:#f1f3f4 }
+.upc-date-badge {
+  flex-shrink:0; width:36px; text-align:center; background:#f8f9fa; border-radius:8px; padding:4px 0;
+}
+.upc-date-badge.today-badge { background:#e8f0fe }
+.upc-date-badge .mo { font-size:9px; text-transform:uppercase; color:#70757a; letter-spacing:.5px; font-weight:600 }
+.upc-date-badge.today-badge .mo { color:#1a73e8 }
+.upc-date-badge .dy { font-size:17px; font-weight:500; color:#3c4043; line-height:1.2 }
+.upc-date-badge.today-badge .dy { color:#1a73e8 }
+.upc-info { flex:1; min-width:0; padding-top:1px }
+.upc-title { font-size:12px; font-weight:500; color:#3c4043; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.upc-sub   { display:flex; align-items:center; gap:5px; margin-top:3px }
+.upc-time  { font-size:11px; color:#80868b; margin-top:2px }
+
+/* ── Week grid ── */
+.week-grid { flex:1; min-width:0; overflow:hidden; display:flex; flex-direction:column }
+
+/* Time column + day columns */
+.week-header {
+  display:grid; flex-shrink:0;
+  border-bottom:1px solid #e8eaed; background:#fff;
+}
+.week-header-cell {
+  padding:8px 4px 6px; text-align:center; border-left:1px solid #e8eaed;
+}
+.week-header-cell:first-child { border-left:none }
+.week-dow { font-size:11px; font-weight:500; color:#70757a; text-transform:uppercase; letter-spacing:.5px }
+.week-daynum {
+  width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:22px; font-weight:400; color:#3c4043; margin:3px auto 0; cursor:pointer; transition:.12s;
+}
+.week-daynum:hover { background:#f1f3f4 }
+.week-daynum.today { background:#1a73e8; color:#fff; font-weight:500 }
+
+.week-body { flex:1; overflow-y:auto; position:relative }
+.week-scroll { position:relative; display:grid }
+
+.time-col { font-size:10px; color:#70757a; text-align:right; padding-right:8px; position:relative }
+.time-label {
+  position:absolute; right:8px; font-size:10px; color:#70757a;
+  transform:translateY(-50%); white-space:nowrap; letter-spacing:.3px;
+}
+
+.day-col {
+  border-left:1px solid #e8eaed; position:relative; cursor:pointer;
+}
+.day-col:hover { background:rgba(26,115,232,.02) }
+
+/* Hour lines */
+.hour-line {
+  position:absolute; left:0; right:0; border-top:1px solid #e8eaed;
+  pointer-events:none;
+}
+
+/* Now indicator */
+.now-line {
+  position:absolute; left:0; right:0; height:2px; background:#1a73e8; z-index:3; pointer-events:none;
+}
+.now-line::before {
+  content:''; width:10px; height:10px; border-radius:50%; background:#1a73e8;
+  position:absolute; left:-5px; top:-4px;
+}
+
+/* ── Event blocks ── */
+.ev-block {
+  position:absolute; border-radius:5px; padding:3px 6px;
+  font-size:11px; font-weight:500; overflow:hidden; cursor:pointer;
+  box-shadow:0 1px 3px rgba(0,0,0,.12); transition:.12s; z-index:2;
+  display:flex; flex-direction:column; gap:1px;
+}
+.ev-block:hover { filter:brightness(.93); box-shadow:0 2px 6px rgba(0,0,0,.18) }
+.ev-title { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.ev-time  { opacity:.8; font-size:10px; white-space:nowrap }
+
+/* ── Event/Schedule modal ── */
+.modal-overlay {
+  display:none; position:fixed; inset:0; z-index:2000;
+  background:rgba(15,23,42,.4); align-items:flex-start; justify-content:center; padding:48px 16px;
+}
+.modal-overlay.open { display:flex }
+.ev-modal {
+  background:#fff; border-radius:12px; width:100%; max-width:440px;
+  box-shadow:0 24px 80px rgba(0,0,0,.25); animation:mslide .16s ease;
+  font-family:'Google Sans',Roboto,sans-serif;
+}
+@keyframes mslide { from{transform:translateY(-16px);opacity:0} to{transform:none;opacity:1} }
+.ev-modal-hdr {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 20px; border-bottom:1px solid #e8eaed;
+}
+.ev-modal-hdr .title { font-size:16px; font-weight:500; color:#3c4043 }
+.ev-modal-close { border:none; background:none; cursor:pointer; font-size:18px; color:#5f6368; line-height:1 }
+.ev-modal-body { padding:18px 20px; display:flex; flex-direction:column; gap:12px }
+.ev-modal-ftr { padding:12px 20px; border-top:1px solid #e8eaed; display:flex; gap:8px; justify-content:flex-end }
+.ev-field { display:flex; flex-direction:column; gap:4px }
+.ev-label { font-size:11px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; color:#70757a }
+
+/* Cancel modal */
+.cancel-modal { background:#fff; border-radius:12px; width:100%; max-width:420px; box-shadow:0 24px 48px rgba(0,0,0,.2); overflow:hidden; font-family:'Google Sans',Roboto,sans-serif }
+.cancel-modal-hdr { padding:16px 20px; border-bottom:1px solid #e8eaed; display:flex; align-items:center; justify-content:space-between }
+.cancel-modal-body { padding:18px 20px; display:flex; flex-direction:column; gap:12px }
+.cancel-modal-ftr { padding:12px 20px; border-top:1px solid #e8eaed; display:flex; gap:8px; justify-content:flex-end }
+
+/* Detail popup (click on event) */
+.ev-popup {
+  position:fixed; z-index:2010; background:#fff; border-radius:10px;
+  box-shadow:0 8px 32px rgba(0,0,0,.22); padding:0; width:280px; overflow:hidden;
+  display:none;
+}
+.ev-popup.open { display:block }
+.ev-popup-color { height:8px }
+.ev-popup-body  { padding:14px 16px 16px }
+.ev-popup-title { font-size:15px; font-weight:500; color:#3c4043; margin-bottom:6px }
+.ev-popup-row   { font-size:12px; color:#5f6368; margin-bottom:3px; display:flex; align-items:center; gap:6px }
+.ev-popup-actions { display:flex; gap:6px; margin-top:12px }
+
+/* Status colors */
+.status-scheduled { color:#1a73e8 }
+.status-conducted  { color:#0b8043 }
+.status-postponed  { color:#e37400 }
+.status-missed     { color:#d93025 }
+.status-cancelled  { color:#80868b }
+</style>
+</head>
+<body style="overflow:hidden">
+
+<!-- ── Sidebar ── -->
+<div class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-brand-icon">C</div>
+    <div class="sb-brand-text"><div class="title">CMS</div><div class="sub">Convergence</div></div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-section">Main</div>
+    <a href="dashboard.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
+      <span class="label">Dashboard</span>
+    </a>
+    <a href="planner.html" class="sb-item active">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="2.5" width="13" height="12" rx="2"/><path d="M5 1v3M11 1v3M1.5 6.5h13M5 10.5l2 2 4-4"/></svg>
+      <span class="label">Planner</span>
+    </a>
+    <a href="meetings.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="2.5" width="13" height="12" rx="2"/><path d="M5 1v3M11 1v3M1.5 6.5h13"/></svg>
+      <span class="label">Meetings</span>
+    </a>
+    <a href="items.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3.5L10.5 10"/></svg>
+      <span class="label">Item Tracker</span>
+    </a>
+    <a href="documents.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><path d="M9.5 1H3.5A1.5 1.5 0 0 0 2 2.5v11A1.5 1.5 0 0 0 3.5 15h9A1.5 1.5 0 0 0 14 13.5V5.5L9.5 1z"/><path d="M9 1v5h5M5 9h6M5 12h4"/></svg>
+      <span class="label">D.O. Letters</span>
+    </a>
+    <a href="worklog.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="1.5" width="13" height="13" rx="2"/><path d="M5 8h6M5 5h6M5 11h3"/></svg>
+      <span class="label">Daily Work</span>
+    </a>
+    <a href="reviews.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><polyline points="1,10 4,6 7,9 10,4 15,7"/></svg>
+      <span class="label">Team Activity</span>
+    </a>
+    <a href="task-board.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1" y="1" width="14" height="14" rx="2"/><line x1="1" y1="6" x2="15" y2="6"/><line x1="6" y1="6" x2="6" y2="15"/></svg>
+      <span class="label">Task Board</span>
+    </a>
+    <a href="minutes.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="2.5" y="1" width="11" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>
+      <span class="label">Minutes</span>
+    </a>
+    <a href="admin-panel.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M2.93 2.93l1.41 1.41M11.66 11.66l1.41 1.41M2.93 13.07l1.41-1.41M11.66 4.34l1.41-1.41"/></svg>
+      <span class="label">Admin Panel</span>
+    </a>
+  </nav>
+</div>
+
+<!-- ── Fixed header (reuse from layout) ── -->
+<div class="header">
+  <div class="page-title">
+    <div class="name">Planner</div>
+    <div class="sub">Google Calendar-style week view</div>
+  </div>
+  <div class="header-actions">
+    <button class="hbtn" style="position:relative">
+      <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1a5.5 5.5 0 0 1 5.5 5.5c0 3.5 1.5 5 1.5 5H1s1.5-1.5 1.5-5A5.5 5.5 0 0 1 8 1zM6.5 13.5a1.5 1.5 0 0 0 3 0"/></svg>
+      <span style="position:absolute;top:4px;right:4px;background:var(--bad);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1">3</span>
+    </button>
+    <button class="user-btn">
+      <span class="u-avatar" style="background:#1e2333">AD</span>
+      <span class="name">Admin</span>
+      <span class="caret">▾</span>
+    </button>
+  </div>
+</div>
+
+<!-- ── Planner full-height layout ── -->
+<div style="margin-left:240px;padding-top:57px;height:100vh;display:flex;flex-direction:column;overflow:hidden">
+
+  <!-- GCal toolbar -->
+  <div class="gcal-toolbar">
+    <span class="brand">Meeting Planner</span>
+    <div style="flex:1"></div>
+    <button class="gcal-btn" onclick="goToday()">Today</button>
+    <div class="gcal-nav">
+      <button onclick="prevWeek()" title="Previous week">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15,18 9,12 15,6"/></svg>
+      </button>
+      <button onclick="nextWeek()" title="Next week">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9,18 15,12 9,6"/></svg>
+      </button>
+    </div>
+    <span class="week-label" id="weekLabel"></span>
+    <button class="new-mtg-btn" onclick="openNewMtg()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      New meeting
+    </button>
+  </div>
+
+  <!-- Body -->
+  <div class="gcal-body">
+
+    <!-- Left sidebar -->
+    <div class="gcal-sidebar">
+      <!-- Mini month calendar -->
+      <div id="miniCal"></div>
+
+      <div class="sidebar-divider"></div>
+
+      <!-- Upcoming list -->
+      <div id="upcomingList"></div>
+    </div>
+
+    <!-- Week grid -->
+    <div class="week-grid">
+      <!-- Column headers (DOW + date) -->
+      <div class="week-header" id="weekHeader" style="grid-template-columns:52px repeat(7,1fr)">
+        <div style="border-right:1px solid #e8eaed"></div>
+        <!-- days rendered by JS -->
+      </div>
+
+      <!-- Scrollable body -->
+      <div class="week-body" id="weekBody">
+        <div class="week-scroll" id="weekScroll" style="grid-template-columns:52px repeat(7,1fr)">
+          <!-- Hours + day columns rendered by JS -->
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Event detail popup ── -->
+<div class="ev-popup" id="evPopup">
+  <div class="ev-popup-color" id="evPopupColor"></div>
+  <div class="ev-popup-body">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div class="ev-popup-title" id="evPopupTitle"></div>
+      <button onclick="closePopup()" style="border:none;background:none;cursor:pointer;font-size:16px;color:#5f6368;padding:0;line-height:1">✕</button>
+    </div>
+    <div class="ev-popup-row" id="evPopupDate"></div>
+    <div class="ev-popup-row" id="evPopupType"></div>
+    <div class="ev-popup-row" id="evPopupStatus"></div>
+    <div class="ev-popup-actions">
+      <button onclick="openCancelModal()" class="gcal-btn" style="font-size:12px;padding:5px 12px;color:#d93025;border-color:#d93025">Cancel meeting</button>
+      <button onclick="closePopup()" class="gcal-btn" style="font-size:12px;padding:5px 12px">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── New meeting modal ── -->
+<div class="modal-overlay" id="newMtgModal" onclick="overlayClick(event,'newMtgModal')">
+  <div class="ev-modal">
+    <div class="ev-modal-hdr">
+      <span class="title">Schedule meeting</span>
+      <button class="ev-modal-close" onclick="closeNewMtg()">✕</button>
+    </div>
+    <div class="ev-modal-body">
+      <div class="ev-field">
+        <span class="ev-label">Unit pair</span>
+        <select id="mPair" style="width:100%;padding:9px 12px;border:1px solid #dadce0;border-radius:6px;font-size:14px;color:#3c4043">
+          <option value="">— Select pair —</option>
+          <option value="vp_smc">VP × SMC</option>
+          <option value="vp_cg">VP × CG</option>
+          <option value="vp_acis">VP × ACIS</option>
+          <option value="vp_nsnop">VP × NSNOP</option>
+          <option value="vp_alumni">VP × Alumni</option>
+          <option value="vp_mana">VP × Manarkeni</option>
+          <option value="smc_cg">SMC × CG</option>
+          <option value="cg_acis">CG × ACIS</option>
+          <option value="nsnop_alumni">NSNOP × Alumni</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="ev-field">
+          <span class="ev-label">Date</span>
+          <input type="date" id="mDate" style="padding:9px 12px;border:1px solid #dadce0;border-radius:6px;font-size:14px;color:#3c4043;width:100%">
+        </div>
+        <div class="ev-field">
+          <span class="ev-label">Time</span>
+          <input type="time" id="mTime" value="09:00" style="padding:9px 12px;border:1px solid #dadce0;border-radius:6px;font-size:14px;color:#3c4043;width:100%">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="ev-field">
+          <span class="ev-label">End time</span>
+          <input type="time" id="mEndTime" value="10:30" style="padding:9px 12px;border:1px solid #dadce0;border-radius:6px;font-size:14px;color:#3c4043;width:100%">
+        </div>
+        <div class="ev-field">
+          <span class="ev-label">Type</span>
+          <select id="mType" style="padding:9px 12px;border:1px solid #dadce0;border-radius:6px;font-size:14px;color:#3c4043;width:100%">
+            <option>In-person</option>
+            <option>Virtual</option>
+            <option>Hybrid</option>
+          </select>
+        </div>
+      </div>
+      <div class="ev-field">
+        <span class="ev-label">Agenda (optional)</span>
+        <textarea id="mAgenda" rows="3" placeholder="Topics to discuss…" style="padding:9px 12px;border:1px solid #dadce0;border-radius:6px;font-size:14px;color:#3c4043;resize:vertical;min-height:64px;width:100%"></textarea>
+      </div>
+    </div>
+    <div class="ev-modal-ftr">
+      <button class="gcal-btn" onclick="closeNewMtg()">Cancel</button>
+      <button onclick="saveMeeting()" style="border:none;border-radius:6px;padding:7px 20px;font-size:14px;font-weight:500;cursor:pointer;background:#1a73e8;color:#fff">Schedule</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Cancel modal ── -->
+<div class="modal-overlay" id="cancelModal" onclick="overlayClick(event,'cancelModal')">
+  <div class="cancel-modal">
+    <div class="cancel-modal-hdr">
+      <span style="font-size:16px;font-weight:500;color:#3c4043" id="cancelLabel">Cancel meeting</span>
+      <button onclick="closeCancelModal()" style="border:none;background:none;cursor:pointer;font-size:18px;color:#5f6368;line-height:1">✕</button>
+    </div>
+    <div class="cancel-modal-body">
+      <div style="font-size:13px;color:#5f6368;line-height:1.5" id="cancelDesc"></div>
+      <textarea id="cancelReason" placeholder="Reason (optional)" rows="3" style="resize:none;border:1px solid #dadce0;border-radius:6px;padding:8px 10px;font-size:13px;color:#3c4043;width:100%;box-sizing:border-box"></textarea>
+    </div>
+    <div class="cancel-modal-ftr">
+      <button class="gcal-btn" onclick="closeCancelModal()">Back</button>
+      <button onclick="confirmCancel()" style="border:none;border-radius:4px;padding:7px 18px;font-size:13px;font-weight:500;cursor:pointer;background:#d93025;color:#fff">Cancel meeting</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── Constants ── */
+const MONTHS   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MONTHS_S = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DOWS     = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const HOUR_H   = 48; // px per hour
+const DAY_START = 7; // 7 AM
+const DAY_HOURS = 17; // up to 11 PM (17h span)
+
+const STATUS_COLOR = {
+  scheduled:'#1a73e8', conducted:'#0b8043', postponed:'#e37400', missed:'#d93025', cancelled:'#80868b',
+};
+
+const PAIR_COLORS = {
+  vp_smc:'#6366f1', vp_cg:'#f97316', vp_acis:'#14b8a6', vp_nsnop:'#22c55e',
+  vp_alumni:'#3b82f6', vp_mana:'#f59e0b', smc_cg:'#ec4899',
+  cg_acis:'#8b5cf6', nsnop_alumni:'#22c55e',
+};
+
+/* ── Sample meetings ── */
+let MEETINGS = [
+  { id:1, pair:'vp_smc',   label:'VP × SMC',    date:'2026-06-10', time:'09:00', end_time:'10:30', type:'In-person',  status:'conducted',  agenda:'Q2 beneficiary data sharing' },
+  { id:2, pair:'vp_cg',    label:'VP × CG',     date:'2026-06-05', time:'11:00', end_time:'12:00', type:'Virtual',    status:'conducted',  agenda:'Field visit planning' },
+  { id:3, pair:'smc_cg',   label:'SMC × CG',    date:'2026-06-08', time:'14:00', end_time:'15:00', type:'Virtual',    status:'postponed',  agenda:'Zone mapping coordination' },
+  { id:4, pair:'vp_acis',  label:'VP × ACIS',   date:'2026-06-17', time:'10:00', end_time:'11:30', type:'In-person',  status:'scheduled',  agenda:'Enrollment data review' },
+  { id:5, pair:'vp_mana',  label:'VP × Manarkeni',date:'2026-06-18',time:'14:00',end_time:'15:00', type:'Virtual',    status:'scheduled',  agenda:'Convergence planning' },
+  { id:6, pair:'nsnop_alumni',label:'NSNOP × Alumni',date:'2026-06-20',time:'09:30',end_time:'11:00',type:'In-person',status:'scheduled', agenda:'Joint field visit schedule' },
+  { id:7, pair:'cg_acis',  label:'CG × ACIS',   date:'2026-06-24', time:'11:00', end_time:'12:30', type:'Hybrid',     status:'scheduled',  agenda:'Reporting format alignment' },
+  { id:8, pair:'vp_nsnop', label:'VP × NSNOP',  date:'2026-06-12', time:'09:00', end_time:'10:00', type:'In-person',  status:'missed',     agenda:'Student data collection' },
+];
+
+/* ── State ── */
+const today = new Date(); today.setHours(0,0,0,0);
+let weekStart = getMonday(today);
+let miniMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+let popupMeeting = null;
+
+/* ── Helpers ── */
+function getMonday(d) {
+  const day = d.getDay();
+  const m = new Date(d);
+  m.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
+  m.setHours(0,0,0,0);
+  return m;
+}
+function toIso(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function fmtTime(t) {
+  if (!t) return '';
+  const [h,m] = t.split(':').map(Number);
+  const ap = h >= 12 ? 'PM' : 'AM';
+  const hr = h > 12 ? h-12 : (h === 0 ? 12 : h);
+  return m === 0 ? `${hr} ${ap}` : `${hr}:${String(m).padStart(2,'0')} ${ap}`;
+}
+function timeToMin(t) {
+  if (!t) return 0;
+  const [h,m] = t.split(':').map(Number);
+  return h*60+m;
+}
+
+/* ── Navigation ── */
+function prevWeek() { const d=new Date(weekStart); d.setDate(d.getDate()-7); weekStart=d; render(); }
+function nextWeek() { const d=new Date(weekStart); d.setDate(d.getDate()+7); weekStart=d; render(); }
+function goToday()  { weekStart=getMonday(today); render(); }
+
+/* ── Main render ── */
+function render() {
+  renderWeekLabel();
+  renderWeekHeader();
+  renderWeekBody();
+  renderMiniCal();
+  renderUpcoming();
+}
+
+function renderWeekLabel() {
+  const we = new Date(weekStart); we.setDate(we.getDate()+6);
+  const label = weekStart.getMonth()===we.getMonth()
+    ? `${MONTHS[weekStart.getMonth()]} ${weekStart.getDate()}–${we.getDate()}, ${weekStart.getFullYear()}`
+    : `${MONTHS_S[weekStart.getMonth()]} ${weekStart.getDate()} – ${MONTHS_S[we.getMonth()]} ${we.getDate()}, ${weekStart.getFullYear()}`;
+  document.getElementById('weekLabel').textContent = label;
+}
+
+function renderWeekHeader() {
+  const hdr = document.getElementById('weekHeader');
+  // remove old day cells
+  while (hdr.children.length > 1) hdr.removeChild(hdr.lastChild);
+  for (let i=0; i<7; i++) {
+    const d = new Date(weekStart); d.setDate(d.getDate()+i);
+    const iso = toIso(d);
+    const isToday = iso === toIso(today);
+    const cell = document.createElement('div');
+    cell.className = 'week-header-cell';
+    cell.innerHTML = `
+      <div class="week-dow">${DOWS[d.getDay()]}</div>
+      <div class="week-daynum${isToday?' today':''}">${d.getDate()}</div>
+    `;
+    hdr.appendChild(cell);
+  }
+}
+
+function renderWeekBody() {
+  const scroll = document.getElementById('weekScroll');
+  scroll.innerHTML = '';
+  const totalH = DAY_HOURS * HOUR_H;
+  scroll.style.height = totalH + 'px';
+
+  // Time column
+  const timeCol = document.createElement('div');
+  timeCol.style.cssText = `position:relative;`;
+  timeCol.style.gridColumn = '1';
+  timeCol.style.gridRow = '1';
+  for (let h=0; h<DAY_HOURS; h++) {
+    const lbl = document.createElement('div');
+    lbl.className = 'time-label';
+    lbl.style.top = (h * HOUR_H) + 'px';
+    const hr = DAY_START + h;
+    const ap = hr >= 12 ? 'PM' : 'AM';
+    const display = hr > 12 ? hr-12 : (hr===0?12:hr);
+    if (h > 0) lbl.textContent = `${display} ${ap}`;
+    timeCol.appendChild(lbl);
+  }
+  scroll.appendChild(timeCol);
+
+  // Day columns
+  for (let i=0; i<7; i++) {
+    const d = new Date(weekStart); d.setDate(d.getDate()+i);
+    const iso = toIso(d);
+    const isToday = iso === toIso(today);
+
+    const col = document.createElement('div');
+    col.className = 'day-col';
+    col.style.cssText = `height:${totalH}px;grid-column:${i+2};grid-row:1;position:relative`;
+    col.onclick = (e) => {
+      if (e.target !== col) return;
+      const rect = col.getBoundingClientRect();
+      const relY = e.clientY - rect.top;
+      const minOffset = Math.floor(relY / HOUR_H * 60) + DAY_START * 60;
+      const h = Math.floor(minOffset/60), m = Math.floor(minOffset%60/30)*30;
+      document.getElementById('mDate').value = iso;
+      document.getElementById('mTime').value = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+      openNewMtg();
+    };
+
+    // Hour lines
+    for (let h=0; h<DAY_HOURS; h++) {
+      const line = document.createElement('div');
+      line.className = 'hour-line';
+      line.style.top = (h * HOUR_H) + 'px';
+      col.appendChild(line);
+    }
+
+    // Today line
+    if (isToday) {
+      const now = new Date();
+      const totalMin = now.getHours()*60 + now.getMinutes() - DAY_START*60;
+      if (totalMin >= 0 && totalMin <= DAY_HOURS*60) {
+        const nowLine = document.createElement('div');
+        nowLine.className = 'now-line';
+        nowLine.style.top = (totalMin / 60 * HOUR_H) + 'px';
+        col.appendChild(nowLine);
+      }
+    }
+
+    // Event blocks
+    const dayMtgs = MEETINGS.filter(m => m.date === iso);
+    dayMtgs.forEach(m => {
+      const startMin = timeToMin(m.time) - DAY_START*60;
+      const endMin   = timeToMin(m.end_time) - DAY_START*60;
+      if (endMin <= 0 || startMin >= DAY_HOURS*60) return;
+      const top    = Math.max(0, startMin) / 60 * HOUR_H;
+      const height = Math.max(16, (Math.min(endMin, DAY_HOURS*60) - Math.max(0, startMin)) / 60 * HOUR_H - 2);
+      const color  = STATUS_COLOR[m.status] || '#1a73e8';
+      const ev = document.createElement('div');
+      ev.className = 'ev-block';
+      ev.style.cssText = `top:${top}px;left:4px;right:4px;height:${height}px;background:${color}22;border-left:3px solid ${color};color:${color}`;
+      ev.innerHTML = `<div class="ev-title">${m.label}</div><div class="ev-time">${fmtTime(m.time)} – ${fmtTime(m.end_time)}</div>`;
+      ev.onclick = (e) => { e.stopPropagation(); showPopup(m, ev); };
+      col.appendChild(ev);
+    });
+
+    scroll.appendChild(col);
+  }
+
+  // Scroll to working hours
+  const body = document.getElementById('weekBody');
+  body.scrollTop = (8 - DAY_START) * HOUR_H; // scroll to 8 AM
+}
+
+/* ── Event popup ── */
+function showPopup(m, el) {
+  popupMeeting = m;
+  const rect = el.getBoundingClientRect();
+  const popup = document.getElementById('evPopup');
+  document.getElementById('evPopupColor').style.background = STATUS_COLOR[m.status] || '#1a73e8';
+  document.getElementById('evPopupTitle').textContent = m.label;
+  document.getElementById('evPopupDate').innerHTML = `📅 ${m.date} · ${fmtTime(m.time)} – ${fmtTime(m.end_time)}`;
+  document.getElementById('evPopupType').innerHTML = `📍 ${m.type}`;
+  document.getElementById('evPopupStatus').innerHTML = `<span class="status-${m.status}">${m.status.charAt(0).toUpperCase()+m.status.slice(1)}</span>`;
+
+  popup.style.left = Math.min(rect.right + 8, window.innerWidth - 296) + 'px';
+  popup.style.top  = Math.min(rect.top, window.innerHeight - 200) + 'px';
+  popup.classList.add('open');
+}
+function closePopup() {
+  document.getElementById('evPopup').classList.remove('open');
+  popupMeeting = null;
+}
+
+/* ── Cancel ── */
+function openCancelModal() {
+  if (!popupMeeting) return;
+  closePopup();
+  const m = popupMeeting || {};
+  document.getElementById('cancelLabel').textContent = `Cancel meeting — ${m.label || ''}`;
+  document.getElementById('cancelDesc').innerHTML = `Provide a reason for cancelling the <b>${m.label}</b> meeting on <b>${m.date}</b>.`;
+  document.getElementById('cancelReason').value = '';
+  document.getElementById('cancelModal').classList.add('open');
+}
+function closeCancelModal() { document.getElementById('cancelModal').classList.remove('open'); }
+function confirmCancel() {
+  if (popupMeeting) {
+    MEETINGS = MEETINGS.filter(m => m.id !== popupMeeting.id);
+    render();
+  }
+  closeCancelModal();
+}
+
+/* ── New meeting modal ── */
+function openNewMtg() {
+  if (!document.getElementById('mDate').value) {
+    document.getElementById('mDate').value = toIso(today);
+  }
+  document.getElementById('newMtgModal').classList.add('open');
+}
+function closeNewMtg() { document.getElementById('newMtgModal').classList.remove('open'); }
+function saveMeeting() {
+  const pair  = document.getElementById('mPair').value;
+  const date  = document.getElementById('mDate').value;
+  const time  = document.getElementById('mTime').value;
+  const end   = document.getElementById('mEndTime').value;
+  const type  = document.getElementById('mType').value;
+  if (!pair || !date) { alert('Please select a pair and date.'); return; }
+  const labels = { vp_smc:'VP × SMC', vp_cg:'VP × CG', vp_acis:'VP × ACIS', vp_nsnop:'VP × NSNOP', vp_alumni:'VP × Alumni', vp_mana:'VP × Manarkeni', smc_cg:'SMC × CG', cg_acis:'CG × ACIS', nsnop_alumni:'NSNOP × Alumni' };
+  const newId = Math.max(...MEETINGS.map(m=>m.id),0)+1;
+  MEETINGS.push({ id:newId, pair, label:labels[pair]||pair, date, time, end_time:end, type, status:'scheduled', agenda:'' });
+  closeNewMtg();
+  render();
+}
+
+function overlayClick(e, id) {
+  if (e.target === document.getElementById(id)) {
+    if (id==='newMtgModal') closeNewMtg();
+    else if (id==='cancelModal') closeCancelModal();
+  }
+}
+document.addEventListener('keydown', e => { if (e.key==='Escape') { closeNewMtg(); closeCancelModal(); closePopup(); } });
+document.addEventListener('click', e => {
+  const popup = document.getElementById('evPopup');
+  if (popup.classList.contains('open') && !popup.contains(e.target)) closePopup();
+});
+
+/* ── Mini calendar ── */
+function renderMiniCal() {
+  const mo = miniMonth.getMonth(), yr = miniMonth.getFullYear();
+  const first = new Date(yr, mo, 1);
+  const startD = new Date(yr, mo, 1 - first.getDay());
+  const days = Array.from({length:42}, (_,i) => { const d=new Date(startD); d.setDate(startD.getDate()+i); return d; });
+  const eventDays = new Set(MEETINGS.map(m=>m.date));
+  const todayIso = toIso(today);
+  const weekDates = new Set(Array.from({length:7},(_,i)=>{ const d=new Date(weekStart); d.setDate(d.getDate()+i); return toIso(d); }));
+
+  let html = `<div class="mini-cal-hdr">
+    <span class="mth">${MONTHS_S[mo]} ${yr}</span>
+    <div class="mini-nav">
+      <button onclick="miniPrev()">‹</button>
+      <button onclick="miniNext()">›</button>
+    </div>
+  </div>
+  <div class="mini-dow">${['S','M','T','W','T','F','S'].map(d=>`<span>${d}</span>`).join('')}</div>
+  <div class="mini-days">`;
+
+  days.forEach((d,i) => {
+    const iso    = toIso(d);
+    const isOther= d.getMonth()!==mo;
+    const isToday= iso===todayIso;
+    const inWeek = weekDates.has(iso);
+    const hasEv  = eventDays.has(iso);
+    const col    = i%7;
+    const prevIW = col>0 && weekDates.has(toIso(days[i-1]));
+    const nextIW = col<6 && weekDates.has(toIso(days[i+1]));
+    let bandCls = '';
+    if (inWeek) {
+      if (!prevIW && !nextIW) bandCls=''; // standalone – let inner circle handle
+      else if (!prevIW) bandCls=' band-l';
+      else if (!nextIW) bandCls=' band-r';
+      else bandCls=' band-m';
+    }
+    const bg = inWeek ? ((!prevIW&&!nextIW) ? 'transparent' : '#e8f0fe') : 'transparent';
+    html += `<div class="mini-day${bandCls}${inWeek&&(!prevIW&&!nextIW)?'':''}" style="background:${bg}" onclick="miniDayClick('${iso}')">
+      <div class="mini-inner${isToday?' today-num':''}${isOther&&!isToday?' other-num':''}${inWeek&&!isToday?' ':''}" style="${inWeek&&!isToday?'background:#c2d7fb;border-radius:50%':''}">
+        ${d.getDate()}
+        ${hasEv&&!isToday?`<span class="mini-dot${inWeek?' in-week-dot':''}"></span>`:''}
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  document.getElementById('miniCal').innerHTML = html;
+}
+
+function miniPrev() { miniMonth=new Date(miniMonth.getFullYear(),miniMonth.getMonth()-1,1); renderMiniCal(); }
+function miniNext() { miniMonth=new Date(miniMonth.getFullYear(),miniMonth.getMonth()+1,1); renderMiniCal(); }
+function miniDayClick(iso) {
+  const d = new Date(iso+'T00:00:00');
+  weekStart = getMonday(d);
+  render();
+}
+
+/* ── Upcoming list ── */
+function renderUpcoming() {
+  const todayIso = toIso(today);
+  const list = MEETINGS
+    .filter(m => m.status==='scheduled' && m.date >= todayIso)
+    .sort((a,b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
+    .slice(0,8);
+
+  let html = '<div class="upc-header">Upcoming</div>';
+  if (!list.length) {
+    html += '<div style="padding:16px 4px 4px;font-size:12px;color:#80868b;text-align:center;line-height:1.6"><div style="font-size:28px;margin-bottom:6px">📅</div>No upcoming meetings</div>';
+  } else {
+    list.forEach(m => {
+      const d = new Date(m.date+'T00:00:00');
+      const isToday2 = m.date===todayIso;
+      const color = STATUS_COLOR[m.status]||'#1a73e8';
+      html += `<div class="upc-item" onclick="goToDate('${m.date}')">
+        <div class="upc-date-badge${isToday2?' today-badge':''}">
+          <div class="mo">${MONTHS_S[d.getMonth()]}</div>
+          <div class="dy">${d.getDate()}</div>
+        </div>
+        <div class="upc-info">
+          <div class="upc-title">${m.label}</div>
+          <div class="upc-sub"><span style="width:7px;height:7px;border-radius:50%;background:${color};flex-shrink:0;display:inline-block"></span><span style="font-size:11px;color:#5f6368">${m.label}</span></div>
+          ${m.time?`<div class="upc-time">${fmtTime(m.time)}</div>`:''}
+        </div>
+      </div>`;
+    });
+  }
+  document.getElementById('upcomingList').innerHTML = html;
+}
+
+function goToDate(iso) {
+  const d = new Date(iso+'T00:00:00');
+  weekStart = getMonday(d);
+  render();
+}
+
+/* ── Init ── */
+render();
+</script>
+</body>
+</html>

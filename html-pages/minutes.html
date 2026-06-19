@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Minutes — CMS Convergence</title>
+<link rel="stylesheet" href="_layout.css">
+<style>
+/* ── Meeting row ── */
+.mtg-row {
+  display:flex; align-items:center; gap:16px; padding:14px 18px;
+  border:1px solid var(--line); border-radius:12px; background:#fff;
+  transition:box-shadow .15s; margin-bottom:10px;
+}
+.mtg-row:hover { box-shadow:0 2px 12px rgba(0,0,0,.08) }
+
+/* ── Date badge ── */
+.date-badge {
+  flex-shrink:0; width:48px; text-align:center;
+  background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:6px 0;
+}
+.date-badge .mo { font-size:10px; text-transform:uppercase; color:var(--ink3); letter-spacing:.5px; font-weight:600 }
+.date-badge .dy { font-size:22px; font-weight:700; color:var(--ink); line-height:1.1 }
+
+/* ── Month pill strip ── */
+.month-pill {
+  flex-shrink:0; border:1.5px solid var(--line); border-radius:20px;
+  padding:6px 16px; font-size:13px; font-weight:500; cursor:pointer;
+  background:#fff; color:var(--ink2); transition:all .13s;
+  display:flex; align-items:center; gap:7px; white-space:nowrap;
+}
+.month-pill.on { border-color:var(--accent); background:var(--accent); color:#fff; font-weight:700 }
+.month-count {
+  background:var(--line); color:var(--ink3); border-radius:99px; padding:1px 7px;
+  font-size:11px; font-weight:700;
+}
+.month-pill.on .month-count { background:rgba(255,255,255,.25); color:#fff }
+
+/* ── Status badge ── */
+.stbadge {
+  display:inline-flex; align-items:center; padding:3px 10px; border-radius:99px;
+  font-size:11px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; white-space:nowrap;
+}
+.st-conducted { background:#d1fae5; color:#065f46 }
+.st-scheduled { background:#dbeafe; color:#1d4ed8 }
+.st-postponed { background:#fef3c7; color:#92400e }
+.st-missed    { background:#fee2e2; color:#991b1b }
+.st-cancelled { background:#f1f5f9; color:#64748b }
+
+/* ── Enter MoM button ── */
+.enter-mom-btn {
+  border:none; border-radius:20px; padding:8px 20px; font-size:13px;
+  font-weight:600; cursor:pointer; background:var(--accent); color:#fff;
+  white-space:nowrap; transition:.12s;
+}
+.enter-mom-btn:hover { background:#1557b0 }
+.enter-mom-btn.dim { background:var(--paper); color:var(--ink3); cursor:not-allowed; opacity:.6 }
+.enter-mom-btn.dim:hover { background:var(--paper) }
+
+/* ── Filed MoM card ── */
+.filed-card {
+  border:1px solid var(--line); border-radius:11px; padding:14px 16px; margin-bottom:10px; background:#fff;
+}
+
+/* ── Action point row in filed section ── */
+.ap-item {
+  display:flex; align-items:flex-start; gap:10px; padding:8px 10px;
+  border-radius:8px; margin-bottom:6px; background:#fafafa; border:1px solid var(--line2);
+}
+.ap-item.overdue { background:#fff8f8; border-color:#fecaca }
+.ap-status-badge {
+  flex-shrink:0; font-size:10px; font-weight:700; border-radius:5px;
+  padding:3px 8px; white-space:nowrap; margin-top:1px; letter-spacing:.03em;
+}
+
+/* ── Modal overlay ── */
+.modal-overlay {
+  display:none; position:fixed; inset:0; z-index:2000;
+  background:rgba(0,0,0,.5); align-items:flex-start; justify-content:center; padding:32px 16px; overflow-y:auto;
+}
+.modal-overlay.open { display:flex }
+.modal-box {
+  background:#fff; border-radius:16px; width:100%; max-width:800px; max-height:88vh; overflow-y:auto;
+  box-shadow:0 24px 64px rgba(0,0,0,.3); animation:mslide .18s ease; flex-shrink:0;
+}
+@keyframes mslide { from{transform:translateY(-16px);opacity:0} to{transform:none;opacity:1} }
+.modal-hdr { padding:20px 28px 16px; border-bottom:1px solid var(--line); flex-shrink:0; position:sticky; top:0; background:#fff; z-index:2 }
+.modal-body { padding:24px 28px }
+.modal-ftr  { padding:16px 28px; border-top:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; background:#fff; position:sticky; bottom:0; z-index:2 }
+.modal-cancel { border:1px solid var(--line); border-radius:20px; padding:10px 24px; font-size:14px; font-weight:500; cursor:pointer; background:#fff; color:var(--accent) }
+.modal-save   { border:none; border-radius:20px; padding:10px 32px; font-size:14px; font-weight:600; cursor:pointer; background:var(--accent); color:#fff }
+
+/* ── Cascading AP row ── */
+.ap-cascade { border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:12px; background:#fafbfc }
+.cascade-step { display:flex; align-items:center; gap:10px; margin-top:10px; padding-left:34px }
+.cascade-label { font-size:12px; color:var(--ink3); font-weight:600; white-space:nowrap }
+.unit-btn {
+  display:inline-flex; align-items:center; gap:7px; padding:6px 16px;
+  border-radius:20px; cursor:pointer; font-size:13px; font-weight:500; transition:all .12s;
+  border:1.5px solid var(--line); background:#fff; color:var(--ink);
+}
+.unit-btn.on { color:#fff; font-weight:700 }
+
+/* ── Outcome radio pills ── */
+.outcome-pill {
+  flex:1; display:flex; align-items:center; justify-content:center; gap:8px;
+  height:44px; border:1.5px solid var(--line); border-radius:10px; font-size:14px;
+  cursor:pointer; background:#fff; font-weight:500; color:var(--ink2); transition:.13s;
+}
+.outcome-pill.on { border-color:var(--accent); background:var(--accent-light); font-weight:700; color:var(--accent) }
+.notheld-pill {
+  flex:1; display:flex; align-items:center; justify-content:center; gap:8px;
+  height:44px; border:1.5px solid var(--line); border-radius:10px; font-size:14px;
+  cursor:pointer; background:#fff; font-weight:500; color:var(--ink2); transition:.13s;
+}
+.notheld-pill.on { border-color:#f59e0b; background:#fef9ec; font-weight:700; color:#92600a }
+</style>
+</head>
+<body>
+
+<!-- ── Sidebar ── -->
+<div class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-brand-icon">C</div>
+    <div class="sb-brand-text"><div class="title">CMS</div><div class="sub">Convergence</div></div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-section">Main</div>
+    <a href="dashboard.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
+      <span class="label">Dashboard</span>
+    </a>
+    <a href="planner.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="2.5" width="13" height="12" rx="2"/><path d="M5 1v3M11 1v3M1.5 6.5h13M5 10.5l2 2 4-4"/></svg>
+      <span class="label">Planner</span>
+    </a>
+    <a href="meetings.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="2.5" width="13" height="12" rx="2"/><path d="M5 1v3M11 1v3M1.5 6.5h13"/></svg>
+      <span class="label">Meetings</span>
+    </a>
+    <a href="items.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3.5L10.5 10"/></svg>
+      <span class="label">Item Tracker</span>
+    </a>
+    <a href="documents.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><path d="M9.5 1H3.5A1.5 1.5 0 0 0 2 2.5v11A1.5 1.5 0 0 0 3.5 15h9A1.5 1.5 0 0 0 14 13.5V5.5L9.5 1z"/><path d="M9 1v5h5M5 9h6M5 12h4"/></svg>
+      <span class="label">D.O. Letters</span>
+    </a>
+    <a href="worklog.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1.5" y="1.5" width="13" height="13" rx="2"/><path d="M5 8h6M5 5h6M5 11h3"/></svg>
+      <span class="label">Daily Work</span>
+    </a>
+    <a href="reviews.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><polyline points="1,10 4,6 7,9 10,4 15,7"/></svg>
+      <span class="label">Team Activity</span>
+    </a>
+    <a href="task-board.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><rect x="1" y="1" width="14" height="14" rx="2"/><line x1="1" y1="6" x2="15" y2="6"/><line x1="6" y1="6" x2="6" y2="15"/></svg>
+      <span class="label">Task Board</span>
+    </a>
+    <a href="minutes.html" class="sb-item active">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.5" style="flex-shrink:0"><rect x="2.5" y="1" width="11" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>
+      <span class="label">Minutes</span>
+    </a>
+    <a href="admin-panel.html" class="sb-item">
+      <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" style="flex-shrink:0"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M2.93 2.93l1.41 1.41M11.66 11.66l1.41 1.41M2.93 13.07l1.41-1.41M11.66 4.34l1.41-1.41"/></svg>
+      <span class="label">Admin Panel</span>
+    </a>
+  </nav>
+</div>
+
+<!-- ── Header ── -->
+<div class="header">
+  <div class="page-title">
+    <div class="name">Minutes</div>
+    <div class="sub">Meeting minutes &amp; action points</div>
+  </div>
+  <div class="header-actions">
+    <button class="hbtn" style="position:relative">
+      <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1a5.5 5.5 0 0 1 5.5 5.5c0 3.5 1.5 5 1.5 5H1s1.5-1.5 1.5-5A5.5 5.5 0 0 1 8 1zM6.5 13.5a1.5 1.5 0 0 0 3 0"/></svg>
+      <span style="position:absolute;top:4px;right:4px;background:var(--bad);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1">3</span>
+    </button>
+    <button class="user-btn">
+      <span class="u-avatar" style="background:#1e2333">AD</span>
+      <span class="name">Admin</span>
+      <span class="caret">▾</span>
+    </button>
+  </div>
+</div>
+
+<!-- ── App ── -->
+<div class="app"><div class="wrap">
+
+  <!-- Filterbar -->
+  <div class="filterbar">
+    <div class="period">
+      <div class="l">Minutes of meeting</div>
+      <div class="v" id="workspaceLabel">All meetings</div>
+    </div>
+    <div class="seg" id="unitSeg">
+      <button class="on" onclick="setUnit('all',this)">All</button>
+      <button onclick="setUnit('vp',this)"><span class="sw" style="background:#6366f1"></span>VP</button>
+      <button onclick="setUnit('smc',this)"><span class="sw" style="background:#ec4899"></span>SMC</button>
+      <button onclick="setUnit('cg',this)"><span class="sw" style="background:#f97316"></span>CG</button>
+      <button onclick="setUnit('acis',this)"><span class="sw" style="background:#14b8a6"></span>ACIS</button>
+      <button onclick="setUnit('nsnop',this)"><span class="sw" style="background:#22c55e"></span>NSNOP</button>
+      <button onclick="setUnit('alumni',this)"><span class="sw" style="background:#3b82f6"></span>Alumni</button>
+      <button onclick="setUnit('mana',this)"><span class="sw" style="background:#f59e0b"></span>Man</button>
+    </div>
+  </div>
+
+  <!-- Month strip (6 pills: 3 behind, current, 2 ahead) -->
+  <div style="display:flex;gap:8px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px" id="monthStrip"></div>
+
+  <!-- Status tabs + Record button -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+    <div class="seg" id="tabSeg">
+      <button class="on" onclick="setTab('all',this)">All <span id="cntAll" style="margin-left:5px;background:rgba(255,255,255,.25);color:#fff;border-radius:99px;padding:1px 7px;font-size:11px;font-weight:700;display:none"></span></button>
+      <button onclick="setTab('upcoming',this)">Upcoming <span id="cntUpcoming" style="margin-left:5px;background:var(--line);color:var(--ink3);border-radius:99px;padding:1px 7px;font-size:11px;font-weight:700;display:none"></span></button>
+      <button onclick="setTab('conducted',this)">Conducted <span id="cntConducted" style="margin-left:5px;background:var(--line);color:var(--ink3);border-radius:99px;padding:1px 7px;font-size:11px;font-weight:700;display:none"></span></button>
+      <button onclick="setTab('notheld',this)">Not held <span id="cntNotheld" style="margin-left:5px;background:var(--line);color:var(--ink3);border-radius:99px;padding:1px 7px;font-size:11px;font-weight:700;display:none"></span></button>
+    </div>
+    <button onclick="openRecord()" style="border:none;border-radius:20px;padding:9px 22px;font-size:14px;font-weight:600;cursor:pointer;background:var(--accent);color:#fff;display:flex;align-items:center;gap:8px;box-shadow:0 1px 4px rgba(0,0,0,.18);white-space:nowrap">+ Record meeting</button>
+  </div>
+
+  <!-- Meeting list -->
+  <div id="meetingList"></div>
+
+  <!-- Filed section (shown when tab=conducted) -->
+  <div id="filedSection" style="margin-top:28px;display:none">
+    <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);margin-bottom:12px">Filed minutes</div>
+    <div id="filedList"></div>
+  </div>
+
+</div></div>
+
+<!-- ═══════════════════════════ MoM ENTRY MODAL ═══════════════════════════ -->
+<div class="modal-overlay" id="momModal" onclick="overlayClick(event,'momModal')">
+  <div class="modal-box">
+
+    <div class="modal-hdr" id="momHdr">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+            <span class="dot" id="momDotA" style="width:12px;height:12px"></span>
+            <span style="font-weight:700;font-size:20px;color:var(--ink)" id="momTitle">VP × SMC</span>
+            <span class="dot" id="momDotB" style="width:12px;height:12px"></span>
+            <span class="stbadge" id="momStatusBadge">Conducted</span>
+          </div>
+          <div style="font-size:13px;color:var(--ink3);display:flex;gap:16px;flex-wrap:wrap" id="momSubInfo"></div>
+        </div>
+        <button onclick="closeMom()" style="border:none;background:rgba(0,0,0,.07);cursor:pointer;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink2);font-size:20px;line-height:1;flex-shrink:0">✕</button>
+      </div>
+    </div>
+
+    <div class="modal-body">
+      <!-- Attendees -->
+      <div style="margin-bottom:20px">
+        <label>Attendees present</label>
+        <input type="text" id="momAttendees" placeholder="e.g. 6 of 8 members">
+      </div>
+
+      <!-- Summary -->
+      <div style="margin-bottom:24px">
+        <label>Minutes / Summary</label>
+        <textarea id="momSummary" rows="5" placeholder="Record what was discussed, decisions made, and outcomes of the meeting…" style="min-height:130px;font-size:15px;line-height:1.7"></textarea>
+        <div id="errSummary" style="font-size:12px;color:#dc2626;margin-top:5px;display:none">⚠ Add a summary or at least one action point</div>
+      </div>
+
+      <!-- Action points -->
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <label style="margin:0">Action Points</label>
+          <button onclick="addCascadeAP()" style="border:1.5px solid var(--accent);border-radius:20px;padding:6px 18px;background:var(--accent-light);color:var(--accent);font-size:13px;font-weight:700;cursor:pointer">+ Add action point</button>
+        </div>
+        <div id="apList"></div>
+      </div>
+    </div>
+
+    <div class="modal-ftr">
+      <span style="font-size:12px;color:var(--ink3)">Ctrl+Enter to save</span>
+      <div style="display:flex;gap:10px">
+        <button class="modal-cancel" onclick="closeMom()">Cancel</button>
+        <button class="modal-save" onclick="saveMom()" id="momSaveBtn">Save MoM</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════ RECORD MODAL ═══════════════════════════ -->
+<div class="modal-overlay" id="recordModal" onclick="overlayClick(event,'recordModal')">
+  <div class="modal-box" style="max-width:760px">
+
+    <div class="modal-hdr">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-weight:700;font-size:22px;color:var(--ink)">Record meeting</div>
+          <div style="font-size:13px;color:var(--ink3);margin-top:3px">held → file minutes · not held → record reason</div>
+        </div>
+        <button onclick="closeRecord()" style="border:none;background:none;cursor:pointer;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink2);font-size:22px;line-height:1">✕</button>
+      </div>
+    </div>
+
+    <div class="modal-body">
+      <!-- Pair + Date -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+        <div>
+          <label>Convergence unit pair</label>
+          <select id="recPair">
+            <option value="">— Select pair —</option>
+            <option value="vp_smc">VP × SMC</option>
+            <option value="vp_cg">VP × Career Guidance</option>
+            <option value="vp_acis">VP × ACIS</option>
+            <option value="vp_nsnop">VP × NSNOP</option>
+            <option value="vp_alumni">VP × Alumni</option>
+            <option value="vp_mana">VP × Manarkeni</option>
+            <option value="smc_cg">SMC × Career Guidance</option>
+            <option value="cg_acis">CG × ACIS</option>
+            <option value="nsnop_alumni">NSNOP × Alumni</option>
+          </select>
+          <div id="errRecPair" style="font-size:12px;color:#dc2626;margin-top:5px;display:none">⚠ Select a convergence unit pair</div>
+        </div>
+        <div>
+          <label>Meeting date</label>
+          <input type="date" id="recDate">
+          <div id="errRecDate" style="font-size:12px;color:#dc2626;margin-top:5px;display:none">⚠ Pick a meeting date</div>
+        </div>
+      </div>
+
+      <!-- Outcome -->
+      <div style="margin-bottom:20px">
+        <label>Outcome</label>
+        <div style="display:flex;gap:10px">
+          <div class="outcome-pill on" id="outcomeHeld" onclick="setOutcome('held')">✅ Meeting held</div>
+          <div class="outcome-pill" id="outcomeNot"  onclick="setOutcome('notheld')">⚠ Not held</div>
+        </div>
+      </div>
+
+      <!-- Held section -->
+      <div id="heldSection">
+        <div style="margin-bottom:20px">
+          <label>Attendees present</label>
+          <input type="text" id="recAttendees" placeholder="e.g. 6 of 8 members">
+        </div>
+        <div style="margin-bottom:20px">
+          <label>Summary / discussion</label>
+          <textarea id="recSummary" rows="4" placeholder="What was discussed and decided…"></textarea>
+          <div id="errRecSummary" style="font-size:12px;color:#dc2626;margin-top:5px;display:none">⚠ Add a summary or at least one action point</div>
+        </div>
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <label style="margin:0">Action points</label>
+            <button onclick="addRecAP()" style="border:1.5px solid var(--accent);border-radius:8px;padding:5px 14px;background:var(--accent-light);color:var(--accent);font-size:13px;font-weight:700;cursor:pointer">+ Add item</button>
+          </div>
+          <div id="recApList">
+            <div style="display:grid;grid-template-columns:1fr 160px 130px 34px;gap:8px;margin-bottom:8px" class="rec-ap-row">
+              <input type="text" placeholder="Action item 1…" style="font-size:13px">
+              <select style="font-size:12px"><option value="">— Assign to —</option><option>Rajan Kumar (VP)</option><option>Priya Sundaram (SMC)</option><option>Anand Selvam (CG)</option></select>
+              <input type="date" style="font-size:13px">
+              <span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Not held section -->
+      <div id="notheldSection" style="display:none">
+        <div style="margin-bottom:20px">
+          <label>What happened</label>
+          <div style="display:flex;gap:10px">
+            <div class="notheld-pill on" id="nhPostponed" onclick="setNH('postponed')">🕘 Postponed</div>
+            <div class="notheld-pill" id="nhMissed" onclick="setNH('missed')">✕ Missed</div>
+          </div>
+        </div>
+        <div>
+          <label>Reason — why it didn't happen</label>
+          <textarea id="recReason" rows="4" placeholder="e.g. Key members on field duty…"></textarea>
+          <div id="errRecReason" style="font-size:12px;color:#dc2626;margin-top:5px;display:none">⚠ Provide a reason</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-ftr">
+      <span></span>
+      <div style="display:flex;gap:10px">
+        <button class="modal-cancel" onclick="closeRecord()">Cancel</button>
+        <button class="modal-save" onclick="submitRecord()" id="recSaveBtn">Submit minutes</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ── Data ── */
+const MONTHS_S = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTHS   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+const UNITS = {
+  vp:    { name:'VETRI Palligal', abbr:'VP',    color:'#6366f1' },
+  smc:   { name:'SMC',           abbr:'SMC',   color:'#ec4899' },
+  cg:    { name:'Career Guidance',abbr:'CG',    color:'#f97316' },
+  acis:  { name:'ACIS',          abbr:'ACIS',  color:'#14b8a6' },
+  nsnop: { name:'NSNOP',         abbr:'NSNOP', color:'#22c55e' },
+  alumni:{ name:'Alumni',        abbr:'Alumni',color:'#3b82f6' },
+  mana:  { name:'Manarkeni',     abbr:'Man',   color:'#f59e0b' },
+};
+
+const PAIRS = {
+  vp_smc:   { a:'vp',    b:'smc' },
+  vp_cg:    { a:'vp',    b:'cg' },
+  vp_acis:  { a:'vp',    b:'acis' },
+  vp_nsnop: { a:'vp',    b:'nsnop' },
+  vp_alumni:{ a:'vp',    b:'alumni' },
+  vp_mana:  { a:'vp',    b:'mana' },
+  smc_cg:   { a:'smc',   b:'cg' },
+  cg_acis:  { a:'cg',    b:'acis' },
+  nsnop_alumni:{ a:'nsnop',b:'alumni' },
+};
+
+let MEETINGS = [
+  { id:1, pair:'vp_smc',    date:'2026-06-10', time:'09:00', end_time:'10:30', type:'In-person', status:'conducted',
+    minutes:{ attendees:'6 of 8', summary:'VP shared Q2 beneficiary data with SMC. Joint outreach plan finalised for Tenkasi cluster.',
+      action_points:[
+        { id:1, aid:'AP-001', text:'Share beneficiary list with VP team', done:true,  assigned_to_name:'Priya Sundaram', start_date:'2026-06-10', deadline:'2026-06-15' },
+        { id:2, aid:'AP-002', text:'Map overlapping school zones',         done:false, assigned_to_name:'Rajan Kumar',    start_date:'2026-06-11', deadline:'2026-06-25' },
+        { id:3, aid:'AP-003', text:'Align reporting formats across units', done:false, assigned_to_name:null,            start_date:null,         deadline:'2026-07-01' },
+      ]
+    }
+  },
+  { id:2, pair:'vp_cg',    date:'2026-06-05', time:'11:00', end_time:'12:00', type:'Virtual',   status:'conducted',
+    minutes:{ attendees:'5 of 7', summary:'Field visit planning for June completed. CG unit agreed to align report template.',
+      action_points:[
+        { id:4, aid:'AP-004', text:'Share CG report template with VP for review', done:true, assigned_to_name:'Anand Selvam', start_date:'2026-06-05', deadline:'2026-06-12' },
+      ]
+    }
+  },
+  { id:3, pair:'smc_cg',  date:'2026-06-08', time:'14:00', end_time:'15:00', type:'Virtual',   status:'postponed',  minutes:null },
+  { id:4, pair:'vp_acis', date:'2026-06-17', time:'10:00', end_time:'11:30', type:'In-person', status:'scheduled',  minutes:null },
+  { id:5, pair:'vp_mana', date:'2026-06-18', time:'14:00', end_time:'15:00', type:'Virtual',   status:'scheduled',  minutes:null },
+  { id:6, pair:'nsnop_alumni', date:'2026-06-20', time:'09:30', end_time:'11:00', type:'In-person', status:'scheduled', minutes:null },
+  { id:7, pair:'cg_acis', date:'2026-06-24', time:'11:00', end_time:'12:30', type:'Hybrid',    status:'scheduled',  minutes:null },
+  { id:8, pair:'vp_nsnop',date:'2026-06-12', time:'09:00', end_time:'10:00', type:'In-person', status:'missed',     minutes:null },
+  { id:9, pair:'vp_alumni',date:'2026-05-20',time:'10:00', end_time:'11:00', type:'Virtual',   status:'conducted',
+    minutes:{ attendees:'4 of 6', summary:'Budget coordination for Alumni joint activities discussed.',
+      action_points:[
+        { id:5, aid:'AP-005', text:'Submit budget proposal to Admin', done:true, assigned_to_name:'Rajesh Kumar', start_date:'2026-05-20', deadline:'2026-05-31' },
+      ]
+    }
+  },
+];
+
+/* ── State ── */
+const now = new Date(); now.setHours(0,0,0,0);
+const curMonth = () => `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+let selMonth = curMonth();
+let activeTab = 'all';
+let selUnit   = 'all';
+let curMomId  = null;
+let apCounter = 1;
+let outcome   = 'held';
+let nhType    = 'postponed';
+
+// Cascading AP entries: { text, unitId, userId, startDate, deadline }
+let apEntries = [{ text:'', unitId:null, userId:null, startDate:'', deadline:'' }];
+
+/* ── Helpers ── */
+function pairLabel(pairKey) {
+  const p = PAIRS[pairKey]; if (!p) return pairKey;
+  return `${UNITS[p.a].abbr} × ${UNITS[p.b].abbr}`;
+}
+function pairColors(pairKey) {
+  const p = PAIRS[pairKey]; if (!p) return {};
+  return { a:UNITS[p.a].color, b:UNITS[p.b].color };
+}
+function fmtTime(t) {
+  if (!t) return '—';
+  const [h,m] = t.split(':').map(Number);
+  const ap = h>=12?'PM':'AM', hr=h>12?h-12:(h===0?12:h);
+  return m===0?`${hr} ${ap}`:`${hr}:${String(m).padStart(2,'0')} ${ap}`;
+}
+function statusBadgeHtml(s) {
+  const cls = { conducted:'st-conducted', scheduled:'st-scheduled', postponed:'st-postponed', missed:'st-missed', cancelled:'st-cancelled' };
+  return `<span class="stbadge ${cls[s]||'st-scheduled'}">${s}</span>`;
+}
+function dayDiff(dateStr) {
+  const d = new Date(dateStr+'T00:00:00');
+  return Math.floor((d - now) / 86400000);
+}
+
+/* ── Month strip ── */
+function buildMonthStrip() {
+  const strip = document.getElementById('monthStrip');
+  strip.innerHTML = '';
+  const counts = {};
+  MEETINGS.forEach(m => { if (m.date) { const k=m.date.slice(0,7); counts[k]=(counts[k]||0)+1; } });
+  for (let i=-3; i<=2; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth()+i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const label = `${MONTHS_S[d.getMonth()]} ${d.getFullYear()}`;
+    const cnt = counts[key]||0;
+    const on = key===selMonth;
+    const pill = document.createElement('button');
+    pill.className = 'month-pill'+(on?' on':'');
+    pill.innerHTML = label+(cnt>0?`<span class="month-count">${cnt}</span>`:'');
+    pill.onclick = () => { selMonth=key; renderAll(); };
+    strip.appendChild(pill);
+  }
+}
+
+/* ── Filters ── */
+function setUnit(u, btn) {
+  selUnit = u;
+  document.querySelectorAll('#unitSeg button').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  const labels = { all:'All meetings', vp:'VETRI Palligal workspace', smc:'SMC workspace', cg:'Career Guidance workspace', acis:'ACIS workspace', nsnop:'NSNOP workspace', alumni:'Alumni workspace', mana:'Manarkeni workspace' };
+  document.getElementById('workspaceLabel').textContent = labels[u]||'All meetings';
+  renderAll();
+}
+
+function setTab(t, btn) {
+  activeTab = t;
+  document.querySelectorAll('#tabSeg button').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  // Update counter badge styles
+  ['All','Upcoming','Conducted','Notheld'].forEach(k => {
+    const s = document.getElementById('cnt'+k);
+    if (s) s.style.background = (activeTab==='all'&&k==='All'||activeTab==='upcoming'&&k==='Upcoming'||activeTab==='conducted'&&k==='Conducted'||activeTab==='notheld'&&k==='Notheld') ? 'rgba(255,255,255,.25)' : 'var(--line)';
+  });
+  renderMeetingList();
+}
+
+function getFiltered() {
+  let list = MEETINGS.filter(m => m.date.startsWith(selMonth));
+  if (selUnit !== 'all') {
+    const p = Object.values(PAIRS).filter(p2 => p2.a===selUnit||p2.b===selUnit).map((_,i)=>Object.keys(PAIRS)[i]);
+    list = list.filter(m => { const pk=PAIRS[m.pair]; return pk&&(pk.a===selUnit||pk.b===selUnit); });
+  }
+  if (activeTab==='upcoming')  list = list.filter(m=>m.status==='scheduled');
+  if (activeTab==='conducted') list = list.filter(m=>m.status==='conducted');
+  if (activeTab==='notheld')   list = list.filter(m=>['missed','postponed','cancelled'].includes(m.status));
+  return list.sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+/* ── Render ── */
+function renderAll() {
+  buildMonthStrip();
+  renderMeetingList();
+}
+
+function renderMeetingList() {
+  const filtered = getFiltered();
+  const all = MEETINGS.filter(m=>m.date.startsWith(selMonth));
+
+  // Tab counts
+  const counts = {
+    all: all.length,
+    upcoming: all.filter(m=>m.status==='scheduled').length,
+    conducted: all.filter(m=>m.status==='conducted').length,
+    notheld: all.filter(m=>['missed','postponed','cancelled'].includes(m.status)).length,
+  };
+  Object.entries(counts).forEach(([k,v]) => {
+    const id = 'cnt'+k.charAt(0).toUpperCase()+k.slice(1);
+    const el = document.getElementById(id);
+    if (el) { el.textContent=v; el.style.display=v>0?'':none; if(v>0)el.style.display=''; else el.style.display='none'; }
+  });
+
+  const list = document.getElementById('meetingList');
+  if (filtered.length === 0) {
+    list.innerHTML = `<div style="text-align:center;padding:60px 20px;color:var(--ink3);font-size:14px"><div style="font-size:40px;margin-bottom:12px">📅</div>No meetings in ${MONTHS_S[parseInt(selMonth.slice(5))-1]} ${selMonth.slice(0,4)}</div>`;
+  } else {
+    list.innerHTML = filtered.map(m => renderMtgRow(m)).join('');
+  }
+
+  // Filed section
+  const conducted = filtered.filter(m => m.status==='conducted'&&m.minutes);
+  const filedSection = document.getElementById('filedSection');
+  const filedList    = document.getElementById('filedList');
+  if (activeTab==='conducted' && conducted.length>0) {
+    filedSection.style.display='';
+    filedList.innerHTML = conducted.map(m => renderFiledCard(m)).join('');
+  } else {
+    filedSection.style.display='none';
+  }
+}
+
+function renderMtgRow(m) {
+  const d = new Date(m.date+'T00:00:00');
+  const p = PAIRS[m.pair]||{};
+  const ua = UNITS[p.a]||{abbr:'?',color:'#888'};
+  const ub = UNITS[p.b]||{abbr:'?',color:'#888'};
+  const hasMoM = !!m.minutes;
+  const isConducted = m.status==='conducted';
+  const isScheduled = m.status==='scheduled';
+  const allowed = isConducted || (isScheduled && m.date===`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`);
+
+  return `<div class="mtg-row">
+    <div class="date-badge">
+      <div class="mo">${MONTHS_S[d.getMonth()]}</div>
+      <div class="dy">${d.getDate()}</div>
+    </div>
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+        <span class="dot" style="background:${ua.color}"></span>
+        <span style="font-weight:700;font-size:16px;color:var(--ink)">${ua.abbr} × ${ub.abbr}</span>
+        <span class="dot" style="background:${ub.color}"></span>
+        ${statusBadgeHtml(m.status)}
+      </div>
+      <div style="font-size:12px;color:var(--ink3);display:flex;gap:12px;flex-wrap:wrap">
+        <span>${ua.name} × ${ub.name}</span>
+        ${m.time?`<span>🕐 ${fmtTime(m.time)}${m.end_time?` – ${fmtTime(m.end_time)}`:''}</span>`:''}
+        ${hasMoM?`<span style="color:#1D9E75;font-weight:600">✅ MoM filed</span>`:''}
+      </div>
+    </div>
+    <div style="flex-shrink:0">
+      <button class="enter-mom-btn${allowed?'':' dim'}" onclick="${allowed?`openMom(${m.id})`:'void 0'}">
+        ${hasMoM?'View / Edit MoM':'Enter MoM'}
+      </button>
+    </div>
+  </div>`;
+}
+
+function renderFiledCard(m) {
+  const p = PAIRS[m.pair]||{};
+  const ua = UNITS[p.a]||{abbr:'?',color:'#888',name:'?'};
+  const ub = UNITS[p.b]||{abbr:'?',color:'#888',name:'?'};
+  const mins = m.minutes;
+  const aps = mins.action_points||[];
+  const done = aps.filter(a=>a.done).length;
+  const total= aps.length;
+  const pct  = total ? Math.round(done/total*100) : 0;
+
+  let apsHtml = '';
+  if (aps.length) {
+    const bar = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div style="flex:1;height:6px;background:var(--line);border-radius:99px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:var(--ok);border-radius:99px"></div>
+      </div>
+      <span style="font-size:11px;color:var(--ink3);white-space:nowrap;font-weight:600">${done}/${total} done</span>
+    </div>`;
+    const rows = aps.map(ap => {
+      const diff = ap.deadline ? dayDiff(ap.deadline) : null;
+      const overdue = diff!==null && diff<0 && !ap.done;
+      const lbl = ap.done?'DONE':overdue?'OVERDUE':'PENDING';
+      const bg  = ap.done?'#dcfce7':overdue?'#fee2e2':'#f1f5f9';
+      const clr = ap.done?'#15803d':overdue?'#dc2626':'#64748b';
+      const icon= ap.done?'✓':overdue?'⚠':'○';
+      return `<div class="ap-item${overdue?' overdue':''}">
+        <span class="ap-status-badge" style="background:${bg};color:${clr}">${icon} ${lbl}</span>
+        <span style="flex:1;font-size:13px;color:${ap.done?'var(--ink3)':'var(--ink)'};text-decoration:${ap.done?'line-through':'none'};line-height:1.5">${ap.text}</span>
+        ${ap.assigned_to_name?`<span style="flex-shrink:0;display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--ink2);background:#f1f5f9;border:1px solid var(--line);border-radius:20px;padding:2px 10px;white-space:nowrap">
+          <span style="width:18px;height:18px;border-radius:50%;background:var(--accent);color:#fff;font-size:10px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">${ap.assigned_to_name.charAt(0)}</span>${ap.assigned_to_name}</span>`:''}
+        ${(ap.start_date||ap.deadline)?`<span style="flex-shrink:0;font-size:11px;color:${overdue?'#dc2626':'var(--ink3)'};white-space:nowrap;font-weight:${overdue?700:500}">${ap.start_date?ap.start_date+' → ':''}${ap.deadline||''}</span>`:''}
+      </div>`;
+    }).join('');
+    apsHtml = `<div style="padding-top:10px;border-top:1px solid var(--line2)">${bar}${rows}</div>`;
+  }
+
+  return `<div class="filed-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:${total?12:0}px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:18px">📝</span>
+        <div>
+          <div style="font-weight:700;font-size:16px;display:flex;align-items:center;gap:6px">
+            <span class="dot" style="background:${ua.color}"></span>${ua.abbr}
+            <span style="color:var(--ink3);font-weight:400;font-size:13px">×</span>
+            <span class="dot" style="background:${ub.color}"></span>${ub.abbr}
+          </div>
+          <div style="font-size:11px;color:var(--ink2);margin-top:2px;display:flex;gap:10px;flex-wrap:wrap">
+            <span>📅 ${m.date}</span>
+            ${mins.attendees?`<span>👥 ${mins.attendees}</span>`:''}
+            ${mins.summary?`<span style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${mins.summary}</span>`:''}
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn sm">⬇ PDF</button>
+        <button class="btn sm">⬇ Word</button>
+        <button onclick="shareWA(${m.id})" style="border:none;border-radius:7px;padding:5px 9px;background:#25d366;cursor:pointer;color:#fff;display:flex;align-items:center;justify-content:center" title="Share on WhatsApp">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        </button>
+      </div>
+    </div>
+    ${apsHtml}
+  </div>`;
+}
+
+/* ── MoM Modal ── */
+function openMom(id) {
+  const m = MEETINGS.find(x=>x.id===id); if (!m) return;
+  curMomId = id;
+  const p = PAIRS[m.pair]||{};
+  const ua = UNITS[p.a]||{abbr:'?',color:'#888'};
+  const ub = UNITS[p.b]||{abbr:'?',color:'#888'};
+
+  // Header gradient
+  const hdr = document.getElementById('momHdr');
+  hdr.style.background = `linear-gradient(135deg, ${ua.color}18 0%, ${ub.color}18 100%)`;
+  document.getElementById('momDotA').style.background = ua.color;
+  document.getElementById('momDotB').style.background = ub.color;
+  document.getElementById('momTitle').textContent = `${ua.abbr} × ${ub.abbr}`;
+  const badge = document.getElementById('momStatusBadge');
+  badge.className = 'stbadge st-'+m.status;
+  badge.textContent = m.status;
+
+  let subHtml = `<span>📅 ${m.date}</span>`;
+  if (m.time) subHtml += `<span>🕐 ${fmtTime(m.time)}${m.end_time?` – ${fmtTime(m.end_time)}`:''}</span>`;
+  subHtml += `<span style="font-style:italic">${ua.name} × ${ub.name}</span>`;
+  document.getElementById('momSubInfo').innerHTML = subHtml;
+
+  // Pre-fill from existing minutes
+  const mins = m.minutes;
+  document.getElementById('momAttendees').value = mins?.attendees || '';
+  document.getElementById('momSummary').value   = mins?.summary   || '';
+  document.getElementById('momSaveBtn').textContent = mins ? 'Update MoM' : 'Save MoM';
+
+  // Action points
+  if (mins?.action_points?.length) {
+    apEntries = mins.action_points.map(ap => ({ text:ap.text, unitId:null, userId:null, startDate:ap.start_date||'', deadline:ap.deadline||'' }));
+  } else {
+    apEntries = [{ text:'', unitId:null, userId:null, startDate:'', deadline:'' }];
+  }
+  renderApList();
+
+  document.getElementById('errSummary').style.display = 'none';
+  document.getElementById('momModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeMom() {
+  document.getElementById('momModal').classList.remove('open');
+  document.body.style.overflow = '';
+  curMomId = null;
+}
+
+/* ── Cascading AP list ── */
+function renderApList() {
+  const m = curMomId ? MEETINGS.find(x=>x.id===curMomId) : null;
+  const p = m ? (PAIRS[m.pair]||{}) : {};
+  const ua = p.a ? UNITS[p.a] : { abbr:'Unit A', color:'#6366f1', id:'a' };
+  const ub = p.b ? UNITS[p.b] : { abbr:'Unit B', color:'#ec4899', id:'b' };
+
+  const list = document.getElementById('apList');
+  list.innerHTML = apEntries.map((ap, i) => {
+    const showUnit     = ap.text.trim().length > 0;
+    const showUser     = showUnit && ap.unitId !== null;
+    const showDeadline = showUser;
+
+    const unitBtns = [ua, ub].map(u => {
+      const on = ap.unitId === u.abbr;
+      return `<button class="unit-btn${on?' on':''}" style="border-color:${on?u.color:'var(--line)'};background:${on?u.color:'#fff'};color:${on?'#fff':'var(--ink)'}" onclick="selectUnit(${i},'${u.abbr}','${u.color}',this)">`
+        +`<span style="width:8px;height:8px;border-radius:50%;background:${on?'rgba(255,255,255,.7)':u.color};flex-shrink:0;display:inline-block"></span>${u.abbr}</button>`;
+    }).join('');
+
+    return `<div class="ap-cascade" id="apRow${i}">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.04em;min-width:24px">${i+1}</span>
+        <input type="text" style="flex:1;font-size:15px" value="${ap.text.replace(/"/g,'&quot;')}" placeholder="What needs to be done…"
+          oninput="updateAP(${i},'text',this.value)">
+        ${apEntries.length>1?`<button onclick="removeAP(${i})" style="border:1px solid #fca5a5;border-radius:8px;background:#fff5f5;color:#dc2626;width:34px;height:38px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">×</button>`:'<span style="width:34px"></span>'}
+      </div>
+      ${showUnit?`<div class="cascade-step"><span class="cascade-label">Assign to</span><div style="display:flex;gap:8px">${unitBtns}</div></div>`:''}
+      ${showUser?`<div class="cascade-step"><span class="cascade-label">Person</span>
+        <select style="flex:1;max-width:320px;font-size:13px" onchange="updateAP(${i},'userId',this.value)">
+          <option value="">— Select person —</option>
+          <option ${ap.unitId===ua.abbr?'':'disabled'}>Rajan Kumar</option>
+          <option ${ap.unitId===ua.abbr?'':'disabled'}>Kavitha Murthy</option>
+          <option ${ap.unitId===ub.abbr?'':'disabled'}>Priya Sundaram</option>
+          <option ${ap.unitId===ub.abbr?'':'disabled'}>Anand Selvam</option>
+        </select></div>`:''}
+      ${showDeadline?`<div class="cascade-step" style="flex-wrap:wrap;gap:8px">
+        <span class="cascade-label">From</span>
+        <input type="date" value="${ap.startDate}" style="width:140px;font-size:13px" onchange="updateAP(${i},'startDate',this.value)">
+        <span class="cascade-label">To</span>
+        <input type="date" value="${ap.deadline}" style="width:140px;font-size:13px" onchange="updateAP(${i},'deadline',this.value)">
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function selectUnit(i, abbr, color, btn) {
+  apEntries[i].unitId = apEntries[i].unitId===abbr ? null : abbr;
+  apEntries[i].userId = null;
+  renderApList();
+}
+function updateAP(i, field, val) {
+  apEntries[i][field] = val;
+  if (field==='text') { apEntries[i].unitId=null; apEntries[i].userId=null; apEntries[i].startDate=''; apEntries[i].deadline=''; }
+  if (field==='unitId') { apEntries[i].userId=null; apEntries[i].startDate=''; apEntries[i].deadline=''; }
+  renderApList();
+}
+function addCascadeAP() {
+  apEntries.push({ text:'', unitId:null, userId:null, startDate:'', deadline:'' });
+  renderApList();
+}
+function removeAP(i) {
+  apEntries.splice(i,1);
+  renderApList();
+}
+
+function saveMom() {
+  const summary = document.getElementById('momSummary').value.trim();
+  const cleanAps = apEntries.filter(a=>a.text.trim());
+  if (!summary && !cleanAps.length) {
+    document.getElementById('errSummary').style.display='';
+    return;
+  }
+  document.getElementById('errSummary').style.display='none';
+
+  const m = MEETINGS.find(x=>x.id===curMomId);
+  if (m) {
+    const now2 = new Date();
+    let apId = 100;
+    m.minutes = {
+      attendees: document.getElementById('momAttendees').value,
+      summary,
+      action_points: cleanAps.map(ap => ({
+        id: apId++, aid:'AP-0'+apId,
+        text:ap.text, done:false,
+        assigned_to_name: ap.userId||null,
+        start_date: ap.startDate||null,
+        deadline: ap.deadline||null,
+      })),
+    };
+    if (m.status==='scheduled') m.status='conducted';
+  }
+  closeMom();
+  renderAll();
+}
+
+/* ── Record Modal ── */
+let recApCount = 1;
+function openRecord() {
+  document.getElementById('recPair').value = '';
+  document.getElementById('recDate').value  = '';
+  document.getElementById('recAttendees').value='';
+  document.getElementById('recSummary').value='';
+  document.getElementById('recReason').value='';
+  ['errRecPair','errRecDate','errRecSummary','errRecReason'].forEach(id=>document.getElementById(id).style.display='none');
+  setOutcome('held');
+  document.getElementById('recordModal').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeRecord() {
+  document.getElementById('recordModal').classList.remove('open');
+  document.body.style.overflow='';
+}
+
+function setOutcome(o) {
+  outcome=o;
+  document.getElementById('outcomeHeld').className='outcome-pill'+(o==='held'?' on':'');
+  document.getElementById('outcomeNot').className='outcome-pill'+(o==='notheld'?' on':'');
+  document.getElementById('heldSection').style.display=o==='held'?'':'none';
+  document.getElementById('notheldSection').style.display=o==='notheld'?'':'none';
+  document.getElementById('recSaveBtn').textContent=o==='held'?'Submit minutes':'Record reason';
+}
+
+function setNH(t) {
+  nhType=t;
+  document.getElementById('nhPostponed').className='notheld-pill'+(t==='postponed'?' on':'');
+  document.getElementById('nhMissed').className='notheld-pill'+(t==='missed'?' on':'');
+}
+
+function addRecAP() {
+  recApCount++;
+  const row = document.createElement('div');
+  row.className='rec-ap-row';
+  row.style.cssText='display:grid;grid-template-columns:1fr 160px 130px 34px;gap:8px;margin-bottom:8px';
+  row.innerHTML=`<input type="text" placeholder="Action item ${recApCount}…" style="font-size:13px">
+    <select style="font-size:12px"><option value="">— Assign to —</option><option>Rajan Kumar (VP)</option><option>Priya Sundaram (SMC)</option><option>Anand Selvam (CG)</option></select>
+    <input type="date" style="font-size:13px">
+    <button onclick="this.closest('.rec-ap-row').remove()" style="height:42px;width:34px;border:1px solid #fca5a5;border-radius:8px;background:#fff5f5;color:#dc2626;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>`;
+  document.getElementById('recApList').appendChild(row);
+}
+
+function submitRecord() {
+  const pair   = document.getElementById('recPair').value;
+  const date   = document.getElementById('recDate').value;
+  let valid = true;
+  if (!pair) { document.getElementById('errRecPair').style.display=''; valid=false; }
+  if (!date) { document.getElementById('errRecDate').style.display=''; valid=false; }
+  if (outcome==='held') {
+    const summary = document.getElementById('recSummary').value.trim();
+    if (!summary) { document.getElementById('errRecSummary').style.display=''; valid=false; }
+  } else {
+    const reason = document.getElementById('recReason').value.trim();
+    if (!reason) { document.getElementById('errRecReason').style.display=''; valid=false; }
+  }
+  if (!valid) return;
+
+  const newId = Math.max(...MEETINGS.map(m=>m.id),0)+1;
+  const status = outcome==='held' ? 'conducted' : nhType;
+  const mins = outcome==='held' ? {
+    attendees: document.getElementById('recAttendees').value,
+    summary: document.getElementById('recSummary').value,
+    action_points: [],
+  } : null;
+  MEETINGS.push({ id:newId, pair, date, time:null, end_time:null, type:'In-person', status, minutes:mins });
+  closeRecord();
+  renderAll();
+}
+
+function shareWA(id) {
+  const m = MEETINGS.find(x=>x.id===id); if (!m) return;
+  const p = PAIRS[m.pair]||{};
+  const ua=UNITS[p.a]||{name:'?',abbr:'?'}, ub=UNITS[p.b]||{name:'?',abbr:'?'};
+  const mins=m.minutes||{};
+  const lines = ['📋 MINUTES OF MEETING','═══════════════════════════════',
+    `Meeting : ${ua.name} × ${ub.name}`, `Date    : ${m.date}${m.time?', '+fmtTime(m.time):''}`,
+    ...(mins.attendees?[`Attended: ${mins.attendees}`]:[]),
+    ...(mins.summary?['','📝 SUMMARY',mins.summary]:[]),
+    ...(mins.action_points?.length?['','✅ ACTION POINTS',...mins.action_points.map(ap=>`${ap.done?'☑':'☐'} ${ap.text}`)]:[]),
+    '','─────────────────────────','MS-CMS Convergence — TN EMIS'];
+  window.open('https://wa.me/?text='+encodeURIComponent(lines.join('\n')),'_blank');
+}
+
+function overlayClick(e,id) {
+  if (e.target===document.getElementById(id)) {
+    if (id==='momModal') closeMom();
+    else if (id==='recordModal') closeRecord();
+  }
+}
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape') { closeMom(); closeRecord(); }
+  if (e.key==='Enter'&&(e.ctrlKey||e.metaKey)) {
+    if (document.getElementById('momModal').classList.contains('open')) saveMom();
+    if (document.getElementById('recordModal').classList.contains('open')) submitRecord();
+  }
+});
+
+/* ── Init ── */
+renderAll();
+</script>
+</body>
+</html>
