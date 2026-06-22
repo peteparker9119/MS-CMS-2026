@@ -4,9 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getItems, createItem, updateItem, setItemStatus,
   addActionItem, toggleActionItem,
-  getUsersByUnits,
 } from '../api/items';
-import { getUnits } from '../api/units';
+import { getUnits, getUsersByUnits } from '../api/units';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../api/client';

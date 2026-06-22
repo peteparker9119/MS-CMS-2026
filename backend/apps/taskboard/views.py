@@ -1,25 +1,20 @@
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action, api_view
+from rest_framework.decorators import permission_classes as permission_classes_dec
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 
-from apps.accounts.permissions import IsAdminOrReadOnly
+from apps.accounts.permissions import IsAdmin
 from .models import Task, TaskAssignment, TaskActivity
 from .serializers import TaskSerializer, TaskAssignmentSerializer, TaskActivitySerializer
 
 User = get_user_model()
 
 
-class IsAdminUser(IsAuthenticated):
-    def has_permission(self, request, view):
-        return super().has_permission(request, view) and request.user.role in ('admin', 'super_admin')
-
-
 class TaskViewSet(viewsets.ModelViewSet):
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdmin]
 
     def perform_create(self, serializer):
         # Auto-assign order as max+1
@@ -30,7 +25,7 @@ class TaskViewSet(viewsets.ModelViewSet):
 
 class TaskAssignmentViewSet(viewsets.ModelViewSet):
     serializer_class = TaskAssignmentSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdmin]
 
     def get_queryset(self):
         qs = TaskAssignment.objects.select_related(
@@ -62,22 +57,21 @@ class TaskAssignmentViewSet(viewsets.ModelViewSet):
         return Response(TaskActivitySerializer(activity).data, status=201)
 
 
-class TaskBoardUsersView(viewsets.ViewSet):
+@api_view(['GET'])
+@permission_classes_dec([IsAdmin])
+def board_users(request):
     """Return all active users for the task board matrix rows."""
-    permission_classes = [IsAdminUser]
-
-    def list(self, request):
-        users = User.objects.filter(is_active=True).select_related('unit').order_by('unit__abbr', 'first_name', 'username')
-        data = [
-            {
-                'id':        u.id,
-                'name':      u.get_full_name() or u.username,
-                'username':  u.username,
-                'role':      u.role,
-                'unit_id':   u.unit.id   if u.unit else None,
-                'unit_abbr': u.unit.abbr if u.unit else '',
-                'unit_color':u.unit.color if u.unit else '#6366f1',
-            }
-            for u in users
-        ]
-        return Response(data)
+    users = User.objects.filter(is_active=True).select_related('unit').order_by('unit__abbr', 'first_name', 'username')
+    data = [
+        {
+            'id':        u.id,
+            'name':      u.get_full_name() or u.username,
+            'username':  u.username,
+            'role':      u.role,
+            'unit_id':   u.unit.id   if u.unit else None,
+            'unit_abbr': u.unit.abbr if u.unit else '',
+            'unit_color':u.unit.color if u.unit else '#6366f1',
+        }
+        for u in users
+    ]
+    return Response(data)

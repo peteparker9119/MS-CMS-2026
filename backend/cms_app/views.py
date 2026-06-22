@@ -9,7 +9,7 @@ these under the `api/cms/` prefix.
 
 # accounts
 from apps.accounts.views import (
-    MeView,
+    me_view,
     user_list,
     user_create,
     user_update,
@@ -22,9 +22,9 @@ from apps.units.views import ConvergenceUnitViewSet, UnitPairViewSet
 from apps.meetings.views import (
     MeetingViewSet,
     ActionPointViewSet,
-    MeetingMembersView,
-    DashboardStatsView,
-    DashboardMatrixView,
+    meeting_members,
+    dashboard_stats,
+    dashboard_matrix,
 )
 # items
 from apps.items.views import ItemViewSet
@@ -41,7 +41,7 @@ from apps.reviews.views import (
     reviews_summary,
 )
 # documents
-from apps.documents.views import DOLetterViewSet, DOComplianceView
+from apps.documents.views import DOLetterViewSet, do_compliance
 # notifications
 from apps.notifications.views import NotificationViewSet
 # menus
@@ -50,22 +50,22 @@ from apps.menus.views import CustomMenuViewSet
 from apps.taskboard.views import (
     TaskViewSet,
     TaskAssignmentViewSet,
-    TaskBoardUsersView,
+    board_users,
 )
 
 __all__ = [
-    'MeView', 'user_list', 'user_create', 'user_update', 'user_delete',
+    'me_view', 'user_list', 'user_create', 'user_update', 'user_delete',
     'users_by_units',
     'ConvergenceUnitViewSet', 'UnitPairViewSet',
-    'MeetingViewSet', 'ActionPointViewSet', 'MeetingMembersView',
-    'DashboardStatsView', 'DashboardMatrixView',
+    'MeetingViewSet', 'ActionPointViewSet', 'meeting_members',
+    'dashboard_stats', 'dashboard_matrix',
     'ItemViewSet',
     'WorkTaskViewSet',
     'KPIDefinitionViewSet', 'KPIEntryViewSet', 'kpi_summary',
     'GanttTaskViewSet',
     'ReviewTemplateViewSet', 'ReviewEntryViewSet', 'reviews_summary',
-    'DOLetterViewSet', 'DOComplianceView',
+    'DOLetterViewSet', 'do_compliance',
     'NotificationViewSet',
     'CustomMenuViewSet',
-    'TaskViewSet', 'TaskAssignmentViewSet', 'TaskBoardUsersView',
+    'TaskViewSet', 'TaskAssignmentViewSet', 'board_users',
 ]

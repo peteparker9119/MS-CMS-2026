@@ -4,7 +4,7 @@ import { getMeetings, submitMinutes, recordNotHeld, updateMeeting } from '../api
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../api/client';
-import { getUsersByUnits } from '../api/items';
+import { getUsersByUnits } from '../api/units';
 import DateField from '../components/DateField';
 
 const ERR = { fontSize: 11, color: '#dc2626', marginTop: 4 };

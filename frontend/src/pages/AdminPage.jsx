@@ -2,10 +2,10 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getUsers, updateUser, deleteUser,
-  getUnitsAdmin, createUnit, updateUnit, deleteUnit,
   getCustomMenus, createCustomMenu, updateCustomMenu, deleteCustomMenu,
   getMenuEntries,
 } from '../api/admin';
+import { getUnits, createUnit, updateUnit, deleteUnit } from '../api/units';
 import { useToast } from '../context/ToastContext';
 import {
   CSpinner,
@@ -663,7 +663,7 @@ function UnitsTab() {
   const toast = useToast();
   const qc    = useQueryClient();
 
-  const { data: units = [], isLoading } = useQuery({ queryKey: ['admin-units'], queryFn: getUnitsAdmin });
+  const { data: units = [], isLoading } = useQuery({ queryKey: ['admin-units'], queryFn: getUnits });
   const [modalOpen,  setModalOpen]  = useState(false);
   const [editTarget, setEditTarget] = useState(null);
 
@@ -1162,7 +1162,7 @@ const TABS = [
 
 export default function AdminPage() {
   const [tab, setTab] = useState('users');
-  const { data: units = [] } = useQuery({ queryKey: ['admin-units'], queryFn: getUnitsAdmin });
+  const { data: units = [] } = useQuery({ queryKey: ['admin-units'], queryFn: getUnits });
 
   return (
     <>
