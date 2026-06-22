@@ -4,11 +4,11 @@ from django.db.models import Q, Count, Case, When, IntegerField
 from rest_framework import viewsets, status
 
 logger = logging.getLogger('cms')
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view
+from rest_framework.decorators import permission_classes as permission_classes_dec
 from rest_framework.permissions import IsAuthenticated
 from cms.accounts.permissions import IsAdminOrReadOnly
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from cms.units.models import ConvergenceUnit, UnitPair
 from .models import Meeting, MeetingMinutes, ActionPoint, ActionPointComment, MeetingNotHeld, MeetingHistory
@@ -291,107 +291,104 @@ class ActionPointViewSet(viewsets.ModelViewSet):
         return Response({'sent': created})
 
 
-class MeetingMembersView(APIView):
-    permission_classes = [IsAuthenticated]
+@api_view(['GET'])
+@permission_classes_dec([IsAuthenticated])
+def meeting_members(request, pk):
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    try:
+        meeting = Meeting.objects.select_related('pair__unit_a', 'pair__unit_b').get(pk=pk)
+    except Meeting.DoesNotExist:
+        return Response({'detail': 'Not found'}, status=404)
+    unit_a = meeting.pair.unit_a
+    unit_b = meeting.pair.unit_b
+    users = User.objects.filter(unit__in=[unit_a, unit_b], is_active=True).select_related('unit')
+    data = [
+        {
+            'id': u.id,
+            'name': u.get_full_name() or u.username,
+            'unit_abbr': u.unit.abbr if u.unit else '',
+        }
+        for u in users
+    ]
+    return Response(data)
 
-    def get(self, request, pk=None):
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
-        try:
-            meeting = Meeting.objects.select_related('pair__unit_a', 'pair__unit_b').get(pk=pk)
-        except Meeting.DoesNotExist:
-            return Response({'detail': 'Not found'}, status=404)
-        unit_a = meeting.pair.unit_a
-        unit_b = meeting.pair.unit_b
-        users = User.objects.filter(unit__in=[unit_a, unit_b], is_active=True).select_related('unit')
-        data = [
-            {
-                'id': u.id,
-                'name': u.get_full_name() or u.username,
-                'unit_abbr': u.unit.abbr if u.unit else '',
-            }
-            for u in users
-        ]
-        return Response(data)
+
+@api_view(['GET'])
+@permission_classes_dec([IsAuthenticated])
+def dashboard_stats(request):
+    unit_slug = request.query_params.get('unit')
+    date_from = request.query_params.get('from')
+    date_to = request.query_params.get('to')
+
+    meeting_qs = Meeting.objects.all()
+    if unit_slug and unit_slug != 'all':
+        meeting_qs = meeting_qs.filter(
+            Q(pair__unit_a__slug=unit_slug) | Q(pair__unit_b__slug=unit_slug)
+        )
+    # Scope to user's unit for non-admin roles (poc + team)
+    if not request.user.is_admin and request.user.unit:
+        meeting_qs = meeting_qs.filter(
+            Q(pair__unit_a=request.user.unit) | Q(pair__unit_b=request.user.unit)
+        )
+    if date_from:
+        meeting_qs = meeting_qs.filter(date__gte=date_from)
+    if date_to:
+        meeting_qs = meeting_qs.filter(date__lte=date_to)
+
+    planned = meeting_qs.count()
+    conducted = meeting_qs.filter(status=Meeting.STATUS_CONDUCTED).count()
+    postponed = meeting_qs.filter(status=Meeting.STATUS_POSTPONED).count()
+    missed = meeting_qs.filter(status=Meeting.STATUS_MISSED).count()
+    moms = MeetingMinutes.objects.filter(meeting__in=meeting_qs).count()
+
+    ap_qs = ActionPoint.objects.filter(minutes__meeting__in=meeting_qs)
+    a_tot = ap_qs.count()
+    a_done = ap_qs.filter(done=True).count()
+    a_pend = a_tot - a_done
+
+    return Response({
+        'planned': planned,
+        'conducted': conducted,
+        'postponed': postponed,
+        'missed': missed,
+        'moms': moms,
+        'a_tot': a_tot,
+        'a_done': a_done,
+        'a_pend': a_pend,
+        'act_pct': round(a_done / a_tot * 100, 1) if a_tot else 0,
+    })
 
 
-class DashboardStatsView(APIView):
-    permission_classes = [IsAuthenticated]
+@api_view(['GET'])
+@permission_classes_dec([IsAuthenticated])
+def dashboard_matrix(request):
+    """Returns per-pair conducted/planned counts for the convergence tile grid."""
+    date_from = request.query_params.get('from')
+    date_to = request.query_params.get('to')
 
-    def get(self, request):
-        unit_slug = request.query_params.get('unit')
-        date_from = request.query_params.get('from')
-        date_to = request.query_params.get('to')
+    pairs = UnitPair.objects.select_related('unit_a', 'unit_b').all()
 
-        meeting_qs = Meeting.objects.all()
-        if unit_slug and unit_slug != 'all':
-            meeting_qs = meeting_qs.filter(
-                Q(pair__unit_a__slug=unit_slug) | Q(pair__unit_b__slug=unit_slug)
-            )
-        # Scope to user's unit for non-admin roles (poc + team)
-        if not request.user.is_admin and request.user.unit:
-            meeting_qs = meeting_qs.filter(
-                Q(pair__unit_a=request.user.unit) | Q(pair__unit_b=request.user.unit)
-            )
+    # Scope to user's unit for non-admin roles (poc + team)
+    user = request.user
+    if not user.is_admin and user.unit:
+        pairs = pairs.filter(Q(unit_a=user.unit) | Q(unit_b=user.unit))
+
+    result = []
+    for pair in pairs:
+        qs = pair.meetings.all()
         if date_from:
-            meeting_qs = meeting_qs.filter(date__gte=date_from)
+            qs = qs.filter(date__gte=date_from)
         if date_to:
-            meeting_qs = meeting_qs.filter(date__lte=date_to)
-
-        planned = meeting_qs.count()
-        conducted = meeting_qs.filter(status=Meeting.STATUS_CONDUCTED).count()
-        postponed = meeting_qs.filter(status=Meeting.STATUS_POSTPONED).count()
-        missed = meeting_qs.filter(status=Meeting.STATUS_MISSED).count()
-        moms = MeetingMinutes.objects.filter(meeting__in=meeting_qs).count()
-
-        ap_qs = ActionPoint.objects.filter(minutes__meeting__in=meeting_qs)
-        a_tot = ap_qs.count()
-        a_done = ap_qs.filter(done=True).count()
-        a_pend = a_tot - a_done
-
-        return Response({
+            qs = qs.filter(date__lte=date_to)
+        planned = qs.count()
+        conducted = qs.filter(status=Meeting.STATUS_CONDUCTED).count()
+        result.append({
+            'pair_id': pair.id,
+            'unit_a': pair.unit_a.slug,
+            'unit_b': pair.unit_b.slug,
             'planned': planned,
             'conducted': conducted,
-            'postponed': postponed,
-            'missed': missed,
-            'moms': moms,
-            'a_tot': a_tot,
-            'a_done': a_done,
-            'a_pend': a_pend,
-            'act_pct': round(a_done / a_tot * 100, 1) if a_tot else 0,
+            'rate': round(conducted / planned, 3) if planned else None,
         })
-
-
-class DashboardMatrixView(APIView):
-    """Returns per-pair conducted/planned counts for the convergence tile grid."""
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        date_from = request.query_params.get('from')
-        date_to = request.query_params.get('to')
-
-        pairs = UnitPair.objects.select_related('unit_a', 'unit_b').all()
-
-        # Scope to user's unit for non-admin roles (poc + team)
-        user = request.user
-        if not user.is_admin and user.unit:
-            pairs = pairs.filter(Q(unit_a=user.unit) | Q(unit_b=user.unit))
-
-        result = []
-        for pair in pairs:
-            qs = pair.meetings.all()
-            if date_from:
-                qs = qs.filter(date__gte=date_from)
-            if date_to:
-                qs = qs.filter(date__lte=date_to)
-            planned = qs.count()
-            conducted = qs.filter(status=Meeting.STATUS_CONDUCTED).count()
-            result.append({
-                'pair_id': pair.id,
-                'unit_a': pair.unit_a.slug,
-                'unit_b': pair.unit_b.slug,
-                'planned': planned,
-                'conducted': conducted,
-                'rate': round(conducted / planned, 3) if planned else None,
-            })
-        return Response(result)
+    return Response(result)

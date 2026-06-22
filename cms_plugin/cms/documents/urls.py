@@ -1,12 +1,11 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from cms.authentication import Auth
-from .views import DOLetterViewSet, DOComplianceView
+from .views import DOLetterViewSet, do_compliance
 
 router = DefaultRouter()
 router.register(r'do-letters', DOLetterViewSet, basename='doletter')
 
 urlpatterns = [
     path('', include(router.urls)),
-    path('do-compliance/', DOComplianceView.as_view(), name='do-compliance'),
+    path('do-compliance/', do_compliance, name='do-compliance'),
 ]
