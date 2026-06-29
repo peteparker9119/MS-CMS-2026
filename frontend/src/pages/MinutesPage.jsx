@@ -64,7 +64,7 @@ function formatMoM(meeting) {
     lines.push('', '✅ ACTION POINTS');
     mins.action_points.forEach(ap => lines.push(`${ap.done?'☑':'☐'} ${ap.aid}: ${ap.text}`));
   }
-  lines.push('', '──────────────────────────────', 'MS - CMS Convergence — TN EMIS');
+  lines.push('', '──────────────────────────────', 'MS CMS — Model Schools CMS');
   return lines.join('\n');
 }
 function shareWhatsApp(meeting) {

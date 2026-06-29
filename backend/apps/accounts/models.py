@@ -10,7 +10,7 @@ class User(AbstractUser):
     ROLE_CHOICES = [
         (ROLE_SUPER_ADMIN, 'Super Admin'),
         (ROLE_ADMIN,       'Admin'),
-        (ROLE_POC,         'Unit POC'),
+        (ROLE_POC,         'Unit TL'),
         (ROLE_TEAM,        'Team Member'),
     ]
 
@@ -20,7 +20,7 @@ class User(AbstractUser):
         null=True, blank=True,
         on_delete=models.SET_NULL,
         related_name='poc_users',
-        help_text='Set for POC and Team users',
+        help_text='Set for TL and Team users',
     )
     is_team_lead = models.BooleanField(default=False)
     menu_permissions = models.JSONField(default=list, blank=True)

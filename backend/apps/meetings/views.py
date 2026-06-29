@@ -259,7 +259,7 @@ class ActionPointViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='ask-status', permission_classes=[IsAuthenticated])
     def ask_status(self, request, pk=None):
-        """Admin sends in-app notification to POC users asking why item is still pending."""
+        """Admin sends in-app notification to TL users asking why item is still pending."""
         from apps.notifications.models import Notification
         from django.contrib.auth import get_user_model
         User = get_user_model()

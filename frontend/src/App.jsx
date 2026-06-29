@@ -112,7 +112,7 @@ function AppLayout() {
             </div>
           </CContainer>
         </div>
-        <footer className="foot">MS - CMS Convergence — TN EMIS · {new Date().getFullYear()}</footer>
+        <footer className="foot">MS CMS — Model Schools Convergence Management System · {new Date().getFullYear()}</footer>
       </div>
     </div>
   );

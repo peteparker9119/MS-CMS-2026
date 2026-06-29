@@ -37,7 +37,7 @@ const MENU_SLUGS = MENUS.map(m => m.slug);
 
 const ROLE_META = {
   admin: { label: 'Admin',    bg: '#1e2333', color: '#fff'    },
-  poc:   { label: 'Unit Rep', bg: '#dbeafe', color: '#1d4ed8' },
+  poc:   { label: 'Unit TL', bg: '#dbeafe', color: '#1d4ed8' },
   user:  { label: 'User',     bg: '#f1f5f9', color: '#475569' },
 };
 
@@ -54,7 +54,7 @@ const FIELD_TYPES = [
 ];
 
 const ICONS = ['grid','list','document','chart','folder','star','settings','users','calendar','tag'];
-const ACCESS_OPTS = [['all','All Users'],['admin','Admin Only'],['poc','Unit Only']];
+const ACCESS_OPTS = [['all','All Users'],['admin','Admin Only'],['poc','TL Only']];
 
 const TYPE_ICON = {
   text:'T', number:'#', date:'📅', email:'@', phone:'☎',
@@ -371,7 +371,7 @@ function UserModal({ visible, onClose, editUser, units }) {
             <Field label="Role">
               <select style={INPUT} value={fRole} onChange={e => setFRole(e.target.value)}>
                 <option value="admin">Admin</option>
-                <option value="poc">Unit Rep</option>
+                <option value="poc">Unit TL</option>
               </select>
             </Field>
           </CCol>
@@ -569,7 +569,7 @@ function UsersTab({ units }) {
     { label: 'Total Users', value: users.length, color: '#4f46e5' },
     { label: 'Active',      value: totalActive,  color: '#16a34a' },
     { label: 'Admin',       value: totalAdmin,   color: '#0f172a' },
-    { label: 'Unit Rep',    value: totalPoc,     color: '#2563eb' },
+    { label: 'Unit TL',     value: totalPoc,     color: '#2563eb' },
   ];
 
   return (

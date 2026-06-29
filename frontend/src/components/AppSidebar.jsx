@@ -112,10 +112,10 @@ export default function AppSidebar() {
           background: 'linear-gradient(135deg,#6366f1,#818cf8)',
           color: '#fff', fontFamily: 'var(--fd)', fontWeight: 800,
           fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>C</div>
+        }}>M</div>
         <div>
-          <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 15, color: '#fff', lineHeight: 1, letterSpacing: '-.01em' }}>CMS</div>
-          <div style={{ fontFamily: 'var(--fm)', fontSize: 10, color: 'rgba(255,255,255,.4)', lineHeight: 1, marginTop: 3, letterSpacing: '.04em', textTransform: 'uppercase' }}>Convergence</div>
+          <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 15, color: '#fff', lineHeight: 1, letterSpacing: '-.01em' }}>MS CMS</div>
+          <div style={{ fontFamily: 'var(--fm)', fontSize: 10, color: 'rgba(255,255,255,.4)', lineHeight: 1, marginTop: 3, letterSpacing: '.04em', textTransform: 'uppercase' }}>Model Schools</div>
         </div>
       </div>
 
@@ -149,7 +149,7 @@ export default function AppSidebar() {
         )}
       </nav>
 
-      {/* ── Unit badge (POC / Team) ── */}
+      {/* ── Unit badge (TL / Team) ── */}
       {user?.unit_name && (
         <div style={{
           padding: '10px 16px 14px',

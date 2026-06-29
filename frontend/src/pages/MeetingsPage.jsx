@@ -46,7 +46,7 @@ function shareWhatsApp(m) {
     lines.push('', '✅ ACTION POINTS');
     mins.action_points.forEach(ap => lines.push(`${ap.done ? '☑' : '☐'} ${ap.aid ?? ''}: ${ap.text ?? ap}`));
   }
-  lines.push('', '──────────────────────', 'MS - CMS Convergence — TN EMIS');
+  lines.push('', '──────────────────────', 'MS CMS — Model Schools CMS');
   window.open('https://wa.me/?text=' + encodeURIComponent(lines.join('\n')), '_blank');
 }
 

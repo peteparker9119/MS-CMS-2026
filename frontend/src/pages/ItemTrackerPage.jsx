@@ -55,7 +55,7 @@ function buildWhatsAppUrl(item) {
   const sla  = item.sla_end ? `\nSLA End: ${item.sla_end}` : '';
   const asgn = item.assigned_to_name ? `\nAssigned To: ${item.assigned_to_name}` : '';
   const msg  = [
-    `📋 *MS-CMS Item: ${item.item_id}*`,
+    `📋 *MS CMS Item: ${item.item_id}*`,
     `Type: ${t.label} | Priority: ${item.priority}`,
     `Title: ${item.title}`,
     `Raised by: ${item.raiser?.name ?? '—'} → ${tg}`,
@@ -283,8 +283,8 @@ export default function ItemTrackerPage() {
   const buildEmail = (item) => {
     const t  = typeByValue[item.type] ?? ITEM_TYPES[0];
     const tg = item.targets.map(u => u.name).join(', ');
-    const subject = encodeURIComponent(`[MS-CMS] ${item.item_id} — ${item.title}`);
-    const body    = encodeURIComponent(`TN EMIS — MS-CMS\nType: ${t.label}\nItem: ${item.item_id}\nRaised by: ${item.raiser.name}\nTo: ${tg}\n\n${item.description||''}`);
+    const subject = encodeURIComponent(`[MS CMS] ${item.item_id} — ${item.title}`);
+    const body    = encodeURIComponent(`MS CMS — Model Schools CMS\nType: ${t.label}\nItem: ${item.item_id}\nRaised by: ${item.raiser.name}\nTo: ${tg}\n\n${item.description||''}`);
     return `mailto:?subject=${subject}&body=${body}`;
   };
 

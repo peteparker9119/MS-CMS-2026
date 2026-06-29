@@ -22,7 +22,7 @@ const DEV_USERS = {
   },
   poc: {
     id: 3, username: 'dev_poc', role: 'poc',
-    first_name: 'VP', last_name: 'POC',
+    first_name: 'VP', last_name: 'TL',
     unit_slug: 'vp', unit_name: 'VETRI Palligal', unit_color: '#6366f1',
     menu_permissions: [],
   },
@@ -70,7 +70,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Switch between admin and POC in dev mode
+  // Switch between admin and TL in dev mode
   const switchDevRole = (role) => {
     localStorage.setItem('cms_dev_role', role);
     setUser(DEV_USERS[role]);

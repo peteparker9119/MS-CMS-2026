@@ -2,7 +2,7 @@
 Management command: python manage.py seed_data
 
 Creates the 7 convergence units, all 21 unit-pairs,
-one admin user, and one POC user per unit.
+one admin user, and one TL user per unit.
 """
 from itertools import combinations
 from django.core.management.base import BaseCommand
@@ -63,7 +63,7 @@ class Command(BaseCommand):
         else:
             self.stdout.write('  Admin user already exists')
 
-        # One POC per unit
+        # One TL per unit
         for slug, unit in unit_objs.items():
             username = f'poc_{slug}'
             if not User.objects.filter(username=username).exists():
@@ -74,8 +74,8 @@ class Command(BaseCommand):
                     role=User.ROLE_POC,
                     unit=unit,
                     first_name=unit.abbr,
-                    last_name='POC',
+                    last_name='TL',
                 )
-                self.stdout.write(f'  Created POC: {username} / Poc@1234')
+                self.stdout.write(f'  Created TL: {username} / Poc@1234')
 
         self.stdout.write(self.style.SUCCESS('Seed complete.'))

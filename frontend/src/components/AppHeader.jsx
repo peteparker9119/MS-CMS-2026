@@ -49,7 +49,7 @@ export default function AppHeader() {
   const userRef  = useRef(null);
 
   const initials  = user?.role === 'admin' ? 'AD' : (user?.unit_slug ?? '').slice(0, 2).toUpperCase();
-  const roleLabel = user?.role === 'admin' ? 'Admin' : `${user?.unit_slug?.toUpperCase() ?? ''} POC`;
+  const roleLabel = user?.role === 'admin' ? 'Admin' : `${user?.unit_slug?.toUpperCase() ?? ''} TL`;
   const fullName  = user?.first_name ? `${user.first_name} ${user.last_name ?? ''}`.trim() : roleLabel;
   const avatarBg  = user?.role === 'admin' ? '#1e2333' : (user?.unit_color ?? 'var(--accent)');
 
@@ -128,7 +128,7 @@ export default function AppHeader() {
           {[
             { key: 'super_admin', label: 'S.Admin' },
             { key: 'admin',       label: 'Admin'   },
-            { key: 'poc',         label: 'POC'     },
+            { key: 'poc',         label: 'TL'      },
             { key: 'team',        label: 'Team'    },
           ].map(({ key, label }) => (
             <button key={key} onClick={() => switchDevRole(key)}

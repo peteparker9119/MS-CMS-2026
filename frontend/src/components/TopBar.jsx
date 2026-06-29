@@ -19,12 +19,12 @@ export default function TopBar() {
     : (user?.unit_slug ?? '').slice(0,2).toUpperCase();
 
   const avatarBg = user?.role === 'admin' ? 'var(--ink)' : (user?.unit_color ?? 'var(--ink)');
-  const roleLabel = user?.role === 'admin' ? 'Admin' : `${user?.unit_slug?.toUpperCase() ?? ''} POC`;
+  const roleLabel = user?.role === 'admin' ? 'Admin' : `${user?.unit_slug?.toUpperCase() ?? ''} TL`;
 
   return (
     <div className="topbar">
       <div className="brand">
-        <span className="mark">MS - CMS</span>
+        <span className="mark">MS CMS</span>
         <span className="vseg">
           {navItems.map(([path, label]) => (
             <button

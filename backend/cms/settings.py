@@ -203,7 +203,7 @@ else:
 
 # ── Email ─────────────────────────────────────────────────────────────────────
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-DEFAULT_FROM_EMAIL = 'CMS Convergence <cms@tnschools.gov.in>'
+DEFAULT_FROM_EMAIL = 'MS CMS <cms@tnschools.gov.in>'
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 # EC-04: structured logging; EC-05: DB errors; EC-06: role failures

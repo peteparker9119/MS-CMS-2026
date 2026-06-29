@@ -35,12 +35,12 @@ export default function LoginPage() {
                 <span style={{ fontFamily: 'var(--fd)', fontWeight: 900, fontSize: 13, color: '#4338ca', lineHeight: 1 }}>M</span>
               </div>
             </div>
-            <span style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 18, letterSpacing: '-.01em' }}>MS - CMS</span>
+            <span style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 18, letterSpacing: '-.01em' }}>MS CMS</span>
           </div>
 
           <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 24, lineHeight: 1.28, letterSpacing: '-.02em', marginBottom: 10 }}>
-            Convergence Management<br />
-            <span style={{ color: '#c7d2fe' }}>System — TN EMIS</span>
+            Model Schools<br />
+            <span style={{ color: '#c7d2fe' }}>Convergence Management System</span>
           </div>
 
           <div style={{ fontFamily: 'var(--fm)', fontSize: 13, color: 'rgba(255,255,255,.72)', lineHeight: 1.65, marginBottom: 28 }}>

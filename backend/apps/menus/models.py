@@ -18,7 +18,7 @@ class CustomMenu(models.Model):
     ROLE_CHOICES = [
         ('all',   'All Users'),
         ('admin', 'Admin Only'),
-        ('poc',   'POC Only'),
+        ('poc',   'TL Only'),
     ]
 
     name        = models.CharField(max_length=80)
