@@ -27,6 +27,28 @@ function NotFoundPage() {
   );
 }
 
+function ComingSoonPage() {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', minHeight: '55vh', gap: 14, textAlign: 'center',
+    }}>
+      <div style={{
+        width: 72, height: 72, borderRadius: 20,
+        background: 'linear-gradient(135deg, #fef3c7, #fde68a)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 36, lineHeight: 1,
+      }}>🚧</div>
+      <div style={{ fontFamily: 'var(--fd)', fontWeight: 700, fontSize: 24, color: 'var(--ink)', letterSpacing: '-.02em' }}>
+        Coming Soon
+      </div>
+      <div style={{ fontFamily: 'var(--fm)', fontSize: 14, color: 'var(--ink3)', maxWidth: 360, lineHeight: 1.6 }}>
+        This module is under development and will be available in an upcoming release.
+      </div>
+    </div>
+  );
+}
+
 import LoginPage       from './pages/LoginPage';
 import DashboardPage   from './pages/DashboardPage';
 import PlannerPage     from './pages/PlannerPage';
@@ -78,35 +100,25 @@ function AppLayout() {
           <CContainer fluid style={{ maxWidth: 1340, padding: 'clamp(18px,3vw,30px) clamp(18px,4vw,44px) 60px' }}>
             <div key={location.pathname} className="page-enter">
               <Routes>
-                {/* All roles */}
+                {/* Active modules */}
                 <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/meetings"  element={<MeetingsPage />} />
-                <Route path="/items"     element={<ItemTrackerPage />} />
-                <Route path="/documents" element={<DocumentsPage />} />
-
-                {/* super_admin + admin only */}
                 <Route path="/planner" element={
                   <Guard roles={['super_admin','admin']}><PlannerPage /></Guard>
                 }/>
+                <Route path="/meetings"  element={<MeetingsPage />} />
                 <Route path="/minutes" element={
                   <Guard roles={['super_admin','admin']}><MinutesPage /></Guard>
                 }/>
-                <Route path="/admin-panel" element={
-                  <Guard roles={['super_admin','admin']}><AdminPage /></Guard>
-                }/>
-                <Route path="/task-board" element={
-                  <Guard roles={['super_admin','admin']}><TaskBoardPage /></Guard>
-                }/>
 
-                {/* super_admin + poc + team */}
-                <Route path="/worklog" element={
-                  <Guard roles={['super_admin','poc','team']}><WorkLogPage /></Guard>
-                }/>
-                <Route path="/reviews" element={
-                  <Guard roles={['super_admin','poc','team']}><ReviewsPage /></Guard>
-                }/>
+                {/* Coming soon */}
+                <Route path="/items"       element={<ComingSoonPage />} />
+                <Route path="/documents"   element={<ComingSoonPage />} />
+                <Route path="/worklog"     element={<ComingSoonPage />} />
+                <Route path="/reviews"     element={<ComingSoonPage />} />
+                <Route path="/task-board"  element={<ComingSoonPage />} />
+                <Route path="/admin-panel" element={<ComingSoonPage />} />
+                <Route path="/menu/:slug"  element={<ComingSoonPage />} />
 
-                <Route path="/menu/:slug" element={<CustomMenuPage />} />
                 <Route path="*"          element={<NotFoundPage />} />
               </Routes>
             </div>

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getMeetings, submitMinutes, recordNotHeld, updateMeeting } from '../api/meetings';
+import { getMeetings, submitMinutes, recordNotHeld, updateMeeting, updateActionPoint, addComment } from '../api/meetings';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../api/client';
@@ -140,9 +140,31 @@ function MiniCalendar({ calMonth, setCalMonth, byDay, selDay, setSelDay, now }) 
   );
 }
 
-/* ── Inline MoM content ────────────────────────────────── */
-function MomContent({ meeting }) {
+/* ── Inline MoM content (interactive for TL/team) ─────── */
+function MomContent({ meeting, user, isTL, isTeam, qc, toast }) {
   const mins = meeting.minutes;
+  const [commentTexts, setCommentTexts] = useState({});
+
+  const unitA = meeting.pair?.unit_a;
+  const unitB = meeting.pair?.unit_b;
+  const { data: usersA = [] } = useQuery({ queryKey:['users-by-unit', unitA?.id], queryFn:()=>getUsersByUnits([unitA.id]), enabled:!!(isTL && unitA), staleTime:5*60*1000 });
+  const { data: usersB = [] } = useQuery({ queryKey:['users-by-unit', unitB?.id], queryFn:()=>getUsersByUnits([unitB.id]), enabled:!!(isTL && unitB), staleTime:5*60*1000 });
+  const allMembers = useMemo(() => [...usersA, ...usersB], [usersA, usersB]);
+
+  const updateApMut = useMutation({
+    mutationFn: ({ id, data }) => updateActionPoint(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['meetings'] }),
+    onError: (err) => toast?.(getErrorMessage(err)),
+  });
+
+  const addCommentMut = useMutation({
+    mutationFn: ({ id, text }) => addComment(id, text),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['meetings'] });
+    },
+    onError: (err) => toast?.(getErrorMessage(err)),
+  });
+
   if (!mins) return <div style={{ fontSize: 13, color: 'var(--ink3)', fontStyle: 'italic' }}>No minutes filed yet.</div>;
   return (
     <div>
@@ -177,24 +199,108 @@ function MomContent({ meeting }) {
             const statusLabel = ap.done ? 'DONE' : isOverdue ? 'OVERDUE' : 'PENDING';
             const statusBg    = ap.done ? '#dcfce7' : isOverdue ? '#fee2e2' : '#f1f5f9';
             const statusColor = ap.done ? '#15803d' : isOverdue ? '#dc2626' : '#64748b';
+            const canAssign   = isTL;
+            const canInteract = isTL || (isTeam && ap.assigned_to === user?.id);
             return (
-              <div key={ap.id ?? i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '7px 10px', borderRadius: 8, marginBottom: 5, background: isOverdue ? '#fff8f8' : '#fafafa', border: `1px solid ${isOverdue ? '#fecaca' : 'var(--line2)'}` }}>
-                <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, color: statusColor, background: statusBg, borderRadius: 5, padding: '3px 7px', whiteSpace: 'nowrap', marginTop: 1, letterSpacing: '.03em' }}>
-                  {ap.done ? '✓' : isOverdue ? '⚠' : '○'} {statusLabel}
-                </span>
-                <span style={{ flex: 1, fontSize: 13, color: ap.done ? 'var(--ink3)' : 'var(--ink)', textDecoration: ap.done ? 'line-through' : 'none', lineHeight: 1.5 }}>{ap.text ?? ap}</span>
-                {ap.assigned_to_name && (
-                  <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--ink2)', background: '#f1f5f9', border: '1px solid var(--line)', borderRadius: 20, padding: '2px 10px', whiteSpace: 'nowrap' }}>
-                    <span style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--accent)', color: '#fff', fontSize: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      {ap.assigned_to_name.charAt(0).toUpperCase()}
+              <div key={ap.id ?? i} style={{ borderRadius: 10, marginBottom: 8, background: isOverdue ? '#fff8f8' : '#fafafa', border: `1px solid ${isOverdue ? '#fecaca' : 'var(--line2)'}`, overflow: 'hidden' }}>
+                {/* Top row — status, text, assigned, dates */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px' }}>
+                  <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, color: statusColor, background: statusBg, borderRadius: 5, padding: '3px 7px', whiteSpace: 'nowrap', marginTop: 1, letterSpacing: '.03em' }}>
+                    {ap.done ? '✓' : isOverdue ? '⚠' : '○'} {statusLabel}
+                  </span>
+                  <span style={{ flex: 1, fontSize: 13, color: ap.done ? 'var(--ink3)' : 'var(--ink)', textDecoration: ap.done ? 'line-through' : 'none', lineHeight: 1.5 }}>{ap.text ?? ap}</span>
+                  {ap.assigned_to_name && (
+                    <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--ink2)', background: '#f1f5f9', border: '1px solid var(--line)', borderRadius: 20, padding: '2px 10px', whiteSpace: 'nowrap' }}>
+                      <span style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--accent)', color: '#fff', fontSize: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {ap.assigned_to_name.charAt(0).toUpperCase()}
+                      </span>
+                      {ap.assigned_to_name}
                     </span>
-                    {ap.assigned_to_name}
-                  </span>
+                  )}
+                  {(ap.start_date || ap.deadline) && (
+                    <span style={{ flexShrink: 0, fontSize: 11, color: isOverdue ? '#dc2626' : 'var(--ink3)', whiteSpace: 'nowrap', fontWeight: isOverdue ? 700 : 500 }}>
+                      {ap.start_date ? `${ap.start_date} → ` : ''}{ap.deadline ?? ''}
+                    </span>
+                  )}
+                </div>
+
+                {/* TL controls — assign person + timeline */}
+                {canAssign && (
+                  <div style={{ padding: '8px 12px', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', borderTop: '1px dashed var(--line)' }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink3)', fontFamily: 'var(--fm)' }}>Assign</span>
+                    <select
+                      value={ap.assigned_to ?? ''}
+                      onChange={e => updateApMut.mutate({ id: ap.id, data: { assigned_to: e.target.value ? Number(e.target.value) : null } })}
+                      style={{ fontSize: 12, padding: '4px 8px', borderRadius: 8, border: '1px solid var(--line)', fontFamily: 'var(--fm)', background: '#fff', cursor: 'pointer' }}>
+                      <option value="">— Select —</option>
+                      {allMembers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </select>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink3)', fontFamily: 'var(--fm)', marginLeft: 4 }}>From</span>
+                    <DateField value={ap.start_date ?? ''} onChange={v => updateApMut.mutate({ id: ap.id, data: { start_date: v || null } })} placeholder="Start" style={{ display: 'inline-block' }} />
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink3)', fontFamily: 'var(--fm)' }}>To</span>
+                    <DateField value={ap.deadline ?? ''} onChange={v => updateApMut.mutate({ id: ap.id, data: { deadline: v || null } })} placeholder="Deadline" style={{ display: 'inline-block' }} />
+                  </div>
                 )}
-                {(ap.start_date || ap.deadline) && (
-                  <span style={{ flexShrink: 0, fontSize: 11, color: isOverdue ? '#dc2626' : 'var(--ink3)', whiteSpace: 'nowrap', fontWeight: isOverdue ? 700 : 500 }}>
-                    {ap.start_date ? `${ap.start_date} → ` : ''}{ap.deadline ?? ''}
-                  </span>
+
+                {/* Deadline history tracker */}
+                {ap.deadline_history?.length > 0 && (
+                  <div style={{ padding: '4px 12px 6px', fontSize: 11, color: 'var(--ink3)', borderTop: '1px solid var(--line2)' }}>
+                    {ap.deadline_history.map((h, j) => (
+                      <div key={j} style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 2 }}>
+                        <span style={{ fontWeight: 600 }}>{h.changed_by_name}</span>
+                        <span>changed deadline: {h.old_deadline ?? '—'} → {h.new_deadline ?? '—'}</span>
+                        <span style={{ opacity: 0.7 }}>{new Date(h.changed_at).toLocaleDateString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Comments / remarks section */}
+                {canInteract && (
+                  <div style={{ padding: '8px 12px', borderTop: '1px solid var(--line2)' }}>
+                    {ap.comments?.length > 0 && (
+                      <div style={{ marginBottom: 8 }}>
+                        {ap.comments.map(c => (
+                          <div key={c.id} style={{ fontSize: 12, color: 'var(--ink2)', marginBottom: 6, lineHeight: 1.5, padding: '4px 8px', background: '#f8fafc', borderRadius: 6 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                              <span style={{ fontWeight: 700, color: 'var(--ink)', fontSize: 12 }}>{c.created_by_name}</span>
+                              <span style={{ color: 'var(--ink3)', fontSize: 10 }}>
+                                {new Date(c.created_at).toLocaleDateString()} {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <div>{c.text}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <input
+                        value={commentTexts[ap.id] ?? ''}
+                        onChange={e => setCommentTexts(prev => ({ ...prev, [ap.id]: e.target.value }))}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            const txt = (commentTexts[ap.id] ?? '').trim();
+                            if (!txt) return;
+                            addCommentMut.mutate({ id: ap.id, text: txt });
+                            setCommentTexts(prev => ({ ...prev, [ap.id]: '' }));
+                          }
+                        }}
+                        placeholder="Add remark / action taken..."
+                        style={{ flex: 1, fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '1px solid var(--line)', fontFamily: 'var(--fm)', outline: 'none', background: '#fff' }}
+                      />
+                      <button
+                        onClick={() => {
+                          const txt = (commentTexts[ap.id] ?? '').trim();
+                          if (!txt) return;
+                          addCommentMut.mutate({ id: ap.id, text: txt });
+                          setCommentTexts(prev => ({ ...prev, [ap.id]: '' }));
+                        }}
+                        disabled={addCommentMut.isPending}
+                        style={{ fontSize: 12, fontFamily: 'var(--fb)', fontWeight: 600, padding: '6px 14px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#fff', cursor: 'pointer', flexShrink: 0 }}>
+                        Add
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             );
@@ -295,12 +401,14 @@ export default function MeetingsPage() {
   const { user } = useAuth();
   const now      = new Date();
   const isAdmin  = ['admin', 'super_admin'].includes(user?.role);
+  const isTL     = user?.role === 'poc';
+  const isTeam   = user?.role === 'team';
 
   const [calMonth,    setCalMonth]    = useState(new Date(now.getFullYear(), now.getMonth(), 1));
   const [selDay,      setSelDay]      = useState(null);
   const [tab,         setTab]         = useState('all');
   const [expanded,    setExpanded]    = useState(new Set());
-  const [monthFilter, setMonthFilter] = useState(null); // single month (1-12) or null
+  const [monthFilter, setMonthFilter] = useState(null);
 
   /* Reschedule modal state */
   const [rsOpen,    setRsOpen]    = useState(false);
@@ -314,12 +422,12 @@ export default function MeetingsPage() {
   const [momOpen,    setMomOpen]    = useState(false);
   const [momMeeting, setMomMeeting] = useState(null);
   const [momMode,    setMomMode]    = useState(null);
-  const [attendees,  setAttendees]  = useState('');
   const [summary,    setSummary]    = useState('');
   const [aps,        setAps]        = useState([{ id:null, text:'', unitId:null, userId:null, startDate:'', deadline:'' }]);
   const [nhStatus,   setNhStatus]   = useState('postponed');
   const [reason,     setReason]     = useState('');
   const [momFe,      setMomFe]      = useState({});
+  const [checkedAttendees, setCheckedAttendees] = useState(new Set());
 
   const momUnitA = momMeeting?.pair?.unit_a;
   const momUnitB = momMeeting?.pair?.unit_b;
@@ -390,25 +498,16 @@ export default function MeetingsPage() {
   const todayISO = toISO(now);
   const filtered = useMemo(() => {
     let list = [...meetings];
-
-    // Year filter — matches calendar year
     list = list.filter(m => m.date && String(new Date(m.date).getFullYear()) === calYear);
-
-    // Month filter
     if (monthFilter)
       list = list.filter(m => m.date && new Date(m.date).getMonth() + 1 === monthFilter);
-
-    // Day filter from calendar click
     if (selDay) {
       const key = toISO(selDay);
       list = list.filter(m => m.date === key);
     }
-
-    // Tab filter
     if (tab === 'upcoming')  list = list.filter(m => m.status === 'scheduled' && m.date >= todayISO);
     if (tab === 'conducted') list = list.filter(m => m.status === 'conducted');
     if (tab === 'notheld')   list = list.filter(m => m.status === 'postponed' || m.status === 'missed');
-
     return list.sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [meetings, tab, selDay, todayISO, monthFilter, calYear]);
 
@@ -426,9 +525,11 @@ export default function MeetingsPage() {
       type === 'minutes' ? submitMinutes(meetingId, data) : recordNotHeld(meetingId, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['meetings'] });
+      const wasConduct = momMode === 'conduct';
       setMomOpen(false); setMomMeeting(null); setMomMode(null);
-      setAttendees(''); setSummary(''); setAps([{ id:null,text:'',unitId:null,userId:null,startDate:'',deadline:'' }]); setReason('');
-      toast(momMode === 'conduct' ? 'Minutes filed' : 'Recorded');
+      setSummary(''); setAps([{ id:null,text:'',unitId:null,userId:null,startDate:'',deadline:'' }]); setReason('');
+      setCheckedAttendees(new Set());
+      toast(wasConduct ? 'Minutes filed' : 'Recorded');
     },
     onError: (err) => toast(getErrorMessage(err)),
   });
@@ -465,7 +566,13 @@ export default function MeetingsPage() {
       const cleanAps = aps.filter(ap=>ap.text.trim()).map(ap=>({ text:ap.text.trim(), responsible_unit:ap.unitId??null, assigned_to:ap.userId??null, start_date:ap.startDate||null, deadline:ap.deadline||null }));
       if (!summary && !cleanAps.length) { setMomFe({ summary: 'Add a summary or at least one action point' }); return; }
       setMomFe({});
-      momMutation.mutate({ meetingId: momMeeting.id, data: { attendees, summary, action_points: cleanAps, source: 'written' }, type: 'minutes' });
+      // Build attendees string from checklist
+      const allUsers = [...momUsersA, ...momUsersB];
+      const checkedNames = allUsers.filter(u => checkedAttendees.has(u.id)).map(u => u.name);
+      const attendeesStr = checkedNames.length
+        ? `${checkedNames.length} of ${allUsers.length} — ${checkedNames.join(', ')}`
+        : '';
+      momMutation.mutate({ meetingId: momMeeting.id, data: { attendees: attendeesStr, summary, action_points: cleanAps, source: 'written' }, type: 'minutes' });
     } else {
       if (!reason) { setMomFe({ reason: 'Provide a reason for not holding the meeting' }); return; }
       setMomFe({});
@@ -473,22 +580,40 @@ export default function MeetingsPage() {
     }
   };
 
+  /* Open MoM modal — directly in conduct mode (no mode selection step) */
   const openMom = (m, editExisting = false) => {
     setMomMeeting(m);
+    setMomMode('conduct');
     if (editExisting && m.minutes) {
-      setMomMode('conduct');
-      setAttendees(m.minutes.attendees ?? '');
       setSummary(m.minutes.summary ?? '');
       setAps((m.minutes.action_points ?? []).length
         ? m.minutes.action_points.map(ap=>({ id:ap.id??null, text:ap.text??'', unitId:ap.responsible_unit??null, userId:ap.assigned_to??null, startDate:ap.start_date??'', deadline:ap.deadline??'' }))
         : [{ id:null, text:'', unitId:null, userId:null, startDate:'', deadline:'' }]);
+      // Pre-check attendees if editing
+      const existingNames = (m.minutes.attendees ?? '').toLowerCase();
+      const allUsers = [...momUsersA, ...momUsersB];
+      const preChecked = new Set();
+      allUsers.forEach(u => { if (existingNames.includes(u.name.toLowerCase())) preChecked.add(u.id); });
+      setCheckedAttendees(preChecked);
     } else {
-      setMomMode(null);
-      setAttendees(''); setSummary('');
+      setSummary('');
       setAps([{ id:null, text:'', unitId:null, userId:null, startDate:'', deadline:'' }]);
+      setCheckedAttendees(new Set());
     }
-    setReason(''); setNhStatus('postponed');
+    setReason(''); setNhStatus('postponed'); setMomFe({});
     setMomOpen(true);
+  };
+
+  /* Open Not-Held modal directly */
+  const openNotHeld = (m) => {
+    setMomMeeting(m);
+    setMomMode('notheld');
+    setReason(''); setNhStatus('postponed'); setMomFe({});
+    setMomOpen(true);
+  };
+
+  const closeMomModal = () => {
+    setMomOpen(false); setMomMeeting(null); setMomMode(null);
   };
 
   /* Tab counts — scoped to current year + month selection */
@@ -695,7 +820,7 @@ export default function MeetingsPage() {
                                 </CButton>
                               )}
                             </div>
-                            <MomContent meeting={m} />
+                            <MomContent meeting={m} user={user} isTL={isTL} isTeam={isTeam} qc={qc} toast={toast} />
                           </div>
                         )}
 
@@ -707,7 +832,7 @@ export default function MeetingsPage() {
                           </div>
                         )}
 
-                        {/* Scheduled → Enter MoM + admin Reschedule */}
+                        {/* Scheduled → Enter MoM + Not Held + Reschedule */}
                         {m.status === 'scheduled' && (
                           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                             {isAdmin && (
@@ -715,6 +840,13 @@ export default function MeetingsPage() {
                                 onClick={(e) => { e.stopPropagation(); openMom(m); }}
                                 style={{ fontFamily: 'var(--fb)', fontSize: 15 }}>
                                 ✅ Enter MoM
+                              </CButton>
+                            )}
+                            {isAdmin && (
+                              <CButton size="sm" color="warning" variant="outline"
+                                onClick={(e) => { e.stopPropagation(); openNotHeld(m); }}
+                                style={{ fontFamily: 'var(--fb)', fontSize: 13 }}>
+                                ⚠ Not Held
                               </CButton>
                             )}
                             {isAdmin && (
@@ -772,40 +904,75 @@ export default function MeetingsPage() {
         </CModal>
       )}
 
-      {/* ── MoM entry modal (for scheduled meetings only) ── */}
+      {/* ── MoM / Not-Held modal ── */}
       {momMeeting && (
-        <CModal visible={momOpen} onClose={() => { setMomOpen(false); setMomMeeting(null); setMomMode(null); }} size="lg" alignment="center">
+        <CModal visible={momOpen} onClose={closeMomModal} size="lg" alignment="center">
           <CModalHeader>
             <CModalTitle style={{ fontFamily: 'var(--fd)', fontWeight: 600, fontSize: 18 }}>
-              {momMeeting.pair.unit_a.abbr} × {momMeeting.pair.unit_b.abbr} — {momMeeting.date}
-              {momMeeting.status === 'conducted' && momMeeting.minutes ? ' · Edit MoM' : ''}
+              {momMode === 'notheld'
+                ? `Record Not Held — ${momMeeting.pair.unit_a.abbr} × ${momMeeting.pair.unit_b.abbr}`
+                : `${momMeeting.pair.unit_a.abbr} × ${momMeeting.pair.unit_b.abbr} — ${momMeeting.date}${momMeeting.status === 'conducted' && momMeeting.minutes ? ' · Edit MoM' : ''}`
+              }
             </CModalTitle>
           </CModalHeader>
           <CModalBody>
-            {momMeeting.agenda && (
+            {momMeeting.agenda && momMode === 'conduct' && (
               <div style={{ fontFamily: 'var(--fm)', fontSize: 13, color: 'var(--ink2)', marginBottom: 16, padding: '10px 12px', background: 'var(--paper)', borderRadius: 8, border: '1px solid var(--line)' }}>
                 <span style={{ ...LBL, display: 'block', marginBottom: 4 }}>Agenda</span>
                 {momMeeting.agenda}
               </div>
             )}
 
-            {!momMode && (
-              <div style={{ display: 'flex', gap: 10, flexDirection: 'column' }}>
-                <CButton color="dark" onClick={() => setMomMode('conduct')} style={{ fontFamily: 'var(--fb)' }}>
-                  ✅ Mark Conducted — Enter MoM
-                </CButton>
-                <CButton color="secondary" variant="outline" onClick={() => setMomMode('notheld')} style={{ fontFamily: 'var(--fb)' }}>
-                  ⚠ Record Not Held
-                </CButton>
-              </div>
-            )}
-
             {momMode === 'conduct' && (
               <>
+                {/* Attendees checklist */}
                 <div className="mb-3">
-                  <CFormLabel style={LBL}>Attendees present</CFormLabel>
-                  <CFormInput value={attendees} onChange={e => setAttendees(e.target.value)} placeholder="e.g. 6 of 8" />
+                  <CFormLabel style={LBL}>Members present</CFormLabel>
+                  {[
+                    { label: momUnitA?.abbr, color: momUnitA?.color, users: momUsersA },
+                    { label: momUnitB?.abbr, color: momUnitB?.color, users: momUsersB },
+                  ].filter(g => g.users.length > 0).map(group => (
+                    <div key={group.label} style={{ marginBottom: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: group.color }} />
+                        <span style={{ fontSize: 12, fontWeight: 700, fontFamily: 'var(--fb)', color: 'var(--ink2)' }}>{group.label}</span>
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {group.users.map(u => {
+                          const on = checkedAttendees.has(u.id);
+                          return (
+                            <button type="button" key={u.id}
+                              onClick={() => setCheckedAttendees(prev => {
+                                const next = new Set(prev);
+                                on ? next.delete(u.id) : next.add(u.id);
+                                return next;
+                              })}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 5,
+                                padding: '5px 14px', borderRadius: 20, fontSize: 13,
+                                border: `1.5px solid ${on ? group.color : 'var(--line)'}`,
+                                background: on ? group.color : '#fff',
+                                color: on ? '#fff' : 'var(--ink)',
+                                fontFamily: 'var(--fb)', fontWeight: on ? 600 : 400,
+                                cursor: 'pointer', transition: 'all .12s',
+                              }}>
+                              {on ? '✓ ' : ''}{u.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                  {momUsersA.length === 0 && momUsersB.length === 0 && (
+                    <div style={{ fontSize: 13, color: 'var(--ink3)', fontStyle: 'italic' }}>Loading members...</div>
+                  )}
+                  {checkedAttendees.size > 0 && (
+                    <div style={{ marginTop: 6, fontSize: 12, color: 'var(--ink3)' }}>
+                      {checkedAttendees.size} of {momUsersA.length + momUsersB.length} selected
+                    </div>
+                  )}
                 </div>
+
                 <div className="mb-3">
                   <CFormLabel style={LBL}>Summary / discussion</CFormLabel>
                   <CFormTextarea value={summary}
@@ -849,14 +1016,12 @@ export default function MeetingsPage() {
               </>
             )}
           </CModalBody>
-          {(momMode === 'conduct' || momMode === 'notheld') && (
-            <CModalFooter>
-              <CButton color="secondary" variant="outline" onClick={() => setMomMode(null)} style={{ fontFamily: 'var(--fb)' }}>Back</CButton>
-              <CButton color="dark" onClick={handleMomSubmit} disabled={momMutation.isPending} style={{ fontFamily: 'var(--fb)' }}>
-                {momMutation.isPending ? <CSpinner size="sm" /> : (momMode === 'conduct' ? 'Submit MoM' : 'Record')}
-              </CButton>
-            </CModalFooter>
-          )}
+          <CModalFooter>
+            <CButton color="secondary" variant="outline" onClick={closeMomModal} style={{ fontFamily: 'var(--fb)' }}>Cancel</CButton>
+            <CButton color="dark" onClick={handleMomSubmit} disabled={momMutation.isPending} style={{ fontFamily: 'var(--fb)' }}>
+              {momMutation.isPending ? <CSpinner size="sm" /> : (momMode === 'conduct' ? 'Submit MoM' : 'Record')}
+            </CButton>
+          </CModalFooter>
         </CModal>
       )}
     </>

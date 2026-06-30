@@ -26,6 +26,7 @@ const Icon = ({ name, active }) => {
 };
 
 // Access matrix — which roles see each menu item
+const ACTIVE_PATHS = new Set(['dashboard', 'planner', 'meetings']);
 const NAV_ITEMS = [
   { path: 'dashboard',   label: 'Dashboard',      icon: 'dashboard', roles: ['super_admin','admin','poc','team'] },
   { path: 'planner',     label: 'Planner',        icon: 'planner',   roles: ['super_admin','admin'] },
@@ -62,6 +63,7 @@ export default function AppSidebar() {
 
   const NavBtn = ({ path, label, icon }) => {
     const isActive = cur === path || cur.startsWith(path + '/');
+    const comingSoon = !ACTIVE_PATHS.has(path);
     return (
       <button
         onClick={() => navigate(`/${path}`)}
@@ -73,6 +75,7 @@ export default function AppSidebar() {
           borderLeft: `3px solid ${isActive ? '#818cf8' : 'transparent'}`,
           borderRadius: '0 8px 8px 0',
           transition: 'background .13s',
+          opacity: comingSoon ? 0.5 : 1,
         }}
         onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,.06)'; }}
         onMouseLeave={e => { e.currentTarget.style.background = isActive ? 'rgba(99,102,241,.18)' : 'transparent'; }}
@@ -82,10 +85,18 @@ export default function AppSidebar() {
           fontFamily: 'var(--fb)', fontSize: 13,
           fontWeight: isActive ? 600 : 400,
           color: isActive ? '#fff' : 'rgba(255,255,255,.72)',
-          whiteSpace: 'nowrap',
+          whiteSpace: 'nowrap', flex: 1,
         }}>
           {label}
         </span>
+        {comingSoon && (
+          <span style={{
+            fontSize: 8, fontFamily: 'var(--fm)', fontWeight: 700,
+            color: '#fbbf24', background: 'rgba(251,191,36,.15)',
+            padding: '2px 6px', borderRadius: 4,
+            letterSpacing: '.04em', textTransform: 'uppercase', whiteSpace: 'nowrap',
+          }}>Soon</span>
+        )}
       </button>
     );
   };
