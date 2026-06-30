@@ -5,7 +5,7 @@ import { getMe } from '../api/auth';
 const AuthContext = createContext(null);
 
 // ── Dev mode mock users ───────────────────────────────────────────────────────
-const IS_DEV = import.meta.env.DEV;
+const IS_DEV = import.meta.env.DEV || import.meta.env.VITE_DEMO_MODE === 'true';
 
 const DEV_USERS = {
   super_admin: {
