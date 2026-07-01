@@ -40,4 +40,23 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
         n.response  = resp
         n.read      = True
         n.save(update_fields=['responded', 'response', 'read'])
+
+        # Notify admins about the RSVP response
+        if n.action_type == 'rsvp' and resp in ('accept', 'decline'):
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            user_name = request.user.get_full_name() or request.user.username
+            emoji = '✅' if resp == 'accept' else '❌'
+            units = n.action_data.get('units', '')
+            date  = n.action_data.get('date', '')
+            admins = User.objects.filter(role__in=['admin', 'super_admin'])
+            for admin in admins:
+                Notification.objects.create(
+                    user=admin,
+                    title=f'{emoji} {user_name} {resp}ed meeting',
+                    message=f'{user_name} has {resp}ed the meeting {units} on {date}.',
+                    notif_type='meeting_scheduled',
+                    object_id=n.object_id,
+                )
+
         return Response(NotificationSerializer(n).data)
